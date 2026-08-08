@@ -47,6 +47,16 @@ const C_MAX = 0.19;
 const CHROMA_FLOOR = 0.04;
 
 /**
+ * Contrast headroom requested above the nominal WCAG threshold.
+ *
+ * `formatOklch` rounds L to four places and H to two so the emitted CSS stays
+ * readable, and that rounding can move the ratio by a few thousandths. Solving
+ * for exactly 4.5 therefore ships values that measure 4.499. Solving for
+ * 4.5 + margin means the rounded value is still above the line.
+ */
+const CONTRAST_MARGIN = 0.05;
+
+/**
  * Pick the hue to build the issue around: the most chromatic token in the
  * document, preferring ones the brand labelled accent/primary when chroma ties.
  */
@@ -122,8 +132,10 @@ export function deriveIssueTheme(
 
   // The sweep guarantees these already pass, but a brand can seed an unusual
   // hue/chroma pair — enforce the floor rather than trusting the constants.
-  const safeLight = ensureContrast(accentLight, PAPER.light, WCAG.AA_TEXT);
-  const safeDark = ensureContrast(accentDark, PAPER.dark, WCAG.AA_TEXT);
+  const AA = WCAG.AA_TEXT + CONTRAST_MARGIN;
+  const AAA = WCAG.AAA_TEXT + CONTRAST_MARGIN;
+  const safeLight = ensureContrast(accentLight, PAPER.light, AA);
+  const safeDark = ensureContrast(accentDark, PAPER.dark, AA);
 
   return {
     owner,
@@ -131,17 +143,13 @@ export function deriveIssueTheme(
     chroma: Math.round(chroma * 1000) / 1000,
     accentLight: formatOklch(safeLight),
     accentDark: formatOklch(safeDark),
-    accentForegroundLight: formatOklch(
-      ensureContrast(PAPER.lightHc, safeLight, WCAG.AA_TEXT),
-    ),
-    accentForegroundDark: formatOklch(
-      ensureContrast(PAPER.darkHc, safeDark, WCAG.AA_TEXT),
-    ),
+    accentForegroundLight: formatOklch(ensureContrast(PAPER.lightHc, safeLight, AA)),
+    accentForegroundDark: formatOklch(ensureContrast(PAPER.darkHc, safeDark, AA)),
     accentLightHc: formatOklch(
-      ensureContrast(toneAt(hue, chroma, L_LIGHT), PAPER.lightHc, WCAG.AAA_TEXT),
+      ensureContrast(toneAt(hue, chroma, L_LIGHT), PAPER.lightHc, AAA),
     ),
     accentDarkHc: formatOklch(
-      ensureContrast(toneAt(hue, chroma, L_DARK), PAPER.darkHc, WCAG.AAA_TEXT),
+      ensureContrast(toneAt(hue, chroma, L_DARK), PAPER.darkHc, AAA),
     ),
     ink: inkFrom(colors),
     chartLight: chartSeries(hue, chroma, L_LIGHT),

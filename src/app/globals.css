@@ -2,6 +2,15 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* ── Owned partials. WS-0 owns this file and these import lines; every other
+   workstream edits its own partial and never touches globals.css. ────── */
+@import "../styles/tokens.css";
+@import "../styles/theme-modes.css";
+@import "../styles/reader.css";
+@import "../styles/prose.css";
+@import "../styles/code.css";
+@import "../styles/chart.css";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -126,5 +135,37 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer base {
+  /* A visible focus ring is not optional; the width is a contrast token so
+     high-contrast mode can thicken it. */
+  :focus-visible {
+    outline: var(--focus-ring-width) solid var(--ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  ::selection {
+    background-color: var(--selection-bg);
+    color: var(--selection-fg);
+  }
+
+  /* Next 16 removed automatic smooth scrolling; opt in, but never against
+     an explicit reduced-motion preference. */
+  @media (prefers-reduced-motion: no-preference) {
+    html[data-scroll-behavior="smooth"] {
+      scroll-behavior: smooth;
+    }
+  }
+
+  /* Anchored headings must not land under the sticky header. */
+  :target {
+    scroll-margin-top: calc(var(--header-h) + 1.5rem);
+  }
+
+  body {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
 }

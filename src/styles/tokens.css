@@ -1,0 +1,216 @@
+/**
+ * tokens.css — owner: WS-0
+ *
+ * The only file in the app permitted to contain a raw colour literal.
+ *
+ * Theming is three independent axes, not a list of themes:
+ *
+ *   A. colour scheme  `.dark` on <html>        → the chrome (shadcn/stone)
+ *   B. paper mode     `data-paper` on <html>   → the reading surface only
+ *   C. contrast       `data-contrast` on <html>→ amplifies both
+ *
+ * Keeping the chrome constant across issues is what makes twenty different
+ * skills repos still read as one publication. Per-issue branding
+ * (`[data-issue]`) may only touch the `--issue-*` group, `--radius`, and
+ * `--font-display`; it must never reach `--paper`, `--ink`, or a stone token.
+ *
+ * Every ink/paper pair below is verified by `scripts/audit-contrast.mts`,
+ * which fails the build on regression. Do not hand-edit a value without
+ * re-running `pnpm verify:contrast`.
+ */
+
+@theme inline {
+  /* Reading surface */
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-strong: var(--ink-strong);
+  --color-ink-muted: var(--ink-muted);
+  --color-rule: var(--rule);
+
+  /* Per-issue branding */
+  --color-issue-accent: var(--issue-accent);
+  --color-issue-accent-foreground: var(--issue-accent-foreground);
+  --color-issue-ink: var(--issue-ink);
+
+  /* Reader typography */
+  --font-reader: var(--reader-font-family);
+  --font-reader-code: var(--reader-code-family);
+  --font-display: var(--display-font-family);
+}
+
+/* ══════════════════════════════════════════════ B. Paper — light schemes */
+
+:root,
+[data-paper="paper"] {
+  /* Warm off-white: book stock, not a lightbox. */
+  --paper: oklch(0.985 0.0035 85);
+  --paper-raised: oklch(0.965 0.005 85);
+  --ink: oklch(0.235 0.008 60);
+  --ink-strong: oklch(0.155 0.009 55);
+  --ink-muted: oklch(0.48 0.011 62);
+  --rule: oklch(0.815 0.007 80);
+  --selection-bg: oklch(0.9 0.055 95);
+  --selection-fg: oklch(0.2 0.01 60);
+}
+
+[data-paper="sepia"] {
+  --paper: oklch(0.949 0.023 82);
+  --paper-raised: oklch(0.925 0.028 80);
+  --ink: oklch(0.28 0.026 55);
+  --ink-strong: oklch(0.2 0.03 50);
+  --ink-muted: oklch(0.475 0.03 58);
+  --rule: oklch(0.785 0.032 78);
+  --selection-bg: oklch(0.875 0.06 70);
+  --selection-fg: oklch(0.24 0.03 52);
+}
+
+/* Maximum-legibility neutral: no warmth, no tint, highest achievable ink. */
+[data-paper="eink"] {
+  --paper: oklch(0.975 0 0);
+  --paper-raised: oklch(0.945 0 0);
+  --ink: oklch(0.185 0 0);
+  --ink-strong: oklch(0.1 0 0);
+  --ink-muted: oklch(0.44 0 0);
+  --rule: oklch(0.805 0 0);
+  --selection-bg: oklch(0.86 0 0);
+  --selection-fg: oklch(0.14 0 0);
+}
+
+/* ═══════════════════════════════════════════════ B. Paper — dark schemes */
+
+.dark,
+.dark [data-paper="night"],
+[data-paper="night"] {
+  /* Stone-tinted, low-glare. Never pure black: halation on OLED makes
+     white-on-black body text visibly vibrate at reading sizes. */
+  --paper: oklch(0.171 0.0045 60);
+  --paper-raised: oklch(0.213 0.005 58);
+  --ink: oklch(0.895 0.004 80);
+  --ink-strong: oklch(0.965 0.003 85);
+  --ink-muted: oklch(0.68 0.008 70);
+  --rule: oklch(0.36 0.007 60);
+  --selection-bg: oklch(0.36 0.045 250);
+  --selection-fg: oklch(0.97 0.003 85);
+}
+
+.dark [data-paper="midnight"],
+[data-paper="midnight"] {
+  --paper: oklch(0.135 0.0085 265);
+  --paper-raised: oklch(0.178 0.011 265);
+  --ink: oklch(0.875 0.008 260);
+  --ink-strong: oklch(0.955 0.006 260);
+  --ink-muted: oklch(0.655 0.014 260);
+  --rule: oklch(0.345 0.015 265);
+  --selection-bg: oklch(0.36 0.06 265);
+  --selection-fg: oklch(0.96 0.005 260);
+}
+
+.dark [data-paper="slate"],
+[data-paper="slate"] {
+  --paper: oklch(0.212 0.0055 250);
+  --paper-raised: oklch(0.256 0.007 250);
+  --ink: oklch(0.905 0.005 250);
+  --ink-strong: oklch(0.972 0.003 250);
+  --ink-muted: oklch(0.695 0.01 250);
+  --rule: oklch(0.395 0.009 250);
+  --selection-bg: oklch(0.39 0.05 250);
+  --selection-fg: oklch(0.975 0.003 250);
+}
+
+/* ═══════════════════════════════════════════ C. Contrast — high */
+
+[data-contrast="high"] {
+  --paper: oklch(1 0 0);
+  --paper-raised: oklch(0.965 0 0);
+  --ink: oklch(0.06 0 0);
+  --ink-strong: oklch(0 0 0);
+  --ink-muted: oklch(0.3 0 0);
+  --rule: oklch(0.42 0 0);
+  --selection-bg: oklch(0.85 0 0);
+  --selection-fg: oklch(0 0 0);
+
+  --border: oklch(0.42 0 0);
+  --muted-foreground: oklch(0.3 0 0);
+  --focus-ring-width: 3px;
+}
+
+[data-contrast="high"].dark,
+.dark [data-contrast="high"] {
+  --paper: oklch(0.09 0 0);
+  --paper-raised: oklch(0.16 0 0);
+  --ink: oklch(0.98 0 0);
+  --ink-strong: oklch(1 0 0);
+  --ink-muted: oklch(0.8 0 0);
+  --rule: oklch(0.62 0 0);
+  --selection-bg: oklch(0.3 0 0);
+  --selection-fg: oklch(1 0 0);
+
+  --border: oklch(0.62 0 0);
+  --muted-foreground: oklch(0.8 0 0);
+}
+
+/* ══════════════════════════════════ Per-issue branding (safe defaults) */
+
+:root {
+  --issue-hue: 60;
+  --issue-chroma: 0.12;
+  /* Neutral until a design.md resolves; every issue overrides these. */
+  --issue-accent: oklch(0.52 0.12 60);
+  --issue-accent-foreground: oklch(0.99 0 0);
+  --issue-ink: var(--ink-strong);
+  --issue-chart-1: oklch(0.52 0.12 60);
+  --issue-chart-2: oklch(0.57 0.09 228);
+  --issue-chart-3: oklch(0.62 0.12 122);
+  --issue-chart-4: oklch(0.52 0.09 310);
+  --issue-chart-5: oklch(0.57 0.12 175);
+}
+
+.dark {
+  --issue-accent: oklch(0.7 0.12 60);
+  --issue-accent-foreground: oklch(0.14 0 0);
+}
+
+/* ═════════════════════════════════════════ D. Reader typography inputs */
+
+:root {
+  /* Written live by the controls panel; SSR'd from the reader-prefs cookie. */
+  --reader-size-step: 19px;
+  --reader-measure-cpl: 68;
+  --reader-lh-manual: 1.6;
+  --reader-tracking: -0.003em;
+  --reader-word-spacing: 0em;
+  --reader-para-gap: 0.9em;
+  --reader-para-indent: 0em;
+  --reader-align: left;
+  --reader-weight: 400;
+  --reader-code-offset: -1;
+
+  --reader-font-family: var(--font-literata), Georgia, "Times New Roman", serif;
+  --reader-code-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --display-font-family: var(--font-literata), Georgia, serif;
+
+  /* E. Per-family metrics — overridden by [data-reader-font]. */
+  --font-avg-char: 0.4795; /* Literata */
+  --font-size-mult: 1;
+  --font-x-height: 0.48;
+  --font-caps: "smcp" 1, "onum" 1;
+
+  /* F. Derived. Never set these directly.
+     `1ch` is the width of a zero, not of an average character, and that ratio
+     swings from 0.84 to 1.47 across our families — so measure is expressed in
+     characters-per-line and converted per family. */
+  --reader-font-size: calc(var(--reader-size-step) * var(--font-size-mult));
+  --reader-lh-auto: calc(0.49rem + 1.186 * var(--reader-font-size));
+  --reader-measure: calc(var(--reader-measure-cpl) * var(--font-avg-char) * 1em);
+  --reader-bleed: calc(var(--reader-measure) * 1.18);
+
+  /* G. Chrome and motion. */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --header-h: 3.5rem;
+  --rail-w: 17.5rem;
+  --rail-w-right: 16.25rem;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}

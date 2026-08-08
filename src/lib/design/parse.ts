@@ -409,11 +409,11 @@ export function parseDesignMarkdown(source: string, sourceUrl: string): DesignMa
     if (node.type === "table") {
       const rows = node.children;
       if (rows.length < 2) return;
-      const header = rows[0].children.map((c) => textOf(c).toLowerCase());
-      const isFontTable = header.some((h) => /\b(font|family|typeface)\b/.test(h));
+      const header = rows[0].children.map((c: RootContent) => textOf(c).toLowerCase());
+      const isFontTable = header.some((h: string) => /\b(font|family|typeface)\b/.test(h));
 
       for (const row of rows.slice(1)) {
-        const cells = row.children.map((c) => textOf(c).trim());
+        const cells = row.children.map((c: RootContent) => textOf(c).trim());
         if (cells.length === 0) continue;
         const label = cells[0].replace(/[*`]/g, "");
         const usage = cells.length > 1 ? cells.at(-1)! : null;

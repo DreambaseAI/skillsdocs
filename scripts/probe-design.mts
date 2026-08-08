@@ -31,9 +31,10 @@ const D = (s: string) => `\x1b[2m${s}\x1b[0m`;
 
 let failures = 0;
 
-const targets: Array<readonly [string, string | null]> = process.argv.slice(2).length
-  ? process.argv.slice(2).map((o) => [o, null] as const)
-  : SAMPLE;
+const targets: ReadonlyArray<readonly [string, string | null]> =
+  process.argv.slice(2).length
+    ? process.argv.slice(2).map((o) => [o, null] as const)
+    : SAMPLE;
 
 console.log(
   `\n${pad("owner", 22)}${pad("origin", 12)}${pad("format", 12)}${pad("colors", 7)}${pad("hue", 7)}${pad("light", 8)}${pad("dark", 8)}fonts`,

@@ -1245,3 +1245,18 @@ Featured grid from `SEED_REPOS` merged with the live leaderboard; `weeklyInstall
 | 19 | Install command | **`npx skills add <owner>/<repo>` only.** | The per-skill form is unverified; only the repo form is observed in the wild. |
 | 20 | `SkillResource` vs `SkillFile` | **Keep `SkillResource`; add `SkillFile` as an alias; new code uses `SkillFile`.** | The shipped name wins; the alias avoids a pointless rename. |
 | 21 | Bionic Reading | **Deferred to P4, self-implemented, named "Fixation emphasis", default off, CI grep bans the word.** | Patent + trademark + commercial-use prohibition, and weak efficacy evidence. |
+
+---
+
+# 11. WS-0 addendum — decisions resolved during implementation
+
+| # | Item | Resolution |
+|---|---|---|
+| R8 | `RouteContext<'/route'>` was unverified | **Confirmed present.** `.next/types/routes.d.ts` declares `PageProps`, `LayoutProps`, and `RouteContext` globally after the first build. Use them; do not hand-write params types. |
+| — | Reader prefs via `cookies()` in the root layout | **Reversed.** `cookies()` in the root layout opts *every* route out of prerendering under `cacheComponents`, and makes the HTML vary per reader, forfeiting CDN caching. Replaced with `ReaderPrefsScript` — a blocking inline script in `<head>` generated from the same constants as the codec. Still no flash (it runs before first paint); the HTML stays static and identical for everyone. Cost: readers with JS disabled get the defaults, which are a good reading experience. |
+| — | `next/font` argument form | Every option must be an inline literal. `subsets: [...latin]` fails the build with "Unexpected spread". No variables, no spreads, no computed values. |
+| — | TypeScript target | Raised `ES2017` → `ES2022`. Named capture groups in the design.md parser require ES2018+. |
+| — | `@types/mdast`, `@types/hast`, `@types/unist` | Required as devDependencies; the unified ecosystem ships its types separately. |
+| — | Contrast serialization margin | `formatOklch` rounds L to 4dp and H to 2dp, which can move a ratio by a few thousandths and land a "solved for exactly 7.0" accent at 6.998. `deriveIssueTheme` now solves for `target + 0.05`. Caught by `pnpm verify:contrast`. |
+| — | Atkinson Hyperlegible Next/Mono | `next/font` has no fallback-metric override data for these two, so it skips fallback generation and emits a build warning. Accepted — they are opt-in accessibility faces, not the default. |
+| — | Hairline rules vs WCAG 1.4.11 | Decorative separators are not "graphical objects required to understand content", so 3:1 does not bind. The audit holds them to an editorial 1.7:1 as an advisory check. |
