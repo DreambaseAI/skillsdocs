@@ -3,12 +3,18 @@
  *
  *   pnpm probe                    # default sample
  *   pnpm probe owner/repo ...     # specific repos
+ *   pnpm probe --seeds            # re-verify every entry in SEED_REPOS
  *
- * Uses `gh api` when available (5000 req/hr) and falls back to anonymous.
+ * Uses `gh api` (5000 req/hr; requires `gh auth login`).
+ *
+ * `--seeds` is the drift check for `src/lib/data/seed-repos.ts`: it compares
+ * the recorded branch, license, star count and skillCount against live GitHub
+ * and prints only what moved. Run it before a release and patch the catalog.
  */
 
 import { execFileSync } from "node:child_process";
 import { collectResources, discoverSkills, parseSkill } from "../src/lib/skills";
+import { SEED_REPOS } from "../src/lib/data/seed-repos";
 import type { TreeEntry } from "../src/lib/github";
 
 const DEFAULT_SAMPLE = [
@@ -93,15 +99,70 @@ async function probe(full: string) {
   return { full, count: skills.length, issues: withIssues.length };
 }
 
-const targets = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_SAMPLE;
-const results = [];
-for (const t of targets) {
-  try {
-    results.push(await probe(t));
-  } catch (err) {
-    console.log(`\n\x1b[31m${t}  FAILED: ${(err as Error).message.split("\n")[0]}\x1b[0m`);
+/** Compare every seed entry against live GitHub and report only the drift. */
+async function verifySeeds() {
+  let drifted = 0;
+  let failed = 0;
+
+  for (const seed of SEED_REPOS) {
+    const full = `${seed.owner}/${seed.repo}`;
+    try {
+      const meta = gh<{
+        name: string;
+        default_branch: string;
+        stargazers_count: number;
+        license: { spdx_id: string } | null;
+      }>(`repos/${full}`);
+      const tree = gh<{ tree: TreeEntry[] }>(
+        `repos/${full}/git/trees/${meta.default_branch}?recursive=1`,
+      );
+      const count = discoverSkills(tree.tree, meta.name).length;
+      const license = meta.license?.spdx_id ?? null;
+
+      const drift: string[] = [];
+      if (meta.default_branch !== seed.branch) {
+        drift.push(`branch ${seed.branch} → ${meta.default_branch}`);
+      }
+      if (license !== seed.license) drift.push(`license ${seed.license} → ${license}`);
+      if (count !== seed.skillCount) drift.push(`skills ${seed.skillCount} → ${count}`);
+      // Stars move constantly; only flag a move big enough to be worth editing.
+      if (Math.abs(meta.stargazers_count - seed.stars) > Math.max(50, seed.stars * 0.05)) {
+        drift.push(`stars ${seed.stars} → ${meta.stargazers_count}`);
+      }
+      if (count === 0) drift.push("NO SKILLS — remove from the catalog");
+
+      if (drift.length) {
+        drifted++;
+        console.log(`\x1b[33mDRIFT\x1b[0m ${full.padEnd(38)} ${drift.join("  |  ")}`);
+      }
+    } catch (err) {
+      failed++;
+      console.log(
+        `\x1b[31mFAIL \x1b[0m ${full.padEnd(38)} ${(err as Error).message.split("\n")[0]}`,
+      );
+    }
   }
+
+  console.log(
+    `\n\x1b[1m${SEED_REPOS.length} seeds checked:\x1b[0m ${SEED_REPOS.length - drifted - failed} clean, ${drifted} drifted, ${failed} unreachable`,
+  );
+  if (failed) process.exitCode = 1;
 }
-console.log(
-  `\n\x1b[1mTotal:\x1b[0m ${results.reduce((n, r) => n + r.count, 0)} skills across ${results.length}/${targets.length} repos`,
-);
+
+const args = process.argv.slice(2);
+if (args.includes("--seeds")) {
+  await verifySeeds();
+} else {
+  const targets = args.length ? args : DEFAULT_SAMPLE;
+  const results = [];
+  for (const t of targets) {
+    try {
+      results.push(await probe(t));
+    } catch (err) {
+      console.log(`\n\x1b[31m${t}  FAILED: ${(err as Error).message.split("\n")[0]}\x1b[0m`);
+    }
+  }
+  console.log(
+    `\n\x1b[1mTotal:\x1b[0m ${results.reduce((n, r) => n + r.count, 0)} skills across ${results.length}/${targets.length} repos`,
+  );
+}

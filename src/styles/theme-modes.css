@@ -1,7 +1,526 @@
 /**
  * theme-modes.css — owner: WS-3
  *
- * forced-colors, prefers-contrast, reduced-transparency and motion resets.
+ * The user-preference layer: forced colors, prefers-contrast,
+ * prefers-reduced-transparency, motion, and print.
+ *
+ * Theming is three orthogonal axes (ARCHITECTURE §4.1) and their *values* live
+ * in `tokens.css`. This file owns what happens when the operating system, the
+ * browser, or the reader overrides those values — which is where a design like
+ * ours actually breaks.
+ *
+ * The single highest-risk accessibility bug in this product's design direction
+ * is here: **base-luma popovers are translucent.** Every popup surface is
+ * `bg-popover/70` with a `::before` carrying `backdrop-blur-2xl`. In Windows
+ * High Contrast Mode `backdrop-filter` is ignored and the semi-transparent
+ * background is replaced by the forced palette, so a menu renders as arbitrary
+ * page content showing through arbitrary text. The `forced-colors` block below
+ * is not a nicety; without it the reading controls are unusable for the exact
+ * population that most needs them.
  *
  * Imported by globals.css. Do not edit globals.css to add rules here.
+ *
+ * Selector contract for the other workstreams:
+ *   .translucent-surface   any blurred/see-through panel you author
+ *   .paper-texture         decorative grain on the reading surface
+ *   .decorative-gradient   any purely ornamental gradient or glow
+ *   [data-print="hide"]    chrome that must not appear on paper
+ *   [data-print="keep"]    an element inside hidden chrome that must survive
+ *   [data-chart]           a canvas/SVG chart root needing an HCM fallback
  */
+
+/* ═══════════════════════════════════════════ Paper mode × colour scheme
+ *
+ * A light paper under the dark scheme is incoherent, so the axes pair: the
+ * `.dark` block in tokens.css is authored after the light paper modes and at
+ * equal specificity, which makes it win — `sepia` in dark mode resolves to
+ * `night`. `PaperPicker` only ever offers modes valid for the current scheme,
+ * so this is a backstop, not the mechanism.
+ *
+ * `color-scheme` is set here rather than in tokens.css because it governs UA
+ * widgets (scrollbars, form controls, the canvas behind an over-scroll), which
+ * is preference behaviour rather than a token value.
+ */
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+/* ═════════════════════════════════════════════════ Forced colors (Windows HCM)
+ *
+ * In this mode the UA replaces author colours with a small system palette:
+ * Canvas, CanvasText, LinkText, VisitedText, ButtonFace, ButtonText,
+ * ButtonBorder, Highlight, HighlightText, GrayText, Field, FieldText.
+ * `background-image`, `box-shadow` and `backdrop-filter` are all dropped, so
+ * anything whose legibility depends on them must be rebuilt from that palette.
+ */
+
+@media (forced-colors: active) {
+  /* Let the UA force colours everywhere by default; opt out only where an
+     element carries meaning in colour and we substitute another cue. */
+  :root {
+    forced-color-adjust: auto;
+  }
+
+  /* --- Popups and sheets: opaque, bordered, unblurred ------------------- */
+
+  .translucent-surface,
+  [data-slot="popover-content"],
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="drawer-popup"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="select-content"],
+  [data-slot="hover-card-content"],
+  [data-slot="command"],
+  [data-slot="command-list"] {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  /* base-luma paints the blur on a ::before pseudo-element, which survives the
+     rule above and would otherwise sit as a transparent sheet over the popup. */
+  .translucent-surface::before,
+  [data-slot="popover-content"]::before,
+  [data-slot="dropdown-menu-content"]::before,
+  [data-slot="dropdown-menu-sub-content"]::before,
+  [data-slot="select-content"]::before,
+  [data-slot="hover-card-content"]::before,
+  [data-slot="drawer-popup"]::before {
+    display: none;
+  }
+
+  /* A tooltip is inverted (bg-foreground / text-background) and collapses to
+     an invisible block once colours are forced. */
+  [data-slot="tooltip-content"] {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+
+  /* Scrims stop being scrims. Keep them out of the way rather than letting
+     them paint an opaque Canvas sheet over the dialog they sit behind. */
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"],
+  [data-slot="drawer-overlay"] {
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  /* --- Controls -------------------------------------------------------- */
+
+  button,
+  [role="button"],
+  [data-slot="button"],
+  [data-slot="toggle"],
+  [data-slot="toggle-group-item"],
+  [data-slot="select-trigger"] {
+    border: 1px solid ButtonBorder;
+  }
+
+  /* Selected state is conveyed only by colour in the default styling, and
+     forced colours would flatten it away. Highlight/HighlightText is the
+     system's own selection pair, so opting out here is safe and required. */
+  [aria-current="page"],
+  [aria-selected="true"],
+  [data-selected],
+  [data-checked],
+  [data-state="on"],
+  [data-highlighted] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  /* Disabled controls must still read as disabled. */
+  :disabled,
+  [aria-disabled="true"] {
+    color: GrayText;
+  }
+
+  /* --- Editorial furniture --------------------------------------------- */
+
+  .decorative-gradient,
+  .paper-texture {
+    display: none;
+  }
+
+  /* Hairlines drawn with a background colour vanish; redraw as borders. */
+  [data-slot="separator"],
+  hr {
+    background: CanvasText;
+    border-color: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  /* The issue accent is gone in this mode, so links need their own shape. */
+  a {
+    text-decoration: underline;
+  }
+
+  /* --- Focus ------------------------------------------------------------ */
+
+  :focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* --- Charts -----------------------------------------------------------
+   * SVG `fill` and `stroke` are NOT forced, so a multi-series chart either
+   * keeps invisible colours or collapses into indistinguishable shapes.
+   * Opt the chart root out entirely and re-encode in CanvasText, leaving
+   * series differentiation to the dash patterns WS-7 emits. Canvas-painted
+   * charts cannot be recoloured at all — their sr-only data table is the
+   * accessible path, and `AccessibleChart` always renders one. */
+  [data-chart],
+  [data-chart] * {
+    forced-color-adjust: none;
+  }
+
+  [data-chart] {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+
+  [data-chart] :is(path, line, rect, circle, polyline, polygon)[stroke] {
+    stroke: CanvasText;
+  }
+
+  [data-chart] text {
+    fill: CanvasText;
+  }
+
+  /* Canvas cannot be re-encoded; the figure's data table carries the meaning. */
+  [data-chart] canvas {
+    opacity: 0.999;
+  }
+}
+
+/* ══════════════════════════════════════════════════ prefers-contrast: more
+ *
+ * A user asking for more contrast is asking for fewer soft signals. Mute
+ * greys collapse into the body ink, rules and rings thicken, and every
+ * translucent surface becomes opaque so text never competes with what is
+ * behind it. `data-contrast="high"` (the in-app control) is handled in
+ * tokens.css; this is the same intent arriving from the OS.
+ */
+
+@media (prefers-contrast: more) {
+  :root {
+    --ink-muted: var(--ink);
+    --focus-ring-width: 3px;
+  }
+
+  .translucent-surface,
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="select-content"],
+  [data-slot="hover-card-content"],
+  [data-slot="drawer-popup"] {
+    background-color: var(--popover);
+    backdrop-filter: none;
+  }
+
+  .translucent-surface::before,
+  [data-slot="popover-content"]::before,
+  [data-slot="dropdown-menu-content"]::before,
+  [data-slot="dropdown-menu-sub-content"]::before,
+  [data-slot="select-content"]::before,
+  [data-slot="hover-card-content"]::before,
+  [data-slot="drawer-popup"]::before {
+    display: none;
+  }
+
+  /* Colour alone must not distinguish a link from its surroundings — and that
+     applies to the chrome as much as to the prose, so this is not scoped to
+     `.reader`. Anything rendered as a button opts out by carrying the slot. */
+  a:not([data-slot="button"], [data-no-underline]) {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  [data-slot="separator"],
+  hr {
+    opacity: 1;
+  }
+
+  .paper-texture,
+  .decorative-gradient {
+    display: none;
+  }
+}
+
+/* ══════════════════════════════════════ prefers-reduced-transparency: reduce
+ *
+ * Distinct from `prefers-contrast`: a reader can be perfectly happy with our
+ * contrast and still find a blurred surface over moving text nauseating or
+ * illegible. Replace the blur with the solid token, keep everything else.
+ */
+
+@media (prefers-reduced-transparency: reduce) {
+  .translucent-surface,
+  [data-slot="popover-content"],
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="drawer-popup"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="select-content"],
+  [data-slot="hover-card-content"],
+  [data-slot="command"] {
+    background-color: var(--popover);
+    backdrop-filter: none;
+  }
+
+  .translucent-surface::before,
+  [data-slot="popover-content"]::before,
+  [data-slot="dropdown-menu-content"]::before,
+  [data-slot="dropdown-menu-sub-content"]::before,
+  [data-slot="select-content"]::before,
+  [data-slot="hover-card-content"]::before,
+  [data-slot="drawer-popup"]::before {
+    display: none;
+  }
+
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"],
+  [data-slot="drawer-overlay"] {
+    backdrop-filter: none;
+  }
+
+  .paper-texture {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════ Motion
+ *
+ * Tri-state, per WCAG 2.3.3 and control #13: System | Force | Allow.
+ *
+ * The system preference is honoured unless the reader has explicitly asked for
+ * motion back — hence `:root:not([data-motion="allow"])` rather than a bare
+ * media query. `[data-motion="reduce"]` forces the same treatment on a machine
+ * with no OS preference set.
+ *
+ * Durations go to 0.01ms rather than 0 so `transitionend` and `animationend`
+ * still fire: Base UI's exit animations wait for them, and a popup that never
+ * finishes closing is worse than one that animates.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="allow"]) *,
+  :root:not([data-motion="allow"]) *::before,
+  :root:not([data-motion="allow"]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  :root:not([data-motion="allow"]) {
+    scroll-behavior: auto !important;
+  }
+
+  :root:not([data-motion="allow"]) .motion-transform {
+    transform: none !important;
+  }
+}
+
+[data-motion="reduce"] *,
+[data-motion="reduce"] *::before,
+[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  transition-delay: 0ms !important;
+}
+
+[data-motion="reduce"] {
+  scroll-behavior: auto !important;
+}
+
+[data-motion="reduce"] .motion-transform {
+  transform: none !important;
+}
+
+/* The scroll-driven reading progress bar animates without a transition, so it
+   needs its own opt-out. Parallax and any transform-driven decoration must
+   carry `.motion-transform` to be caught by the rules above. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="allow"]) [data-slot="reading-progress"] {
+    animation: none !important;
+  }
+}
+
+[data-motion="reduce"] [data-slot="reading-progress"] {
+  animation: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════ Print
+ *
+ * A book should print like a book. Chrome, rails and controls go; the reading
+ * column takes the full measure; external link targets are written out,
+ * because a printed underline points nowhere.
+ */
+
+@media print {
+  :root {
+    color-scheme: light;
+    --paper: #fff;
+    --paper-raised: #fff;
+    --ink: #000;
+    --ink-strong: #000;
+    --ink-muted: #333;
+    --rule: #999;
+    --issue-accent: #000;
+    --issue-ink: #000;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Chrome, navigation and every floating surface. */
+  [data-print="hide"],
+  [role="banner"],
+  [role="contentinfo"],
+  [data-slot="site-header"],
+  [data-slot="rail-left"],
+  [data-slot="rail-right"],
+  [data-slot="controls-trigger"],
+  [data-slot="reading-progress"],
+  [data-slot="reading-ruler"],
+  [data-slot="popover-content"],
+  [data-slot="dialog-content"],
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-content"],
+  [data-slot="sheet-overlay"],
+  [data-slot="drawer-popup"],
+  [data-slot="drawer-overlay"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="tooltip-content"],
+  /* Sonner does not forward unknown props to its root, so there is no
+     `data-slot` to hang this on — `data-sonner-toaster` is the library's own
+     attribute and the only selector that actually matches the toast list. */
+  [data-sonner-toaster],
+  .skip-links,
+  .paper-texture,
+  .decorative-gradient {
+    display: none !important;
+  }
+
+  [data-print="keep"] {
+    display: revert !important;
+  }
+
+  /* The reading column is the page. */
+  main,
+  .reader {
+    max-width: none !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    grid-template-columns: 1fr !important;
+    display: block !important;
+  }
+
+  /* Never break a code sample or a table row across pages — a shell command
+     split over a page boundary is a shell command that cannot be typed. */
+  pre,
+  figure,
+  blockquote,
+  tr,
+  [data-slot="code-block"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  pre,
+  code {
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid #999;
+  }
+
+  /* A heading alone at the foot of a page is an orphan. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-after: avoid;
+    page-break-after: avoid;
+    break-inside: avoid;
+  }
+
+  p,
+  li,
+  blockquote {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Chapter openers start a fresh sheet. */
+  [data-slot="chapter-opener"] {
+    break-before: page;
+    page-break-before: always;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* Write out the destination of links that leave the page. Internal anchors
+     and links whose text already is the URL are skipped, because printing
+     "(https://…)" twice is noise. */
+  a[href^="http"]:not([href*="githubskills"])::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    word-break: break-all;
+  }
+
+  a[href^="#"]::after,
+  a[data-print-url="none"]::after {
+    content: "";
+  }
+
+  a {
+    color: #000 !important;
+    text-decoration: underline;
+  }
+
+  /* Charts print as line art, not as a grey block. */
+  [data-chart] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    filter: grayscale(1) contrast(1.4);
+  }
+
+  /* No animation on paper, and no shadows to render as grey smudges. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  @page {
+    margin: 18mm 16mm;
+  }
+}

@@ -3,22 +3,56 @@
  *
  * Everything here runs on the server. The content is untrusted (arbitrary
  * markdown from arbitrary GitHub repos), so raw HTML is never passed through
- * and the tree is sanitized before any decoration is added.
+ * and the tree is scrubbed before any decoration is added.
  *
  * Rendering to React happens in `components/reader/markdown.tsx`, which
- * consumes the HAST this module produces.
+ * consumes the HAST this module produces. Nothing in this pipeline produces an
+ * HTML string, and nothing downstream uses `dangerouslySetInnerHTML`.
+ *
+ * ## Plugin order is load-bearing
+ *
+ *   remark-parse → remark-gfm → smartypants
+ *     → remark-rehype (allowDangerousHtml: FALSE — raw HTML is dropped)
+ *     → rehype-sanitize          ← untrusted content is scrubbed HERE
+ *     → fix-clobbered-anchors    ← sanitize prefixed ids; re-point the hrefs
+ *     → heading-normalize        ← strip duplicate H1, shift, repair skips
+ *     → rehype-slug              ← AFTER sanitize, or every anchor id gets the
+ *                                  `user-content-` clobber prefix and the TOC
+ *                                  breaks
+ *     → resolve-links
+ *     → bound-code-languages
+ *     → shiki                    ← AFTER sanitize; its markup is OURS
+ *     → code-meta
+ *     → nbsp                     ← LAST, or U+00A0 lands in the heading slugs
+ *
+ * Two rules that must survive every future edit, each with a unit test:
+ *
+ *   - **Never enable `rehype-raw`, never pass `allowDangerousHtml`.** Buy
+ *     fidelity back by allow-listing tags in the sanitize schema, never by
+ *     re-enabling raw HTML.
+ *   - **Sanitize before Shiki and before slug.** Sanitising after Shiki strips
+ *     every token colour; slugging before sanitize gets every id rewritten.
  */
 
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import rehypeShiki from "@shikijs/rehype";
+import rehypeShikiFromHighlighter from "@shikijs/rehype/core";
+import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
-import { visit } from "unist-util-visit";
-import { toString as hastToString } from "hast-util-to-string";
-import type { Element, Root } from "hast";
+import type { Root } from "hast";
+import type { Root as MdastRoot } from "mdast";
+
+import { codeRatioOf, rehypeBoundCodeLanguages, rehypeCodeMeta } from "./markdown/code";
+import { collectHeadings, rehypeHeadingNormalize, type HeadingRepair } from "./markdown/headings";
+import { getHighlighter, SHIKI_THEMES } from "./markdown/highlighter";
+import { rehypeFixClobberedAnchors, rehypeResolveLinks } from "./markdown/links";
+import { sanitizeSchema } from "./markdown/sanitize";
+import { rehypeNbsp, remarkSmartypants } from "./markdown/typography";
+
+export type { HeadingRepair } from "./markdown/headings";
+export { PRELOADED_LANGS, SHIKI_THEMES } from "./markdown/highlighter";
 
 export interface MarkdownContext {
   owner: string;
@@ -28,165 +62,87 @@ export interface MarkdownContext {
   baseDir: string;
   /** Maps an in-repo path to an internal route, when we publish that page. */
   resolveInternal?: (repoPath: string) => string | null;
+  /** The chapter title, so a duplicate leading H1 can be stripped. */
+  title?: string;
 }
 
 export interface RenderedMarkdown {
   tree: Root;
   headings: Array<{ depth: number; text: string; id: string }>;
+  /** Heading repairs taken, surfaced in the colophon accessibility report. */
+  repairs: HeadingRepair[];
+  /** Fenced-code chars ÷ total chars. Gates spread mode and the drop cap. */
+  codeRatio: number;
 }
 
 /**
- * Sanitization schema: the GitHub-flavored default, widened only for the
- * attributes our own plugins add (Shiki tokens, heading ids, task lists).
+ * A leading YAML/TOML frontmatter block.
+ *
+ * CommonMark has no concept of frontmatter, so `---\nname: x\n---` parses as a
+ * thematic break followed by a *setext H2* whose text is the entire metadata
+ * block. On `anthropics/skills/skill-creator` that produced a 330-character
+ * heading, an unusable anchor id, and a bogus first TOC entry.
+ *
+ * Skill bodies arrive already stripped by gray-matter in `skills.ts`, but
+ * READMEs and linked `.md` files do not go through that path and this renders
+ * arbitrary third-party documents. Stripping here is idempotent and matches
+ * what GitHub itself does with frontmatter.
  */
-const schema = {
-  ...defaultSchema,
-  attributes: {
-    ...defaultSchema.attributes,
-    "*": [...(defaultSchema.attributes?.["*"] ?? []), "className", "id", "style"],
-    code: [...(defaultSchema.attributes?.code ?? []), "className"],
-    pre: [...(defaultSchema.attributes?.pre ?? []), "className", "style", "tabIndex"],
-    span: [...(defaultSchema.attributes?.span ?? []), "className", "style"],
-    input: [...(defaultSchema.attributes?.input ?? []), "checked", "disabled", "type"],
-    img: [...(defaultSchema.attributes?.img ?? []), "loading", "decoding", "width", "height"],
-    a: [...(defaultSchema.attributes?.a ?? []), "target", "rel"],
-  },
-  // Shiki emits inline `style` on spans; allow it but keep the tag list closed.
-  clobberPrefix: "md-",
-} satisfies typeof defaultSchema;
+const FRONTMATTER = /^﻿?(?:---|\+\+\+)[ \t]*\r?\n[\s\S]*?\r?\n(?:---|\+\+\+)[ \t]*(?:\r?\n|$)/;
 
-/* ---------------------------------------------------------- link resolving */
-
-const ABSOLUTE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
-
-function joinPath(baseDir: string, rel: string): string {
-  const stack = baseDir ? baseDir.split("/") : [];
-  for (const seg of rel.split("/")) {
-    if (seg === "" || seg === ".") continue;
-    if (seg === "..") stack.pop();
-    else stack.push(seg);
-  }
-  return stack.join("/");
-}
-
-function rawUrlFor(ctx: MarkdownContext, repoPath: string): string {
-  const encoded = repoPath.split("/").map(encodeURIComponent).join("/");
-  return `https://raw.githubusercontent.com/${ctx.owner}/${ctx.repo}/${ctx.ref}/${encoded}`;
-}
-
-function blobUrlFor(ctx: MarkdownContext, repoPath: string): string {
-  const encoded = repoPath.split("/").map(encodeURIComponent).join("/");
-  return `https://github.com/${ctx.owner}/${ctx.repo}/blob/${ctx.ref}/${encoded}`;
+export function stripFrontmatter(source: string): string {
+  return FRONTMATTER.test(source) ? source.replace(FRONTMATTER, "") : source;
 }
 
 /**
- * Rewrite relative links and images so they resolve against the source repo
- * rather than against our own origin, and mark external links for the
- * renderer (which adds rel/target and an affordance).
+ * The document body is already capped at 512 KB by `fetchRawText`, which is
+ * the only path a `SKILL.md` reaches this function by. No second cap here —
+ * a silent truncation at this layer would be invisible to the reader.
  */
-function rehypeResolveLinks(ctx: MarkdownContext) {
-  return (tree: Root) => {
-    visit(tree, "element", (node: Element) => {
-      if (node.tagName === "img") {
-        const src = node.properties?.src;
-        if (typeof src !== "string" || ABSOLUTE.test(src)) return;
-        node.properties!.src = rawUrlFor(ctx, joinPath(ctx.baseDir, src));
-        node.properties!.loading = "lazy";
-        node.properties!.decoding = "async";
-        return;
-      }
-
-      if (node.tagName !== "a") return;
-      const href = node.properties?.href;
-      if (typeof href !== "string" || href === "") return;
-
-      if (href.startsWith("#")) return; // in-page anchor
-
-      if (ABSOLUTE.test(href)) {
-        node.properties!.dataExternal = "true";
-        return;
-      }
-
-      // Relative: prefer an internal route when we publish that document.
-      const [pathPart, hash] = href.split("#");
-      const repoPath = joinPath(ctx.baseDir, pathPart);
-      const internal = ctx.resolveInternal?.(repoPath);
-      if (internal) {
-        node.properties!.href = hash ? `${internal}#${hash}` : internal;
-        node.properties!.dataInternal = "true";
-      } else {
-        node.properties!.href = blobUrlFor(ctx, repoPath);
-        node.properties!.dataExternal = "true";
-        node.properties!.dataRepoFile = repoPath;
-      }
-    });
-  };
-}
-
-/** Record the language and raw source of each code block for the copy button. */
-function rehypeCodeMeta() {
-  return (tree: Root) => {
-    visit(tree, "element", (node: Element, index, parent) => {
-      if (node.tagName !== "pre") return;
-      const code = node.children.find(
-        (c): c is Element => c.type === "element" && c.tagName === "code",
-      );
-      if (!code) return;
-
-      const classes = code.properties?.className;
-      const list = Array.isArray(classes) ? classes.map(String) : [];
-      const lang = list.find((c) => c.startsWith("language-"))?.slice(9);
-
-      node.properties = {
-        ...node.properties,
-        dataLang: lang ?? "text",
-        dataSource: hastToString(code),
-      };
-      void index;
-      void parent;
-    });
-  };
-}
-
-/** Collect headings from the final tree so ids match the rendered anchors. */
-function collectHeadings(tree: Root) {
-  const headings: RenderedMarkdown["headings"] = [];
-  visit(tree, "element", (node: Element) => {
-    const m = /^h([1-6])$/.exec(node.tagName);
-    if (!m) return;
-    const id = typeof node.properties?.id === "string" ? node.properties.id : "";
-    const text = hastToString(node).trim();
-    if (!text) return;
-    headings.push({ depth: Number(m[1]), text, id });
-  });
-  return headings;
-}
-
-/* -------------------------------------------------------------- the runner */
-
-function buildProcessor(ctx: MarkdownContext) {
-  return unified()
-    .use(remarkParse)
-    .use(remarkGfm)
-    // allowDangerousHtml is off: raw HTML in skill docs is dropped, not run.
-    .use(remarkRehype)
-    .use(rehypeSanitize, schema)
-    .use(rehypeSlug)
-    .use(rehypeResolveLinks, ctx)
-    .use(rehypeShiki, {
-      themes: { light: "github-light", dark: "github-dark-dimmed" },
-      defaultColor: false,
-      cssVariablePrefix: "--shiki-",
-      fallbackLanguage: "text",
-    })
-    .use(rehypeCodeMeta);
-}
-
 export async function renderMarkdown(
-  source: string,
+  input: string,
   ctx: MarkdownContext,
 ): Promise<RenderedMarkdown> {
-  const processor = buildProcessor(ctx);
-  const tree = (await processor.run(processor.parse(source))) as Root;
-  return { tree, headings: collectHeadings(tree) };
+  const source = stripFrontmatter(input);
+  const highlighter = await getHighlighter();
+  const repairs: HeadingRepair[] = [];
+
+  const processor = unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkSmartypants)
+    // allowDangerousHtml is off: raw HTML in skill docs is dropped, not run.
+    // clobberPrefix is emptied because sanitize is about to apply its own; two
+    // layers of it produce `user-content-user-content-fn-1`.
+    .use(remarkRehype, { clobberPrefix: "" })
+    .use(rehypeSanitize, sanitizeSchema)
+    .use(rehypeFixClobberedAnchors, sanitizeSchema.clobberPrefix ?? undefined)
+    .use(rehypeHeadingNormalize, { title: ctx.title, sink: repairs })
+    .use(rehypeSlug)
+    .use(rehypeResolveLinks, ctx)
+    .use(rehypeBoundCodeLanguages)
+    .use(rehypeShikiFromHighlighter, highlighter, {
+      themes: SHIKI_THEMES,
+      defaultColor: false,
+      cssVariablePrefix: "--shiki-",
+      // 59% of fences in the measured corpus carry no info string at all.
+      // Without a default they would skip Shiki entirely and render without
+      // the `.shiki` class every code rule in `code.css` hangs off.
+      defaultLanguage: "text",
+      fallbackLanguage: "text",
+      // Shiki rebuilds the `code` element, so the language hint has to be
+      // re-attached for `rehypeCodeMeta` and the language label to find it.
+      addLanguageClass: true,
+      // Grammars outside the preloaded twelve load on first sight; the set is
+      // bounded by rehypeBoundCodeLanguages.
+      lazy: true,
+    })
+    .use(rehypeCodeMeta)
+    .use(rehypeNbsp);
+
+  const mdast = processor.parse(source) as MdastRoot;
+  const codeRatio = codeRatioOf(mdast, source.length);
+  const tree = (await processor.run(mdast)) as Root;
+
+  return { tree, headings: collectHeadings(tree), repairs, codeRatio };
 }

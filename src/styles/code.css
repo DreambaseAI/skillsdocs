@@ -5,3 +5,327 @@
  *
  * Imported by globals.css. Do not edit globals.css to add rules here.
  */
+
+@layer components {
+  /* ══════════════════════════════════════════ Shiki dual themes, four ways
+   *
+   * `defaultColor: false` makes Shiki emit BOTH `--shiki-light` and
+   * `--shiki-dark` on every token instead of baking one theme into `color`.
+   * CSS then picks — and it has to pick correctly under two independent
+   * signals that can disagree: the `dark` class next-themes writes, and the
+   * OS-level `prefers-color-scheme`.
+   *
+   * Four rules, in this order, resolve every combination without `!important`:
+   *
+   *   1. base           → light  (also the answer when no signal exists)
+   *   2. media dark     → dark   (OS preference, when no class overrides it)
+   *   3. .dark class    → dark   (explicit choice)
+   *   4. .light class   → light  (explicit choice; last, so it wins the tie
+   *                               against rule 2 at equal specificity)
+   *
+   * Rule 2 is scoped `:root:not(.light)` so an explicit light choice is never
+   * fighting the media query for the same declaration — the class strategy and
+   * the media query cannot contradict each other.
+   */
+
+  .shiki,
+  .shiki span {
+    color: var(--shiki-light);
+    font-weight: var(--shiki-light-font-weight, inherit);
+    font-style: var(--shiki-light-font-style, inherit);
+    text-decoration: var(--shiki-light-text-decoration, inherit);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) .shiki,
+    :root:not(.light) .shiki span {
+      color: var(--shiki-dark);
+      font-weight: var(--shiki-dark-font-weight, inherit);
+      font-style: var(--shiki-dark-font-style, inherit);
+      text-decoration: var(--shiki-dark-text-decoration, inherit);
+    }
+  }
+
+  :root.dark .shiki,
+  :root.dark .shiki span {
+    color: var(--shiki-dark);
+    font-weight: var(--shiki-dark-font-weight, inherit);
+    font-style: var(--shiki-dark-font-style, inherit);
+    text-decoration: var(--shiki-dark-text-decoration, inherit);
+  }
+
+  :root.light .shiki,
+  :root.light .shiki span {
+    color: var(--shiki-light);
+    font-weight: var(--shiki-light-font-weight, inherit);
+    font-style: var(--shiki-light-font-style, inherit);
+    text-decoration: var(--shiki-light-text-decoration, inherit);
+  }
+
+  /* Shiki also emits `--shiki-*-bg`. We deliberately ignore it: the code ground
+     is the reader's own paper, so a block sits on their chosen stock instead
+     of punching a GitHub-coloured rectangle through a sepia page.
+     That means the themes are being used against grounds they were not
+     designed for, which is why `highlighter.ts` picks the high-contrast pair
+     and why the ground gets the lift below. */
+
+  /* ══════════════════════════════════════════════════════ the block chrome */
+
+  .code-block {
+    --code-radius: var(--radius-md);
+    --code-ground: var(--paper-raised);
+
+    margin-block: calc(1.2 * var(--reader-lh-auto));
+    background: var(--code-ground);
+    border: 1px solid var(--rule);
+    border-radius: var(--code-radius);
+    /* Code is one ladder step below body text by default. */
+    font-size: calc(1em + var(--reader-code-offset) * 0.06em);
+  }
+
+  /*
+   * Lift the code ground 0.04 L away from the ink.
+   *
+   * Measured: on `--paper-raised` unmodified, the lowest-contrast scope in
+   * github-light-high-contrast (`comment`, #66707b) sits at 4.03:1 on sepia
+   * and 4.29:1 on e-ink — below AA. 0.04 is the smallest lift that clears 4.5
+   * on every one of the six paper modes; with it the global worst case across
+   * both themes and all grounds is 4.55:1.
+   *
+   * The same lift in dark mode makes the panel read as raised, which is what
+   * it is. Browsers without relative colour syntax (~7%) keep the unlifted
+   * ground and the comment scope alone lands slightly under AA there.
+   */
+  @supports (background: oklch(from currentcolor l c h)) {
+    .code-block {
+      --code-ground: oklch(from var(--paper-raised) calc(l + 0.04) c h);
+    }
+  }
+
+  .code-block__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.25rem 0.35rem 0.25rem 0.85rem;
+    border-block-end: 1px solid var(--rule);
+    min-block-size: 2.25rem;
+  }
+
+  .code-block__lang {
+    font-family: var(--font-reader-code);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  /* The copy button is only quiet until it is wanted; it must never be the
+     first thing the eye lands on, and it must never disappear from the
+     keyboard. Opacity, not display, so it stays in the tab order. */
+  .code-block__copy {
+    opacity: 0.55;
+    transition: opacity 120ms var(--ease-out-quint);
+  }
+
+  .code-block:hover .code-block__copy,
+  .code-block__copy:focus-visible,
+  .code-block__copy[aria-label][data-pressed] {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .code-block__copy {
+      transition: none;
+    }
+  }
+
+  /* Touch has no hover, so there is nothing to reveal on. */
+  @media (hover: none) {
+    .code-block__copy {
+      opacity: 1;
+    }
+  }
+
+  /* ═════════════════════════════════════════════════ the scroll affordance */
+
+  .code-block__scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border-end-start-radius: var(--code-radius);
+    border-end-end-radius: var(--code-radius);
+
+    /* A right-edge fade says "there is more" without occupying layout or
+       needing a scroll listener. It is painted with a mask so it works over
+       any paper mode, and it is removed once the block is scrolled to the end
+       by `animation-timeline: scroll()` where that is supported. */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      currentcolor 0,
+      currentcolor calc(100% - 2.5rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      currentcolor 0,
+      currentcolor calc(100% - 2.5rem),
+      transparent 100%
+    );
+  }
+
+  @supports (animation-timeline: scroll(self inline)) {
+    .code-block__scroll {
+      animation: code-fade-end linear both;
+      animation-timeline: scroll(self inline);
+      animation-range: contain;
+    }
+
+    @keyframes code-fade-end {
+      to {
+        -webkit-mask-image: linear-gradient(to right, currentcolor 0, currentcolor 100%);
+        mask-image: linear-gradient(to right, currentcolor 0, currentcolor 100%);
+      }
+    }
+  }
+
+  /* The mask hides a focus ring drawn on the same box, so put the ring on an
+     inset shadow that the mask cannot clip away. */
+  .code-block__scroll:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 var(--focus-ring-width) var(--ring);
+  }
+
+  /* ═════════════════════════════════════════════════════════════ the code */
+
+  .code-block__pre {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    background: none;
+    font-family: var(--font-reader-code);
+    font-size: 0.875em;
+    line-height: 1.55;
+    letter-spacing: 0;
+    /* Never wrap. A wrapped shell command is a broken shell command — the
+       reader cannot tell an inserted break from a real newline. */
+    white-space: pre;
+    tab-size: 2;
+    /* `!=` rendered as a single glyph in a diff is a bug factory. */
+    font-variant-ligatures: none;
+    font-variant-numeric: lining-nums tabular-nums;
+    /* Code is never hyphenated, never balanced, never prettied. */
+    hyphens: manual;
+    text-wrap: nowrap;
+    text-indent: 0;
+  }
+
+  .code-block__pre code {
+    display: block;
+    inline-size: fit-content;
+    min-inline-size: 100%;
+    font: inherit;
+    background: none;
+    padding: 0;
+    border: none;
+  }
+
+  .code-block__pre .line {
+    display: block;
+    min-block-size: 1lh;
+  }
+
+  /* Opt-in wrapping, for the reader who asks for it in the controls panel. */
+  [data-code-wrap="on"] .code-block__pre,
+  [data-code-wrap="on"] .code-block__pre code {
+    white-space: pre-wrap;
+    text-wrap: wrap;
+    overflow-wrap: break-word;
+    inline-size: auto;
+  }
+
+  /* ═══════════════════════════════════════════════════════ inline code */
+
+  .prose :not(pre) > code {
+    font-family: var(--font-reader-code);
+    /* 0.875em is right for a block; inline code sits inside a line of prose
+       and needs a hair more to match the x-height of the surrounding text. */
+    font-size: 0.885em;
+    font-variant-ligatures: none;
+    font-variant-numeric: lining-nums tabular-nums slashed-zero;
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: 0.32em;
+    padding: 0.08em 0.32em;
+    /* An identifier split across a line is a different identifier. */
+    hyphens: manual;
+    overflow-wrap: break-word;
+  }
+
+  /* A code span inside a link should read as part of the link. */
+  .prose .prose-link > code {
+    color: inherit;
+    border-color: color-mix(in oklch, var(--issue-accent) 35%, transparent);
+  }
+
+  .prose :is(h1, h2, h3, h4, h5, h6) code {
+    font-size: 0.9em;
+    font-weight: inherit;
+  }
+
+  .prose kbd {
+    font-family: var(--font-reader-code);
+    font-size: 0.82em;
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-block-end-width: 2px;
+    border-radius: 0.3em;
+    padding: 0.05em 0.35em;
+    color: var(--ink-strong);
+  }
+
+  /* ══════════════════════════════════════════════════════ narrow viewports */
+
+  /* Full-bleed to the edge of the reading column on a phone: 44 characters is
+     already tight, and side padding on a scrolling block buys nothing. */
+  @container prose (max-width: 30rem) {
+    .code-block {
+      margin-inline: calc(-1 * var(--side-pad, 1.25rem));
+      border-inline: none;
+      border-radius: 0;
+      --code-radius: 0;
+    }
+  }
+
+  /* ═══════════════════════════════════════ forced colors and high contrast */
+
+  @media (forced-colors: active) {
+    /* Token colours are meaningless when the OS repaints everything, and the
+       fade mask would hide content that HCM users cannot recover. */
+    .code-block__scroll {
+      -webkit-mask-image: none;
+      mask-image: none;
+      animation: none;
+    }
+
+    .code-block {
+      border: 1px solid CanvasText;
+    }
+
+    .shiki,
+    .shiki span {
+      color: CanvasText;
+      background: Canvas;
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    .code-block__scroll {
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+
+    .code-block__copy {
+      opacity: 1;
+    }
+  }
+}

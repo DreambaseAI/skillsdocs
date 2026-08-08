@@ -1260,3 +1260,26 @@ Featured grid from `SEED_REPOS` merged with the live leaderboard; `weeklyInstall
 | — | Contrast serialization margin | `formatOklch` rounds L to 4dp and H to 2dp, which can move a ratio by a few thousandths and land a "solved for exactly 7.0" accent at 6.998. `deriveIssueTheme` now solves for `target + 0.05`. Caught by `pnpm verify:contrast`. |
 | — | Atkinson Hyperlegible Next/Mono | `next/font` has no fallback-metric override data for these two, so it skips fallback generation and emits a build warning. Accepted — they are opt-in accessibility faces, not the default. |
 | — | Hairline rules vs WCAG 1.4.11 | Decorative separators are not "graphical objects required to understand content", so 3:1 does not bind. The audit holds them to an editorial 1.7:1 as an advisory check. |
+
+## Risk 2 — dither-kit licensing: RESOLVED (downgraded 🔴 → 🟢)
+
+The registry item JSONs at `tripwire.sh/r/*.json` carry no `license` field and
+the component sources carry no headers, which is what raised the flag. Tracing
+it upstream:
+
+| Source | Declared licence |
+|---|---|
+| `registry.npmjs.org/@dither-kit/cli` | **MIT** |
+| `Boring-Software-Inc/dither-kit` root `package.json` | **MIT** |
+| `packages/cli/package.json` | **MIT** |
+| `packages/registry-core/package.json` | **MIT** |
+
+The repo has no `LICENSE` *file*, which is why the GitHub API reports
+`license: none` — but MIT is declared at the monorepo root that contains the
+`registry/` sources the CLI copies. That is a licence grant.
+
+**Decision: proceed.** Vendor the components with an attribution header naming
+the project, the author (`ripgrim` / Boring Software Inc), the upstream URL, and
+MIT. Courtesy follow-up: open an issue asking them to add a `LICENSE` file, and
+keep `AccessibleChart` as the seam that would make a swap cheap if the grant
+were ever withdrawn.

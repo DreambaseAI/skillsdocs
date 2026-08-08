@@ -4,4 +4,602 @@
  * Rendered SKILL.md typography: headings, lists, tables, quotes, drop caps.
  *
  * Imported by globals.css. Do not edit globals.css to add rules here.
+ *
+ * Everything is scoped to `.prose`, the container `components/reader/
+ * markdown.tsx` renders. Every value is either a token from tokens.css or a
+ * multiple of the reader's own font size — there is not a single absolute
+ * length in the type scale, because the reader can change the base size at any
+ * moment and the whole scale has to move with it.
+ *
+ * The scale is the one measured in reading-ux.md §3.3: 1.250 (major third) in
+ * the reading column. Tracking is always in `em` so it scales; a constant px
+ * value is wrong at every size but one.
  */
+
+@layer components {
+  .prose {
+    /* Own container so the layout responds to the reading column, not the
+       viewport. The column's width depends on which rails are open, so a media
+       query would be wrong every time a rail collapses. */
+    container: prose / inline-size;
+
+    color: var(--ink);
+    font-variant-numeric: oldstyle-nums proportional-nums;
+    /* Safari-only today, and silently free everywhere else. */
+    hanging-punctuation: first last;
+  }
+
+  /* Families with no `onum` must not be asked for it — the synthesised result
+     is worse than lining figures. */
+  .prose:where([data-font-caps=""] *) {
+    font-variant-numeric: lining-nums proportional-nums;
+  }
+
+  /* ─────────────────────────────────────────────────── measure and bleed */
+
+  .prose > * {
+    max-inline-size: var(--reader-measure);
+    margin-inline: auto;
+  }
+
+  /* Code, tables and figures earn the extra 18%: they are grids of tokens, not
+     lines of prose, and holding them to the text measure just adds scrolling. */
+  .prose > :is(pre, figure, hr, .code-block, .prose-table-scroll, .prose-figure) {
+    max-inline-size: var(--reader-bleed);
+  }
+
+  /* ────────────────────────────────────────────────────────── paragraphs */
+
+  .prose p {
+    margin-block: 0 var(--reader-para-gap);
+    text-indent: var(--reader-para-indent);
+    text-wrap: pretty;
+  }
+
+  /* An indent after a heading or a block is a typographic error: there is
+     nothing above it for the indent to distinguish the paragraph from. */
+  .prose :is(h1, h2, h3, h4, h5, h6) + p,
+  .prose :is(blockquote, pre, figure, ul, ol, table, hr, .code-block) + p,
+  .prose > p:first-child {
+    text-indent: 0;
+  }
+
+  .prose > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* ──────────────────────────────────────────────────────────── headings */
+
+  .prose :is(h1, h2, h3, h4, h5, h6) {
+    color: var(--ink-strong);
+    font-family: var(--font-display);
+    text-wrap: balance;
+    font-variant-numeric: lining-nums proportional-nums;
+    scroll-margin-block-start: calc(var(--header-h) + 1.5rem);
+  }
+
+  /* Removes the half-leading above and below so a heading optically aligns
+     with the rule it sits under. */
+  @supports (text-box: trim-both cap alphabetic) {
+    .prose :is(h1, h2, h3) {
+      text-box: trim-both cap alphabetic;
+    }
+  }
+
+  .prose h1 {
+    font-size: 1.953em;
+    line-height: 1.15;
+    letter-spacing: -0.018em;
+    font-weight: 550;
+    margin-block: calc(2 * var(--reader-lh-auto)) calc(0.9 * var(--reader-lh-auto));
+  }
+
+  .prose h2 {
+    font-size: 1.563em;
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    font-weight: 550;
+    margin-block: calc(2 * var(--reader-lh-auto)) calc(0.85 * var(--reader-lh-auto));
+  }
+
+  .prose h3 {
+    font-size: 1.25em;
+    line-height: 1.32;
+    letter-spacing: -0.006em;
+    font-weight: 600;
+    margin-block: calc(1.5 * var(--reader-lh-auto)) calc(0.6 * var(--reader-lh-auto));
+  }
+
+  .prose h4 {
+    font-size: 1em;
+    line-height: 1.45;
+    letter-spacing: 0;
+    font-weight: 650;
+    margin-block: calc(1 * var(--reader-lh-auto)) calc(0.4 * var(--reader-lh-auto));
+  }
+
+  /* h5 and h6 are the eyebrow role in the scale: small, spaced, small-capped.
+     Real `smcp` where the family has it. */
+  .prose :is(h5, h6) {
+    font-family: inherit;
+    font-size: 0.8em;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    font-variant-caps: all-small-caps;
+    color: var(--ink-muted);
+    margin-block: calc(1 * var(--reader-lh-auto)) calc(0.35 * var(--reader-lh-auto));
+  }
+
+  /* Faked small caps for families with no `smcp`. Never let the browser
+     synthesise them — it just scales capitals and the result is anaemic. */
+  [data-font-caps=""] .prose :is(h5, h6) {
+    font-variant-caps: normal;
+    text-transform: uppercase;
+    font-size: 0.7em;
+    font-weight: 550;
+    letter-spacing: 0.1em;
+  }
+
+  /* The first heading must not push the chapter opener away from the text. */
+  .prose > :is(h1, h2, h3, h4, h5, h6):first-child {
+    margin-block-start: 0;
+  }
+
+  /* ─────────────────────────────────────────────────── heading permalinks */
+
+  .prose .heading-anchor {
+    color: inherit;
+    text-decoration: none;
+    /* The icon hangs in the margin; `inline` keeps the heading's own
+       text-wrap: balance working on the text. */
+    display: inline;
+  }
+
+  .prose .heading-anchor__mark {
+    display: inline-block;
+    vertical-align: baseline;
+    inline-size: 0.62em;
+    block-size: 0.62em;
+    margin-inline-start: 0.3em;
+    color: var(--issue-accent);
+    opacity: 0;
+    transition: opacity 120ms var(--ease-out-quint);
+  }
+
+  .prose .heading-anchor:hover .heading-anchor__mark,
+  .prose .heading-anchor:focus-visible .heading-anchor__mark,
+  .prose :is(h1, h2, h3, h4, h5, h6):hover .heading-anchor__mark {
+    opacity: 1;
+  }
+
+  /* A permalink that only appears on hover is invisible to a keyboard user
+     until it has focus, so give it a ring of its own. */
+  .prose .heading-anchor:focus-visible {
+    outline: var(--focus-ring-width) solid var(--issue-accent);
+    outline-offset: var(--focus-ring-offset);
+    border-radius: var(--radius-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .prose .heading-anchor__mark {
+      transition: none;
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────────────── links */
+
+  .prose .prose-link {
+    color: var(--issue-accent);
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.16em;
+    text-decoration-skip-ink: auto;
+    /* A URL broken across a line by the hyphenator is unreadable. */
+    hyphens: manual;
+  }
+
+  .prose .prose-link:hover {
+    text-decoration-thickness: 0.09em;
+  }
+
+  .prose .prose-link__mark {
+    display: inline-block;
+    inline-size: 0.66em;
+    block-size: 0.66em;
+    margin-inline-start: 0.14em;
+    vertical-align: baseline;
+    opacity: 0.7;
+  }
+
+  [data-contrast="high"] .prose .prose-link {
+    text-decoration-thickness: 0.08em;
+  }
+
+  /* ─────────────────────────────────────────────────────────────── lists */
+
+  .prose :is(ul, ol) {
+    margin-block: 0 var(--reader-para-gap);
+    padding-inline-start: 1.4em;
+  }
+
+  .prose li {
+    margin-block-end: 0.35em;
+    text-wrap: pretty;
+  }
+
+  .prose li::marker {
+    color: var(--ink-muted);
+  }
+
+  .prose :is(ul, ol) :is(ul, ol) {
+    margin-block: 0.35em 0.35em;
+  }
+
+  .prose ul {
+    list-style: disc;
+  }
+
+  .prose ol {
+    list-style: decimal;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .prose ol > li {
+    font-variant-numeric: inherit;
+  }
+
+  .prose dl {
+    margin-block: 0 var(--reader-para-gap);
+  }
+
+  .prose dt {
+    font-weight: 650;
+    color: var(--ink-strong);
+  }
+
+  .prose dd {
+    margin-inline-start: 1.4em;
+    margin-block-end: 0.5em;
+    text-wrap: pretty;
+  }
+
+  /* ─────────────────────────────────────────────────────────── task lists */
+
+  .prose .contains-task-list {
+    list-style: none;
+    padding-inline-start: 0;
+  }
+
+  .prose .task-list-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55em;
+  }
+
+  .prose .prose-task {
+    flex: none;
+    inline-size: 0.82em;
+    block-size: 0.82em;
+    border: 1.5px solid var(--rule);
+    border-radius: var(--radius-sm);
+    translate: 0 0.1em;
+  }
+
+  .prose .prose-task[data-checked="true"] {
+    background: var(--issue-accent);
+    border-color: var(--issue-accent);
+    /* A checkmark drawn in the border colour, so it inherits forced colors. */
+    background-image: linear-gradient(
+        to bottom right,
+        transparent 44%,
+        var(--issue-accent-foreground) 44% 56%,
+        transparent 56%
+      ),
+      linear-gradient(
+        to bottom left,
+        transparent 44%,
+        var(--issue-accent-foreground) 44% 56%,
+        transparent 56%
+      );
+    background-size: 60% 100%, 40% 100%;
+    background-position:
+      right center,
+      left center;
+    background-repeat: no-repeat;
+  }
+
+  /* ────────────────────────────────────────────────────────── blockquote */
+
+  .prose .prose-quote {
+    margin-block: calc(1.2 * var(--reader-lh-auto));
+    padding-inline-start: 1.1em;
+    border-inline-start: 2px solid var(--issue-accent);
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  .prose .prose-quote > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* A short single-paragraph quote is a pull quote, and should read like one:
+     larger, italic, no rule, hanging opening mark. */
+  .prose .prose-quote[data-pull="true"] {
+    border-inline-start: none;
+    padding-inline-start: 0;
+    font-family: var(--font-display);
+    font-size: 1.563em;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    font-style: italic;
+    color: var(--ink-strong);
+    /* Optical margin alignment: the 90% of hanging punctuation that ships
+       everywhere, unlike `hanging-punctuation`. */
+    text-indent: -0.42em;
+  }
+
+  .prose .prose-quote[data-pull="true"]::before,
+  .prose .prose-quote[data-pull="true"]::after {
+    color: var(--ink-muted);
+  }
+
+  /* ──────────────────────────────────────────────────────────── figures */
+
+  .prose .prose-figure {
+    display: block;
+    margin-block: calc(1.2 * var(--reader-lh-auto));
+  }
+
+  .prose .prose-figure--unsized {
+    /* A remote image's intrinsic size is unknowable at render time, so reserve
+       a floor. The block can only grow past it, which bounds the shift instead
+       of letting the page jump by the image's full height. */
+    min-block-size: 6rem;
+  }
+
+  .prose .prose-image {
+    display: block;
+    max-inline-size: 100%;
+    block-size: auto;
+    margin-inline: auto;
+    border-radius: var(--radius-md);
+    background: var(--paper-raised);
+  }
+
+  .prose figcaption {
+    margin-block-start: 0.5em;
+    font-size: 0.8em;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+    color: var(--ink-muted);
+    text-wrap: balance;
+    text-align: center;
+  }
+
+  /* ────────────────────────────────────────────────────────────── tables */
+
+  .prose .prose-table-scroll {
+    margin-block: calc(1.2 * var(--reader-lh-auto));
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    /* Focusable for 2.1.1, so it needs a ring like anything else. */
+    border-radius: var(--radius-md);
+  }
+
+  .prose .prose-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+    line-height: 1.5;
+    font-variant-numeric: lining-nums tabular-nums;
+    text-wrap: pretty;
+  }
+
+  .prose .prose-table :is(th, td) {
+    padding: 0.5em 0.85em;
+    border-block-end: 1px solid var(--rule);
+    text-align: start;
+    vertical-align: baseline;
+  }
+
+  .prose .prose-table th {
+    color: var(--ink-strong);
+    font-weight: 650;
+    font-size: 0.92em;
+    letter-spacing: 0.02em;
+    border-block-end-width: 2px;
+  }
+
+  .prose .prose-table tbody tr:last-child :is(th, td) {
+    border-block-end: none;
+  }
+
+  /* On a phone the first column is the row's label; pin it so a wide table
+     stays readable while it scrolls. */
+  @container prose (max-width: 32rem) {
+    .prose .prose-table :is(th, td):first-child {
+      position: sticky;
+      inset-inline-start: 0;
+      background: var(--paper);
+    }
+  }
+
+  /* ───────────────────────────────────────────────────────────── rules */
+
+  .prose hr {
+    margin-block: calc(2 * var(--reader-lh-auto));
+    border: none;
+    block-size: 1px;
+    background: var(--rule);
+  }
+
+  /* ─────────────────────────────────────────────────── inline semantics */
+
+  .prose strong,
+  .prose b {
+    font-weight: 650;
+    color: var(--ink-strong);
+  }
+
+  .prose em {
+    font-style: italic;
+  }
+
+  .prose :is(del, s) {
+    color: var(--ink-muted);
+  }
+
+  .prose mark {
+    background: var(--selection-bg);
+    color: var(--selection-fg);
+    padding-inline: 0.12em;
+    border-radius: 0.15em;
+  }
+
+  .prose abbr[title] {
+    text-decoration: underline dotted;
+    text-underline-offset: 0.2em;
+    cursor: help;
+  }
+
+  .prose sub,
+  .prose sup {
+    font-size: 0.72em;
+    line-height: 0;
+  }
+
+  /* ────────────────────────────────────────────────────── margin notes */
+
+  .prose .margin-note__ref {
+    color: var(--issue-accent);
+    text-decoration: none;
+    font-variant-numeric: lining-nums;
+    padding-inline: 0.1em;
+  }
+
+  .prose .margin-note {
+    display: block;
+    margin-block: 0.6em;
+    padding-inline-start: 0.9em;
+    border-inline-start: 2px solid var(--rule);
+    font-size: 0.8em;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+    color: var(--ink-muted);
+    text-indent: 0;
+  }
+
+  .prose .margin-note__marker {
+    color: var(--issue-accent);
+    font-variant-numeric: lining-nums;
+    margin-inline-end: 0.4em;
+  }
+
+  .prose .margin-note__backref {
+    color: var(--issue-accent);
+    text-decoration: none;
+  }
+
+  /* Above ~1440px the reading column has an empty right gutter. Float the note
+     into it, where a printed book would set it. */
+  @container prose (min-width: 46rem) {
+    .prose .margin-note {
+      float: inline-end;
+      clear: inline-end;
+      inline-size: 12.5rem;
+      margin-inline-end: -14.5rem;
+      margin-block: 0.2em 0.8em;
+      padding-inline-start: 0;
+      border-inline-start: none;
+    }
+  }
+
+  /* ──────────────────────────────────────────────────────── footnotes */
+
+  /* Only reached when a document has a multi-block footnote, which blocks
+     promotion to margin notes for the whole document. */
+  .prose .footnotes {
+    margin-block-start: calc(2 * var(--reader-lh-auto));
+    padding-block-start: calc(1 * var(--reader-lh-auto));
+    border-block-start: 1px solid var(--rule);
+    font-size: 0.85em;
+    color: var(--ink-muted);
+  }
+
+  /* ───────────────────────────────────────────────────────── drop cap */
+
+  /*
+   * `initial-letter` does the cap-height maths for you and is the only correct
+   * implementation — but Firefox has zero support and has had zero support for
+   * a decade, so the float fallback is not optional.
+   */
+  .prose[data-dropcap="true"] > p:first-of-type::first-letter {
+    font-family: var(--font-display);
+    font-weight: 400;
+    color: var(--issue-accent);
+    font-variant-numeric: lining-nums;
+    -webkit-initial-letter: 3 3;
+    initial-letter: 3 3;
+    margin-inline-end: 0.08em;
+  }
+
+  @supports not (initial-letter: 3) {
+    .prose[data-dropcap="true"] > p:first-of-type::first-letter {
+      float: inline-start;
+      /* Three lines of leading divided by the family's cap height, which is
+         what `initial-letter` computes internally. The token is per-family;
+         0.70 covers Literata, Geist and Fraunces. */
+      font-size: calc(3 * 1.6em / var(--font-cap-height, 0.7) / 2.14);
+      line-height: var(--font-cap-height, 0.7);
+      padding-inline-end: 0.06em;
+      padding-block-start: 0.04em;
+    }
+  }
+
+  /* Never on a phone: three sunk lines out of a 44-character measure leaves a
+     column of two-word lines. */
+  @container prose (max-width: 30rem) {
+    .prose[data-dropcap="true"] > p:first-of-type::first-letter {
+      all: unset;
+    }
+  }
+
+  /* ─────────────────────────────────────────────── narrow-column repairs */
+
+  @container prose (max-width: 30rem) {
+    /* Below 480px a 44-character measure needs hyphenation to stay ragged
+       rather than gap-toothed. `hyphens: auto` no-ops without a `lang`, which
+       the root layout sets. */
+    .prose :is(p, li, dd) {
+      hyphens: auto;
+      hyphenate-limit-chars: 7 3 3;
+    }
+
+    .prose :is(code, kbd, samp, pre, a[href^="http"]) {
+      hyphens: manual;
+    }
+  }
+
+  /* ─────────────────────────────────────── forced colors and high contrast */
+
+  @media (forced-colors: active) {
+    .prose .prose-task {
+      border-color: CanvasText;
+    }
+
+    .prose .prose-task[data-checked="true"] {
+      background: Highlight;
+      border-color: Highlight;
+      forced-color-adjust: none;
+    }
+
+    .prose .prose-quote {
+      border-inline-start-color: CanvasText;
+    }
+
+    .prose .prose-link {
+      text-decoration: underline;
+    }
+  }
+}

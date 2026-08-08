@@ -6,10 +6,17 @@
  */
 
 import { parseDesignMarkdown } from "../src/lib/design/parse";
-import { auditIssueTheme, deriveIssueTheme, PAPER } from "../src/lib/design/theme";
+import {
+  auditIssueTheme,
+  deriveIssueTheme,
+  issueSelector,
+  issueThemeCss,
+  PAPER,
+} from "../src/lib/design/theme";
 import { resolveDesignManifest } from "../src/lib/design/fetch";
 import { contrastRatio, parseColor } from "../src/lib/color";
 import { WCAG } from "../src/lib/color";
+import type { ResolvedFont } from "../src/lib/design/types";
 
 const SAMPLE = [
   ["DreambaseAI", "https://dreambase.com"],
@@ -68,11 +75,30 @@ for (const [owner, site] of targets) {
           .join(" / ") || "—",
       ),
   );
+  const css = issueThemeCss(theme, issueSelector(owner));
+  // Nothing an owner can publish may reach CSS as markup, a comment, an
+  // import, or a rule of its own. Selectors are whatever is left once every
+  // declaration block is removed; they must stay inert.
+  const selectors = css.replace(/\{[^{}]*\}/g, "|");
+  const leaked =
+    /[<>@{}]|javascript:|expression\(|url\(|\/\*/i.test(selectors) ||
+    /[<>]|javascript:|expression\(|url\(|\/\*|@import/i.test(css);
+  if (leaked) {
+    failures++;
+    console.log(R(`  CSS INJECTION LEAK for ${owner}`));
+  }
+
+  const describe = (f: ResolvedFont | null) =>
+    f ? `${f.requested}→${f.label ?? "reader default"} (${f.kind})` : "—";
+
   console.log(
     D(
       `  ${theme.accentLight} / ${theme.accentDark}   hc ${audit.lightHc.toFixed(1)}·${audit.darkHc.toFixed(1)}` +
         `   charts ${audit.chartLight.map((r) => r.toFixed(1)).join(" ")} | ${audit.chartDark.map((r) => r.toFixed(1)).join(" ")}` +
+        `\n  css ${css.length}B` +
+        `  fonts ${describe(theme.fontResolution?.display ?? null)} · ${describe(theme.fontResolution?.body ?? null)} · ${describe(theme.fontResolution?.mono ?? null)}` +
         (manifest.sourceUrl ? `\n  ${manifest.sourceUrl}` : "") +
+        (manifest.warnings.length ? `\n  ${manifest.warnings.join(" ")}` : "") +
         (manifest.voice.words.length ? `\n  voice: ${manifest.voice.words.join(", ")}` : ""),
     ),
   );

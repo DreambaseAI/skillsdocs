@@ -10,7 +10,7 @@
  */
 
 import { formatHex, parseColor } from "../color";
-import { looksLikeMarkdown, parseDesignMarkdown } from "./parse";
+import { looksLikeMarkdown, parseDesignCss, parseDesignMarkdown } from "./parse";
 import { curatedFor, REGISTRY_RAW } from "./registry";
 import { deriveIssueTheme } from "./theme";
 import type { BrandColor, DesignManifest, IssueTheme } from "./types";
@@ -18,6 +18,12 @@ import type { BrandColor, DesignManifest, IssueTheme } from "./types";
 const TIMEOUT_MS = 6000;
 const MIN_BYTES = 64;
 const MAX_BYTES = 512 * 1024;
+/**
+ * External stylesheets get their own, larger ceiling: `vercel-brand.css` is
+ * 108,891 bytes and is the only place Vercel's tokens exist. 512 KB would be
+ * an open invitation, so this is deliberately just wide enough.
+ */
+const MAX_CSS_BYTES = 256 * 1024;
 
 export const DESIGN_REVALIDATE = 60 * 60 * 24;
 
@@ -52,6 +58,30 @@ async function tryFetchMarkdown(url: string): Promise<FetchedDoc | null> {
   }
 }
 
+/** Same guards as markdown, gated on `text/css` and a body that opens like CSS. */
+async function tryFetchCss(url: string): Promise<FetchedDoc | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "text/css, */*;q=0.1" },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      redirect: "follow",
+      next: { revalidate: DESIGN_REVALIDATE },
+    });
+    if (!res.ok) return null;
+    if (Number(res.headers.get("content-length") ?? 0) > MAX_CSS_BYTES) return null;
+    if (!/^text\/css/i.test(res.headers.get("content-type") ?? "")) return null;
+
+    const body = await res.text();
+    if (body.length < MIN_BYTES || body.length > MAX_CSS_BYTES) return null;
+    // A CSS file never opens with a tag; an error page served as text/css does.
+    if (body.trimStart().startsWith("<")) return null;
+
+    return { body, url };
+  } catch {
+    return null;
+  }
+}
+
 /** Strip `www.` and any single subdomain to reach a probable apex. */
 function apexOf(hostname: string): string | null {
   const parts = hostname.split(".");
@@ -73,6 +103,171 @@ function siteCandidates(site: string | null): string[] {
   const apex = apexOf(url.hostname);
   if (apex) out.push(`https://${apex}/design.md`);
   return out;
+}
+
+/* ------------------------------------------------------- pointer chasing */
+
+/**
+ * Some brands publish a *pointer* rather than a document.
+ *
+ * - `resend.com/design.md` is 1,159 bytes of links, and **its own links 404**
+ *   (verified). The real tokens live at `resend-brand/SKILL.md`, reachable
+ *   only by listing the repo tree.
+ * - `vercel.com/design.md` is a 35 KB Agent Skill with zero colour literals;
+ *   everything is in the `vercel-brand.css` it links to.
+ *
+ * So: chase, but chase properly, and exactly one level deep. A pointer's
+ * pointer is somebody else's problem.
+ */
+const MAX_CHASES = 4;
+const BRAND_DOC = /(?:^|\/)(?:SKILL|DESIGN|BRAND|TOKENS|THEME|STYLE)\.md$/i;
+
+/** `github.com/<o>/<r>/blob/<ref>/<path>` → the raw URL for the same bytes. */
+function githubBlobToRaw(url: string): string | null {
+  const m = url.match(
+    /^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/blob\/([^/]+)\/(.+)$/i,
+  );
+  if (!m) return null;
+  const [, owner, repo, ref, path] = m;
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path.split("#")[0]}`;
+}
+
+function githubRepoOf(url: string): { owner: string; repo: string } | null {
+  const m = url.match(/^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)(?:[/?#]|$)/i);
+  return m ? { owner: m[1], repo: m[2].replace(/\.git$/, "") } : null;
+}
+
+/**
+ * List a repo's blobs. Uses the `HEAD` ref so we never need a second call to
+ * discover the default branch — verified against `resend/design-skills`.
+ * Unauthenticated is fine (60 req/hr/IP); `GITHUB_TOKEN` lifts it to 5,000.
+ */
+async function listRepoBlobs(owner: string, repo: string): Promise<string[]> {
+  const token = process.env.GITHUB_TOKEN;
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        next: { revalidate: DESIGN_REVALIDATE },
+      },
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      tree?: Array<{ path?: string; type?: string }>;
+    };
+    return (json.tree ?? [])
+      .filter((e) => e.type === "blob" && typeof e.path === "string")
+      .map((e) => e.path as string);
+  } catch {
+    return [];
+  }
+}
+
+/** Rank brand documents in a repo tree: `resend-brand/SKILL.md` beats `SKILL.md`. */
+function rankBrandDocs(paths: string[]): string[] {
+  return paths
+    .filter((p) => BRAND_DOC.test(p) && !/(^|\/)(tests?|examples?|node_modules)\//i.test(p))
+    .map((p) => {
+      let score = 0;
+      if (/brand/i.test(p)) score += 4;
+      if (/design|token|theme/i.test(p)) score += 2;
+      // A nested doc is the specific one; a root SKILL.md is usually the index.
+      if (p.includes("/")) score += 1;
+      return { p, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.p)
+    .slice(0, 3);
+}
+
+/**
+ * Resolve one pointer to a parsed manifest, or null.
+ * Never recurses: whatever comes back is used as-is.
+ */
+async function chaseOne(url: string): Promise<DesignManifest | null> {
+  if (/\.css(?:[?#]|$)/i.test(url)) {
+    const css = await tryFetchCss(url);
+    if (!css) return null;
+    const parsed = parseDesignCss(css.body, css.url);
+    return parsed.ok ? parsed : null;
+  }
+
+  const raw = githubBlobToRaw(url);
+  if (raw) {
+    const doc = await tryFetchMarkdown(raw);
+    if (doc) {
+      const parsed = parseDesignMarkdown(doc.body, doc.url);
+      if (parsed.ok) return parsed;
+    }
+  }
+
+  // The blob URL 404'd — which is exactly what Resend's published links do.
+  // Fall back to listing the tree and finding the brand document ourselves.
+  const repo = githubRepoOf(url);
+  if (repo) {
+    const blobs = await listRepoBlobs(repo.owner, repo.repo);
+    for (const path of rankBrandDocs(blobs)) {
+      const doc = await tryFetchMarkdown(
+        `https://raw.githubusercontent.com/${repo.owner}/${repo.repo}/HEAD/${path}`,
+      );
+      if (!doc) continue;
+      const parsed = parseDesignMarkdown(doc.body, doc.url);
+      if (parsed.ok && parsed.colors.length > 0) return parsed;
+    }
+    return null;
+  }
+
+  const doc = await tryFetchMarkdown(url);
+  if (!doc) return null;
+  const parsed = parseDesignMarkdown(doc.body, doc.url);
+  return parsed.ok ? parsed : null;
+}
+
+/**
+ * Merge a chased manifest into the pointer document that named it.
+ * The pointer keeps its identity (name, description, voice); the chased
+ * document supplies the tokens it was pointing at.
+ */
+function mergeChased(pointer: DesignManifest, chased: DesignManifest): DesignManifest {
+  return {
+    ...pointer,
+    ok: true,
+    colors: chased.colors.length > 0 ? chased.colors : pointer.colors,
+    fonts: chased.fonts.length > 0 ? chased.fonts : pointer.fonts,
+    radiusPx: pointer.radiusPx ?? chased.radiusPx,
+    name: pointer.name ?? chased.name,
+    description: pointer.description ?? chased.description,
+    format: pointer.colors.length === 0 ? "pointer" : pointer.format,
+    warnings: [...pointer.warnings, `Tokens chased from ${chased.sourceUrl}.`],
+  };
+}
+
+/**
+ * Chase a document's pointers, depth 1.
+ * Only fires when the document itself yielded no colours — a manifest with
+ * real tokens is never second-guessed.
+ */
+async function chasePointers(manifest: DesignManifest): Promise<DesignManifest> {
+  if (manifest.colors.length > 0 || manifest.pointers.length === 0) return manifest;
+
+  const seen = new Set<string>();
+  let budget = MAX_CHASES;
+
+  for (const url of manifest.pointers) {
+    if (budget-- <= 0) break;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const chased = await chaseOne(url);
+    if (chased && chased.colors.length > 0) return mergeChased(manifest, chased);
+  }
+
+  return manifest;
 }
 
 export interface DesignSources {
@@ -120,9 +315,14 @@ export async function resolveDesignManifest(
     if (!doc) continue;
 
     const manifest = parseDesignMarkdown(doc.body, doc.url);
-    if (!manifest.ok) continue;
+    if (!manifest.ok && manifest.pointers.length === 0) continue;
 
-    return applyCurated({ ...manifest, origin }, owner);
+    // A pointer file parses as "ok: false, colours: 0" but is still the right
+    // document — it just delegates. Chase before deciding it is a dead end.
+    const resolved = await chasePointers(manifest);
+    if (!resolved.ok) continue;
+
+    return applyCurated({ ...resolved, origin }, owner);
   }
 
   // Nothing published anything usable — synthesise from the curated seed, or

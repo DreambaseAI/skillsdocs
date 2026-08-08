@@ -16,7 +16,9 @@ export type TokenSource =
   | "data-fence"
   | "table"
   | "bullet"
-  | "prose";
+  | "prose"
+  /** A stylesheet the document delegated to, e.g. vercel.com's brand CSS. */
+  | "external-css";
 
 export type ColorRole =
   | "primary"
@@ -78,6 +80,33 @@ export type DesignFormat =
   | "mixed"
   | "none";
 
+/**
+ * What became of one brand family after matching it against the shipped
+ * catalogue in `lib/fonts.ts`.
+ *
+ * We never load a font we do not already self-host: a runtime `<link>` to
+ * fonts.googleapis.com would add a third-party origin to the CSP, forfeit
+ * `next/font`'s fallback-metric generation, and hand an attacker-controlled
+ * string a route into `<head>`.
+ */
+export interface ResolvedFont {
+  /** The family exactly as the design document named it. */
+  requested: string;
+  /** Font id in `lib/fonts.ts`, or null when nothing sensible matched. */
+  id: string | null;
+  /** Display label of the face we will actually render. */
+  label: string | null;
+  kind: "exact" | "substituted" | "unavailable";
+  /** Colophon line. Present only when the rendered face is not the requested one. */
+  note: string | null;
+}
+
+export interface FontResolution {
+  display: ResolvedFont | null;
+  body: ResolvedFont | null;
+  mono: ResolvedFont | null;
+}
+
 export interface DesignManifest {
   ok: boolean;
   /** Which tier of the resolution chain produced this. */
@@ -124,8 +153,14 @@ export interface IssueTheme {
   chartLight: string[];
   chartDark: string[];
   radiusPx: number | null;
+  /** Families as the brand named them — for the colophon, not for CSS. */
   displayFont: string | null;
   bodyFont: string | null;
   monoFont: string | null;
+  /**
+   * Which shipped faces those families resolved to. Optional so a fixture can
+   * omit it; `deriveIssueTheme` always populates it.
+   */
+  fontResolution?: FontResolution;
   origin: DesignManifest["origin"];
 }

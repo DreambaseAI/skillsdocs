@@ -37,7 +37,42 @@ const COLOR_LITERAL = new RegExp(
   "gi",
 );
 
-const LIGHT_DARK = /light-dark\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/gi;
+const LIGHT_DARK_OPEN = /light-dark\(/gi;
+
+/**
+ * Split `light-dark(a, b)` into its two arguments.
+ *
+ * A regex cannot do this: Vercel writes
+ * `light-dark(oklch(57.61% 0.2508 258.23), oklch(57.61% 0.2321 258.23))`, and
+ * any `[^)]` capture stops at the *inner* closing paren, silently truncating
+ * the dark value into something unparseable. Count the depth instead.
+ */
+function findLightDark(text: string): Array<{ match: string; light: string; dark: string }> {
+  const out: Array<{ match: string; light: string; dark: string }> = [];
+  LIGHT_DARK_OPEN.lastIndex = 0;
+
+  for (let m = LIGHT_DARK_OPEN.exec(text); m; m = LIGHT_DARK_OPEN.exec(text)) {
+    const argsStart = m.index + m[0].length;
+    let depth = 1;
+    let split = -1;
+    let i = argsStart;
+    for (; i < text.length && depth > 0; i++) {
+      const ch = text[i];
+      if (ch === "(") depth++;
+      else if (ch === ")") depth--;
+      else if (ch === "," && depth === 1 && split === -1) split = i;
+    }
+    if (depth !== 0 || split === -1) continue;
+
+    out.push({
+      match: text.slice(m.index, i),
+      light: text.slice(argsStart, split).trim(),
+      dark: text.slice(split + 1, i - 1).trim(),
+    });
+    LIGHT_DARK_OPEN.lastIndex = i;
+  }
+  return out;
+}
 
 /** Lines describing shadows and gridlines carry colours that aren't brand. */
 const NON_BRAND_LINE = /box-shadow|text-shadow|\bshadow\b|gridline|scrim|overlay/i;
@@ -77,9 +112,62 @@ const CONFIDENCE: Record<TokenSource, number> = {
   "data-fence": 0.85,
   "css-fence": 0.8,
   table: 0.7,
+  "external-css": 0.65,
   bullet: 0.6,
   prose: 0.3,
 };
+
+/* ---------------------------------------------------------- sanitisation */
+
+/**
+ * A `design.md` is third-party and attacker-controllable — anyone can publish
+ * one at their own domain and we will happily fetch it. Its values end up
+ * inside a `<style>` element served from *our* origin, so every one of them
+ * passes a whitelist before it is allowed anywhere near CSS.
+ *
+ * Values that fail are **dropped, never escaped**. There is no legitimate
+ * brand token containing a quote, a semicolon, a brace, an angle bracket, or a
+ * `url()`, so there is nothing to preserve by trying to be clever.
+ */
+export const SAFE_COLOR =
+  /^(?:#[0-9a-f]{3,8}|(?:oklch|oklab|rgba?|hsla?)\(\s*[0-9a-z.%\s,/+-]{1,80}\))$/i;
+export const SAFE_LEN = /^-?\d{1,4}(?:\.\d{1,4})?(?:px|rem|em|%)$/;
+/**
+ * Family names only. Letters, digits, spaces and a few joiners — no quotes,
+ * no parentheses, no separators. Unicode-aware so "Söhne" survives.
+ */
+export const SAFE_FONT = /^[\p{L}\p{N}][\p{L}\p{N} ._'-]{0,47}$/u;
+
+/** Hard ceilings, so a hostile document cannot make us emit a megabyte. */
+export const LIMITS = {
+  colors: 64,
+  fonts: 8,
+  /** Bytes of derived CSS. */
+  css: 32 * 1024,
+} as const;
+
+/**
+ * A colour is safe only if it matches the whitelist **and** actually parses.
+ * The pattern alone would pass `rgb(expression)`; the parser will not.
+ */
+export function sanitizeColor(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const v = value.trim();
+  if (v.length > 96 || !SAFE_COLOR.test(v)) return null;
+  return parseColor(v) ? v : null;
+}
+
+export function sanitizeLength(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const v = value.trim();
+  return SAFE_LEN.test(v) ? v : null;
+}
+
+export function sanitizeFontFamily(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const v = value.trim().replace(/\s+/g, " ");
+  return SAFE_FONT.test(v) ? v : null;
+}
 
 /** Turn one colour literal into a BrandColor, or null if unparseable. */
 function toBrandColor(
@@ -121,12 +209,12 @@ function scanColors(
   const out: BrandColor[] = [];
   let remainder = text;
 
-  for (const m of text.matchAll(LIGHT_DARK)) {
-    const light = toBrandColor(m[1], name, usage, source, "light");
-    const dark = toBrandColor(m[2], name, usage, source, "dark");
+  for (const pair of findLightDark(text)) {
+    const light = toBrandColor(pair.light, name, usage, source, "light");
+    const dark = toBrandColor(pair.dark, name, usage, source, "dark");
     if (light) out.push(light);
     if (dark) out.push(dark);
-    remainder = remainder.replace(m[0], " ");
+    remainder = remainder.replace(pair.match, " ");
   }
 
   for (const m of remainder.matchAll(COLOR_LITERAL)) {
@@ -193,9 +281,28 @@ function parseFontStack(value: string): string[] {
 
 function primaryFamily(stack: string[]): string | null {
   for (const f of stack) {
-    if (!GENERIC_FAMILIES.has(f.toLowerCase())) return f;
+    if (GENERIC_FAMILIES.has(f.toLowerCase())) continue;
+    const safe = sanitizeFontFamily(f);
+    if (safe) return safe;
   }
   return null;
+}
+
+/**
+ * Families out of a raw CSS `font-family` value.
+ *
+ * `parseFontStack` strips parentheticals, which is right for the prose form
+ * ("Suisse Intl + Geist (numbers)") and catastrophically wrong for a real CSS
+ * declaration: Vercel's is
+ * `var(--font-geist-sans, var(--font-sans, "Geist", -apple-system, …))`, and
+ * naive stripping yields the family "var". Quoted names are the signal here;
+ * everything else in a `var()` chain is a reference, not a family.
+ */
+function familiesFromCssValue(value: string): string[] {
+  const quoted = [...value.matchAll(/["']([^"']{1,48})["']/g)].map((m) => m[1]);
+  if (quoted.length > 0) return quoted;
+  if (value.includes("var(") || value.includes("--")) return [];
+  return parseFontStack(value);
 }
 
 function roleFromKey(key: string): FontRole {
@@ -268,6 +375,54 @@ function parseRadius(value: unknown): number | null {
 
 const CSS_VAR = /--([\w-]+)\s*:\s*([^;\n}]+)/g;
 const CSS_FONT = /font-family\s*:\s*([^;\n}]+)/gi;
+
+/** `--vbg-radius: 8px` and `--radius: 8px`, but not `--vbg-radius-small`. */
+const RADIUS_NAME = /(?:^|-)(?:border-)?radius$|^rounded(?:-(?:md|base|default))?$/i;
+
+/** A CSS file can be 108 KB; stop before a pathological one becomes our problem. */
+const MAX_DECLARATIONS = 4000;
+
+interface CssHarvest {
+  colors: BrandColor[];
+  fonts: BrandFont[];
+  radiusPx: number | null;
+}
+
+/**
+ * Harvest custom properties and `font-family` declarations out of any blob of
+ * CSS — a fenced block inside a design.md, or a whole external stylesheet.
+ */
+function harvestCss(css: string, source: TokenSource): CssHarvest {
+  const colors: BrandColor[] = [];
+  const fonts: BrandFont[] = [];
+  let radiusPx: number | null = null;
+  let seen = 0;
+
+  for (const m of css.matchAll(CSS_VAR)) {
+    if (++seen > MAX_DECLARATIONS) break;
+    const [, name, value] = m;
+    // Shadows, scrims and gridlines carry colours that are not the brand's.
+    if (NON_BRAND_LINE.test(name)) continue;
+
+    if (/font/i.test(name)) {
+      const stack = familiesFromCssValue(value);
+      const family = primaryFamily(stack);
+      if (family) fonts.push({ family, stack, role: roleFromKey(name), source });
+      continue;
+    }
+
+    for (const c of scanColors(value, name, null, source)) colors.push(c);
+    if (radiusPx === null && RADIUS_NAME.test(name)) radiusPx = parseRadius(value);
+  }
+
+  for (const m of css.matchAll(CSS_FONT)) {
+    const stack = familiesFromCssValue(m[1]);
+    const family = primaryFamily(stack);
+    if (family) fonts.push({ family, stack, role: "unknown", source });
+  }
+
+  return { colors, fonts, radiusPx };
+}
 
 /**
  * `- **Spotify Green** (`#1ed760`): Primary brand accent`
@@ -382,17 +537,10 @@ export function parseDesignMarkdown(source: string, sourceUrl: string): DesignMa
           ? "data-fence"
           : "css-fence";
 
-      for (const m of node.value.matchAll(CSS_VAR)) {
-        for (const c of scanColors(m[2], m[1], null, source)) colors.push(c);
-        if (/^(radius|border-radius|rounded)/i.test(m[1]) && radiusPx === null) {
-          radiusPx = parseRadius(m[2]);
-        }
-      }
-      for (const m of node.value.matchAll(CSS_FONT)) {
-        const stack = parseFontStack(m[1]);
-        const family = primaryFamily(stack);
-        if (family) fonts.push({ family, stack, role: "unknown", source });
-      }
+      const harvest = harvestCss(node.value, source);
+      colors.push(...harvest.colors);
+      fonts.push(...harvest.fonts);
+      if (radiusPx === null) radiusPx = harvest.radiusPx;
       // Fences may also hold bare literals with no custom-property wrapper.
       for (const line of node.value.split("\n")) {
         if (line.includes("--") || NON_BRAND_LINE.test(line)) continue;
@@ -410,7 +558,11 @@ export function parseDesignMarkdown(source: string, sourceUrl: string): DesignMa
       const rows = node.children;
       if (rows.length < 2) return;
       const header = rows[0].children.map((c: RootContent) => textOf(c).toLowerCase());
-      const isFontTable = header.some((h: string) => /\b(font|family|typeface)\b/.test(h));
+      // Which column holds the family matters. Resend's table is
+      // `| Font | Role |` and Clerk's is `| Role | Family | CSS variable |`;
+      // assuming column 1 turns "Display headlines" into a typeface.
+      const fontCol = header.findIndex((h: string) => /\b(font|family|typeface)\b/.test(h));
+      const isFontTable = fontCol !== -1;
 
       for (const row of rows.slice(1)) {
         const cells = row.children.map((c: RootContent) => textOf(c).trim());
@@ -419,13 +571,15 @@ export function parseDesignMarkdown(source: string, sourceUrl: string): DesignMa
         const usage = cells.length > 1 ? cells.at(-1)! : null;
 
         if (isFontTable) {
-          const stack = parseFontStack(cells[1] ?? label);
+          const stack = parseFontStack(cells[fontCol] ?? cells[1] ?? label);
           const family = primaryFamily(stack);
           if (family) {
             fonts.push({
               family,
               stack,
-              role: roleFromKey(`${label} ${usage ?? ""}`),
+              role: roleFromKey(
+                cells.filter((_, i) => i !== fontCol).join(" ") || label,
+              ),
               source: "table",
             });
           }
@@ -457,7 +611,10 @@ export function parseDesignMarkdown(source: string, sourceUrl: string): DesignMa
     }
 
     if (node.type === "link" && typeof node.url === "string") {
-      if (/^https?:/i.test(node.url) && /(design|brand|style|theme)/i.test(node.url)) {
+      if (
+        /^https?:/i.test(node.url) &&
+        /(design|brand|token|style|theme)/i.test(node.url)
+      ) {
         pointers.push(node.url);
       }
     }
@@ -478,20 +635,62 @@ export function parseDesignMarkdown(source: string, sourceUrl: string): DesignMa
 
   const deduped = dedupeColors(colors);
   if (deduped.length === 0) warnings.push("No colour tokens found.");
+  const dedupedFonts = dedupeFonts(fonts);
+  if (deduped.length > LIMITS.colors || dedupedFonts.length > LIMITS.fonts) {
+    warnings.push(
+      `Token set truncated to ${LIMITS.colors} colours and ${LIMITS.fonts} fonts.`,
+    );
+  }
 
   return {
-    ok: deduped.length > 0 || fonts.length > 0,
+    ok: deduped.length > 0 || dedupedFonts.length > 0,
     origin: "owner-site",
     sourceUrl,
     format: pickFormat(formats),
     name,
     description,
-    colors: deduped,
-    fonts: dedupeFonts(fonts),
-    radiusPx,
+    colors: deduped.slice(0, LIMITS.colors),
+    fonts: dedupedFonts.slice(0, LIMITS.fonts),
+    radiusPx: sanitizeRadius(radiusPx),
     voice: extractVoice(description, content),
     pointers: [...new Set(pointers)].slice(0, 5),
     warnings,
+  };
+}
+
+/** Radii outside this range are a parse artefact, not a design decision. */
+function sanitizeRadius(px: number | null): number | null {
+  if (px === null || !Number.isFinite(px)) return null;
+  if (px < 0 || px > 64) return null;
+  return Math.round(px * 100) / 100;
+}
+
+/**
+ * Parse a whole external stylesheet as a token source.
+ *
+ * `vercel.com/design.md` is an Agent Skill containing zero colour literals —
+ * it defers everything to `vercel.com/geist/vercel-brand.css`, 108 KB of
+ * `light-dark()` oklch in both the unit and percent dialects. That file is a
+ * first-class manifest; this is how we read it.
+ */
+export function parseDesignCss(source: string, sourceUrl: string): DesignManifest {
+  const { colors, fonts, radiusPx } = harvestCss(source, "external-css");
+  const deduped = dedupeColors(colors);
+  const dedupedFonts = dedupeFonts(fonts);
+
+  return {
+    ok: deduped.length > 0 || dedupedFonts.length > 0,
+    origin: "owner-site",
+    sourceUrl,
+    format: "mixed",
+    name: null,
+    description: null,
+    colors: deduped.slice(0, LIMITS.colors),
+    fonts: dedupedFonts.slice(0, LIMITS.fonts),
+    radiusPx: sanitizeRadius(radiusPx),
+    voice: { words: [], quotes: [], summary: null },
+    pointers: [],
+    warnings: [],
   };
 }
 
@@ -501,7 +700,13 @@ function pickFormat(formats: Set<DesignFormat>): DesignFormat {
   return [...formats][0];
 }
 
-/** Keep the highest-confidence entry per (key, scheme). */
+/**
+ * Keep the highest-confidence entry per (key, scheme).
+ *
+ * Ordering is confidence first, then chroma — the list gets truncated at
+ * `LIMITS.colors`, and truncating away the one saturated token in a 500-token
+ * stylesheet would silently turn a brand grey.
+ */
 function dedupeColors(colors: BrandColor[]): BrandColor[] {
   const best = new Map<string, BrandColor>();
   for (const c of colors) {
@@ -509,7 +714,9 @@ function dedupeColors(colors: BrandColor[]): BrandColor[] {
     const existing = best.get(id);
     if (!existing || c.confidence > existing.confidence) best.set(id, c);
   }
-  return [...best.values()].sort((a, b) => b.confidence - a.confidence);
+  return [...best.values()].sort(
+    (a, b) => b.confidence - a.confidence || b.oklch.c - a.oklch.c,
+  );
 }
 
 function dedupeFonts(fonts: BrandFont[]): BrandFont[] {

@@ -29,7 +29,14 @@ import {
   WCAG,
   type Oklch,
 } from "../color";
-import type { BrandColor, DesignManifest, IssueTheme } from "./types";
+import { LIMITS, sanitizeColor, sanitizeFontFamily } from "./parse";
+import type {
+  BrandColor,
+  DesignManifest,
+  FontResolution,
+  IssueTheme,
+  ResolvedFont,
+} from "./types";
 
 /** Paper colours the accents must sit on. Kept in sync with globals.css. */
 export const PAPER = {
@@ -110,9 +117,168 @@ const FONT_ROLE_ORDER = {
 function pickFont(manifest: DesignManifest, want: keyof typeof FONT_ROLE_ORDER) {
   for (const role of FONT_ROLE_ORDER[want]) {
     const hit = manifest.fonts.find((f) => f.role === role);
-    if (hit) return hit.family;
+    if (hit) return sanitizeFontFamily(hit.family);
   }
   return null;
+}
+
+/* ------------------------------------------------------- brand fonts */
+
+/**
+ * Match a brand family against the faces we already self-host.
+ *
+ * The rule that governs this whole section: **we never inject a runtime
+ * `<link>` to fonts.googleapis.com.** It would add a third-party origin to the
+ * CSP, forfeit `next/font`'s fallback-metric generation (our largest CLS
+ * lever), and put an attacker-controlled string into `<head>`. A brand either
+ * names a face we ship, or it gets the nearest one we do and a line in the
+ * colophon saying so.
+ *
+ * **Why this data is mirrored instead of imported.** `lib/fonts.ts` calls
+ * `next/font/google` at module scope, and those calls only exist inside a Next
+ * build — importing that module from here would break `pnpm verify:contrast`
+ * and every unit test, both of which run under plain Node. The mirror below is
+ * held to the real catalogue by `theme.test.ts`, which imports `lib/fonts.ts`
+ * with `next/font/google` mocked and fails on any drift.
+ */
+interface ShippedFace {
+  id: string;
+  label: string;
+  cssVar: string;
+  fallback: string;
+}
+
+const SERIF_FALLBACK = "Georgia, 'Times New Roman', serif";
+const SANS_FALLBACK = "system-ui, -apple-system, 'Segoe UI', sans-serif";
+const MONO_FALLBACK = "ui-monospace, SFMono-Regular, Menlo, monospace";
+
+export const SHIPPED_FACES: ShippedFace[] = [
+  { id: "literata", label: "Literata", cssVar: "--font-literata", fallback: SERIF_FALLBACK },
+  { id: "source-serif", label: "Source Serif 4", cssVar: "--font-source-serif", fallback: SERIF_FALLBACK },
+  { id: "newsreader", label: "Newsreader", cssVar: "--font-newsreader", fallback: SERIF_FALLBACK },
+  { id: "eb-garamond", label: "EB Garamond", cssVar: "--font-eb-garamond", fallback: SERIF_FALLBACK },
+  { id: "crimson-pro", label: "Crimson Pro", cssVar: "--font-crimson-pro", fallback: SERIF_FALLBACK },
+  { id: "lora", label: "Lora", cssVar: "--font-lora", fallback: SERIF_FALLBACK },
+  { id: "geist", label: "Geist", cssVar: "--font-geist", fallback: SANS_FALLBACK },
+  { id: "inter", label: "Inter", cssVar: "--font-inter", fallback: SANS_FALLBACK },
+  { id: "public-sans", label: "Public Sans", cssVar: "--font-public-sans", fallback: SANS_FALLBACK },
+  { id: "atkinson", label: "Atkinson Hyperlegible", cssVar: "--font-atkinson", fallback: SANS_FALLBACK },
+  { id: "geist-mono", label: "Geist Mono", cssVar: "--font-geist-mono", fallback: MONO_FALLBACK },
+  { id: "jetbrains-mono", label: "JetBrains Mono", cssVar: "--font-jetbrains-mono", fallback: MONO_FALLBACK },
+  { id: "atkinson-mono", label: "Atkinson Mono", cssVar: "--font-atkinson-mono", fallback: MONO_FALLBACK },
+  { id: "fraunces", label: "Fraunces", cssVar: "--font-fraunces", fallback: SERIF_FALLBACK },
+  { id: "instrument-serif", label: "Instrument Serif", cssVar: "--font-instrument-serif", fallback: SERIF_FALLBACK },
+];
+
+/**
+ * Proprietary and unshipped families mapped to the nearest face we serve.
+ * Mirrors `FONT_SUBSTITUTIONS` in `lib/fonts.ts`; parity is enforced by test.
+ */
+export const BRAND_FONT_SUBSTITUTIONS: Record<string, string> = {
+  copernicus: "newsreader",
+  tiempos: "newsreader",
+  "tiempos text": "newsreader",
+  "tiempos headline": "fraunces",
+  "domaine display": "fraunces",
+  "domaine display narrow": "fraunces",
+  "suisse intl": "inter",
+  "suisse int'l": "inter",
+  söhne: "inter",
+  sohne: "inter",
+  favorit: "inter",
+  styrene: "geist",
+  "styrene a": "geist",
+  "styrene b": "geist",
+  "söhne mono": "jetbrains-mono",
+  "sohne mono": "jetbrains-mono",
+  commitmono: "jetbrains-mono",
+  "berkeley mono": "jetbrains-mono",
+  "gt america": "inter",
+  "abc favorit": "inter",
+  "neue haas grotesk": "inter",
+  helvetica: "inter",
+  "helvetica neue": "inter",
+  circular: "geist",
+  graphik: "inter",
+};
+
+const FACE_BY_ID = new Map(SHIPPED_FACES.map((f) => [f.id, f] as const));
+const FACE_BY_LABEL = new Map(
+  SHIPPED_FACES.map((f) => [f.label.toLowerCase(), f.id] as const),
+);
+
+export function shippedFace(id: string | null): ShippedFace | null {
+  return id ? (FACE_BY_ID.get(id) ?? null) : null;
+}
+
+/** Trailing style qualifiers that are not part of the family's identity. */
+const FAMILY_QUALIFIER = /\s+(?:variable|vf|std|lt|mt|regular|book|text)$/i;
+
+function normaliseFamily(family: string): string {
+  return family
+    .toLowerCase()
+    .replace(/[""'']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(FAMILY_QUALIFIER, "");
+}
+
+/** Substitution keys longest-first, so "söhne mono" wins over "söhne". */
+const SUBSTITUTION_KEYS = Object.keys(BRAND_FONT_SUBSTITUTIONS).sort(
+  (a, b) => b.length - a.length,
+);
+
+export function resolveBrandFont(family: string | null): ResolvedFont | null {
+  const safe = sanitizeFontFamily(family);
+  if (!safe) return null;
+
+  const key = normaliseFamily(safe);
+
+  const exact = FACE_BY_LABEL.get(key);
+  if (exact) {
+    return {
+      requested: safe,
+      id: exact,
+      label: shippedFace(exact)?.label ?? null,
+      kind: "exact",
+      note: null,
+    };
+  }
+
+  // Exact substitution, then containment — "Resend Favorit" is Favorit, and
+  // "Söhne Mono" must not be answered by the "Söhne" entry.
+  const subKey = BRAND_FONT_SUBSTITUTIONS[key]
+    ? key
+    : (SUBSTITUTION_KEYS.find((k) => key.includes(k)) ?? null);
+
+  if (subKey) {
+    const id = BRAND_FONT_SUBSTITUTIONS[subKey];
+    const face = shippedFace(id);
+    return {
+      requested: safe,
+      id,
+      label: face?.label ?? null,
+      kind: "substituted",
+      note: `${safe} is not available to us; set in ${face?.label ?? id}.`,
+    };
+  }
+
+  return {
+    requested: safe,
+    id: null,
+    label: null,
+    kind: "unavailable",
+    note: `${safe} is not a face we ship; the reader's own choice is used.`,
+  };
+}
+
+function resolveFonts(manifest: DesignManifest | null): FontResolution {
+  if (!manifest) return { display: null, body: null, mono: null };
+  return {
+    display: resolveBrandFont(pickFont(manifest, "display")),
+    body: resolveBrandFont(pickFont(manifest, "body")),
+    mono: resolveBrandFont(pickFont(manifest, "mono")),
+  };
 }
 
 export function deriveIssueTheme(
@@ -154,12 +320,19 @@ export function deriveIssueTheme(
     ink: inkFrom(colors),
     chartLight: chartSeries(hue, chroma, L_LIGHT),
     chartDark: chartSeries(hue, chroma, L_DARK),
-    radiusPx: manifest?.radiusPx ?? null,
+    radiusPx: safeRadius(manifest?.radiusPx ?? null),
     displayFont: manifest ? pickFont(manifest, "display") : null,
     bodyFont: manifest ? pickFont(manifest, "body") : null,
     monoFont: manifest ? pickFont(manifest, "mono") : null,
+    fontResolution: resolveFonts(manifest),
     origin: manifest?.origin ?? "name-hash",
   };
+}
+
+/** A radius outside this band is a parse artefact, not a brand decision. */
+function safeRadius(px: number | null): number | null {
+  if (px === null || !Number.isFinite(px) || px < 0 || px > 64) return null;
+  return Math.round(px * 100) / 100;
 }
 
 /** Contrast report for an issue theme, used by tests and the colophon. */
@@ -178,37 +351,107 @@ export function auditIssueTheme(theme: IssueTheme) {
 }
 
 /**
+ * The `[data-issue="…"]` selector for an owner.
+ *
+ * The owner login is a path segment, which means it is whatever the request
+ * URL said it was. Slugify it here rather than trusting a caller to remember:
+ * an owner named `x"]{}html{display:none}[y="` would otherwise author CSS on
+ * our origin.
+ */
+export function issueSelector(owner: string): string {
+  const slug = owner.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
+  return `[data-issue="${slug || "unknown"}"]`;
+}
+
+/**
+ * Selectors that may be handed to `issueThemeCss`.
+ *
+ * Braces, angle brackets, semicolons, parentheses and `@` are all absent by
+ * construction, so no value here can close the rule and open something else.
+ */
+const SAFE_SELECTOR = /^[A-Za-z0-9_\-[\]="':.#>~*\s]{1,96}$/;
+
+/** Custom-property name/value pairs, both already proven safe. */
+type Decls = Array<[string, string]>;
+
+function block(selector: string, decls: Decls): string {
+  if (decls.length === 0) return "";
+  return `${selector}{${decls.map(([k, v]) => `${k}:${v};`).join("")}}`;
+}
+
+/**
  * Serialise a theme as CSS custom properties.
  *
  * Only the accent, radius and fonts change per issue — the stone neutrals are
  * deliberately shared so the magazine still reads as one publication, and so
  * we aren't re-auditing twenty tokens for every owner.
+ *
+ * Every value that reaches this function came, directly or indirectly, from a
+ * third-party document, so each one is re-validated here even though the
+ * accents are machine-generated. Defence in depth is cheap; a stored XSS on
+ * our own origin is not.
  */
 export function issueThemeCss(theme: IssueTheme, selector: string): string {
-  const lines: string[] = [
-    `${selector}{`,
-    `--issue-hue:${theme.hue};`,
-    `--issue-chroma:${theme.chroma};`,
-    `--issue-accent:${theme.accentLight};`,
-    `--issue-accent-foreground:${theme.accentForegroundLight};`,
-    ...theme.chartLight.map((c, i) => `--issue-chart-${i + 1}:${c};`),
+  if (!SAFE_SELECTOR.test(selector)) return "";
+
+  const colors = (values: string[], prefix: string): Decls => {
+    const out: Decls = [];
+    values.slice(0, 5).forEach((value, i) => {
+      const safe = sanitizeColor(value);
+      if (safe) out.push([`${prefix}${i + 1}`, safe]);
+    });
+    return out;
+  };
+
+  const light: Decls = [
+    ["--issue-hue", String(Math.round(theme.hue * 100) / 100)],
+    ["--issue-chroma", String(Math.round(theme.chroma * 1000) / 1000)],
   ];
-  if (theme.radiusPx !== null) lines.push(`--radius:${theme.radiusPx / 16}rem;`);
-  if (theme.ink) lines.push(`--issue-ink:${theme.ink};`);
-  lines.push("}");
+  const accentLight = sanitizeColor(theme.accentLight);
+  const accentFgLight = sanitizeColor(theme.accentForegroundLight);
+  if (accentLight) light.push(["--issue-accent", accentLight]);
+  if (accentFgLight) light.push(["--issue-accent-foreground", accentFgLight]);
+  light.push(...colors(theme.chartLight, "--issue-chart-"));
 
-  lines.push(
-    `.dark ${selector},${selector}.dark{`,
-    `--issue-accent:${theme.accentDark};`,
-    `--issue-accent-foreground:${theme.accentForegroundDark};`,
-    ...theme.chartDark.map((c, i) => `--issue-chart-${i + 1}:${c};`),
-    "}",
-  );
+  const radius = safeRadius(theme.radiusPx);
+  if (radius !== null) light.push(["--radius", `${radius / 16}rem`]);
+  const ink = sanitizeColor(theme.ink);
+  if (ink) light.push(["--issue-ink", ink]);
 
-  lines.push(
-    `[data-contrast="high"] ${selector}{--issue-accent:${theme.accentLightHc};}`,
-    `[data-contrast="high"].dark ${selector},[data-contrast="high"] .dark ${selector}{--issue-accent:${theme.accentDarkHc};}`,
-  );
+  const displayFace = shippedFace(theme.fontResolution?.display?.id ?? null);
+  if (displayFace) {
+    // Only ever a variable we declared ourselves — never the brand's string.
+    light.push([
+      "--display-font-family",
+      `var(${displayFace.cssVar}), ${displayFace.fallback}`,
+    ]);
+  }
 
-  return lines.join("");
+  const dark: Decls = [];
+  const accentDark = sanitizeColor(theme.accentDark);
+  const accentFgDark = sanitizeColor(theme.accentForegroundDark);
+  if (accentDark) dark.push(["--issue-accent", accentDark]);
+  if (accentFgDark) dark.push(["--issue-accent-foreground", accentFgDark]);
+  dark.push(...colors(theme.chartDark, "--issue-chart-"));
+
+  const hcLight = sanitizeColor(theme.accentLightHc);
+  const hcDark = sanitizeColor(theme.accentDarkHc);
+
+  const css = [
+    block(selector, light),
+    block(`.dark ${selector},${selector}.dark`, dark),
+    hcLight
+      ? block(`[data-contrast="high"] ${selector}`, [["--issue-accent", hcLight]])
+      : "",
+    hcDark
+      ? block(
+          `[data-contrast="high"].dark ${selector},[data-contrast="high"] .dark ${selector}`,
+          [["--issue-accent", hcDark]],
+        )
+      : "",
+  ].join("");
+
+  // Cannot happen with the caps above; if it ever does, ship nothing rather
+  // than a truncated rule that leaves a brace open.
+  return css.length > LIMITS.css ? "" : css;
 }
