@@ -129,6 +129,10 @@ const NOISE_ANCESTORS = new Set([
   "third_party",
   "assets",
   "asset",
+  "template",
+  "templates",
+  "example",
+  "examples",
   "fixtures",
   "__fixtures__",
   "test",
@@ -150,14 +154,31 @@ const TEMPLATE_DIR_NAMES = new Set([
 ]);
 
 /**
- * Path prefixes that are per-agent republications of a canonical skill.
- * The captured group names the target agent.
+ * Prefixes that mark a per-agent republication of one canonical skill.
+ *
+ * Repos routinely ship the same skill once per agent runtime, and the copies
+ * are NOT byte-identical — `pbakaus/impeccable` publishes fourteen copies
+ * (`.claude/`, `.cursor/`, `.gemini/`, `.grok/`, `.kiro/`, `.pi/`, `.qoder/`,
+ * `.rovodev/`, `.trae/`, …) with fourteen distinct blob SHAs. Stripping the
+ * prefix and comparing what remains collapses them correctly.
+ *
+ * Only a *leading* dot-directory counts: `facebook/react` legitimately hosts
+ * both `.claude/skills/*` and `compiler/.claude/skills/*`, and those are
+ * different skills that must stay separate.
  */
-const MIRROR_PATTERNS: Array<{ re: RegExp; from: (m: RegExpMatchArray) => string }> = [
-  { re: /^providers\/([^/]+)\//, from: (m) => m[1] },
-  { re: /^\.github\/plugins\/([^/]+)\//, from: (m) => m[1] },
-  { re: /^\.(claude|codex|cursor|agents?|opencode|windsurf|gemini)\//, from: (m) => m[1] },
+const MIRROR_PREFIXES: RegExp[] = [
+  /^\.([a-z0-9][a-z0-9_-]*)\//, // .claude/ .cursor/ .gemini/ .trae-cn/ …
+  /^providers\/([^/]+)\//, // providers/claude/ providers/codex/ …
 ];
+
+/** Strip a mirror prefix, returning the remainder and the agent it targeted. */
+function stripMirror(path: string): { normalized: string; label: string | null } {
+  for (const re of MIRROR_PREFIXES) {
+    const m = path.match(re);
+    if (m) return { normalized: path.slice(m[0].length), label: titleCase(m[1]) };
+  }
+  return { normalized: path, label: null };
+}
 
 function dirname(path: string): string {
   const i = path.lastIndexOf("/");
@@ -225,16 +246,8 @@ function canonicalRank(path: string): number {
   let score = path.split("/").length;
   if (path.startsWith("skills/")) score -= 2;
   if (path.startsWith(".")) score += 4;
-  for (const { re } of MIRROR_PATTERNS) if (re.test(path)) score += 6;
+  if (stripMirror(path).label !== null) score += 6;
   return score;
-}
-
-function mirrorLabel(path: string): string {
-  for (const { re, from } of MIRROR_PATTERNS) {
-    const m = path.match(re);
-    if (m) return titleCase(from(m));
-  }
-  return "Alternate";
 }
 
 /**
@@ -254,28 +267,52 @@ export function discoverSkills(
     .filter((e) => e.type === "blob" && isSkillManifest(e.path) && !isNoise(e.path))
     .sort((a, b) => a.path.localeCompare(b.path));
 
-  // Collapse byte-identical copies, keeping the most canonical path.
-  const byContent = new Map<string, typeof manifests>();
+  /**
+   * Collapse duplicates on two keys: identical content anywhere in the repo,
+   * and identical position once a per-agent mirror prefix is removed. The
+   * second key is what catches near-identical copies that drifted apart.
+   */
+  const groupsByKey = new Map<string, TreeEntry[]>();
+  const keyOf = new Map<string, string>();
+
   for (const entry of manifests) {
-    const list = byContent.get(entry.sha);
+    const contentKey = `sha:${entry.sha}`;
+    const positionKey = `pos:${stripMirror(entry.path).normalized}`;
+    // Reuse whichever key an earlier copy already claimed, so the two
+    // relations merge into one group rather than splitting it.
+    const key = keyOf.get(contentKey) ?? keyOf.get(positionKey) ?? contentKey;
+    keyOf.set(contentKey, key);
+    keyOf.set(positionKey, key);
+
+    const list = groupsByKey.get(key);
     if (list) list.push(entry);
-    else byContent.set(entry.sha, [entry]);
+    else groupsByKey.set(key, [entry]);
   }
 
-  const chosen = [...byContent.values()].map((copies) => {
+  const chosen = [...groupsByKey.values()].map((copies) => {
     const sorted = [...copies].sort(
       (a, b) => canonicalRank(a.path) - canonicalRank(b.path) || a.path.localeCompare(b.path),
     );
     return {
       entry: sorted[0],
       variants: sorted.slice(1).map((e) => ({
-        label: mirrorLabel(e.path),
+        label: stripMirror(e.path).label ?? "Alternate",
         path: e.path,
       })),
     };
   });
 
   chosen.sort((a, b) => a.entry.path.localeCompare(b.entry.path));
+
+  // Names collide legitimately — datadog-labs ships both
+  // `dd-apm/k8s-ssi/verify-ssi` and `dd-apm/linux-ssi/verify-ssi`. Qualify a
+  // colliding slug with its group rather than letting it become "verify-ssi-1".
+  const nameCounts = new Map<string, number>();
+  for (const { entry } of chosen) {
+    const dir = dirname(entry.path);
+    const n = dir === "" ? repoName : basename(dir);
+    nameCounts.set(n, (nameCounts.get(n) ?? 0) + 1);
+  }
 
   const slugger = new GithubSlugger();
   const dirToSlug = new Map<string, string>();
@@ -284,21 +321,21 @@ export function discoverSkills(
     const dir = dirname(entry.path);
     // A SKILL.md at the repo root describes the repo itself.
     const rawName = dir === "" ? repoName : basename(dir);
-    const slug = slugger.slug(rawName);
+    const group = deriveGroup(dir);
+    const qualified =
+      (nameCounts.get(rawName) ?? 0) > 1 && group ? `${group}-${rawName}` : rawName;
+
+    const slug = slugger.slug(qualified);
     dirToSlug.set(dir, slug);
-    return {
-      slug,
-      dir,
-      skillMdPath: entry.path,
-      group: deriveGroup(dir),
-      variants,
-      parentSlug: null,
-    };
+    return { slug, dir, skillMdPath: entry.path, group, variants, parentSlug: null };
   });
 
   // Link nested skills (e.g. `skills/foundry/SKILL.md` encloses
   // `skills/foundry/models/SKILL.md`) to their nearest enclosing skill.
+  // A root SKILL.md is excluded: it describes the repo, and treating it as
+  // everyone's parent would flatten the whole book under one chapter.
   for (const stub of stubs) {
+    if (stub.dir === "") continue;
     let ancestor = dirname(stub.dir);
     while (ancestor !== "") {
       const parent = dirToSlug.get(ancestor);
