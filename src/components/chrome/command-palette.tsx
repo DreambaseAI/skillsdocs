@@ -16,13 +16,22 @@
  * WCAG 2.1.4: `/` is a single-character shortcut, so it is inert whenever
  * focus is in a text field, a `contenteditable`, or an open dialog. ⌘K carries
  * a modifier and is always live.
+ *
+ * **Both keys come from the shared keymap** (`useShortcut("search")`), not from
+ * a listener of this component's own. The private listener this file used to
+ * mount bound a bare `/` that consulted neither the off switch nor the
+ * rebinding table, so the two escapes the shortcuts dialog offers were
+ * decorative for the one shortcut a reader is most likely to collide with:
+ * measured, `/` still opened the palette with shortcuts switched off, and
+ * rebinding Search to `S` announced the change and then left `/` working and
+ * `S` dead.
  */
 
 import { ArrowRight02Icon, Book02Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,19 +44,12 @@ import {
 } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { useShortcut } from "@/hooks/use-shortcut";
 import { foldIndex, searchFolded, type SearchDoc } from "@/lib/search";
 import { paths, parseRepoReference } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 const RESULT_LIMIT = 12;
-
-/** A single-character shortcut must not fire while the reader is typing. */
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-}
 
 export interface CommandPaletteProps {
   /** Books plus the most-installed chapters, from `getPaletteIndex()`. */
@@ -66,22 +68,10 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
   // Folding 600 records is ~1 ms, but it happens on every keystroke otherwise.
   const index = useMemo(() => foldIndex(docs), [docs]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const combo = event.metaKey || event.ctrlKey;
-      if (combo && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setOpen((value) => !value);
-        return;
-      }
-      if (event.key === "/" && !combo && !event.altKey && !isTypingTarget(event.target)) {
-        event.preventDefault();
-        setOpen(true);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  // `/` cannot close the palette — focus is in the search field by then, and a
+  // single-character shortcut is inert inside a text field — so a toggle here
+  // only ever reads as a toggle for ⌘K.
+  useShortcut("search", () => setOpen((value) => !value));
 
   const go = useCallback(
     (href: string, label: string) => {
@@ -197,7 +187,25 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
               it — a touch screen reader reads the popup subtree only. */}
           <DialogTitle className="sr-only">Search skills and books</DialogTitle>
 
-          <Command shouldFilter={false} loop className="bg-transparent">
+          {/* `label` is a prop of the Command *root*: cmdk renders a
+              visually-hidden <label> from it and points the input's
+              `aria-labelledby` at that element. With no label the element is
+              empty, and an `aria-labelledby` that resolves to nothing beats the
+              placeholder in the name computation — leaving the combobox with an
+              accessible name of "" (the only unnamed interactive node in the
+              product, found in the CDP AX tree). */}
+          <Command
+            shouldFilter={false}
+            loop
+            label="Search chapters, books, or paste a repo URL"
+            className="bg-transparent"
+          >
+            {/* cmdk renders a visually-hidden <label> and points the input's
+                `aria-labelledby` at it. With no `label` prop that element is
+                empty, and an `aria-labelledby` that resolves to nothing beats
+                the placeholder in the name computation — leaving the combobox
+                with an accessible name of "" (the only unnamed interactive
+                node in the product, found in the CDP AX tree). */}
             <CommandInput
               ref={inputRef}
               value={query}

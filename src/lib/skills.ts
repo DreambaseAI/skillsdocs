@@ -14,6 +14,8 @@
 import matter from "gray-matter";
 import GithubSlugger from "github-slugger";
 import type { TreeEntry } from "./github";
+import { isSameTitle, normalizeOutlineLevels } from "./markdown/headings";
+import { smarten } from "./markdown/typography";
 
 /* ------------------------------------------------------------------ types */
 
@@ -247,8 +249,37 @@ const BRAND_CASING: Record<string, string> = Object.fromEntries(
     "CloudFront", "CloudWatch", "DataDog", "PagerDuty", "TanStack",
     "npm", "pnpm", "iOS", "macOS", "tvOS", "watchOS", "visionOS", "iPadOS",
     "gRPC", "dbt", "tRPC", "eBPF", "xAI",
+    // Measured misses. `/openai/skills` was setting `Chatgpt Apps`,
+    // `Aspnet Core` and `Gh Address Comments` at 30px in the contents and
+    // 46px on the chapter opener. `gh` maps to itself for the same reason
+    // `npm` does: it is a command, and a capitalised command is a wrong one.
+    "ChatGPT", "gh", "OpenTelemetry", "PyTorch", "TensorFlow", "LangChain",
+    "LlamaIndex", "Kubernetes", "Terraform",
   ].map((b) => [b.toLowerCase(), b]),
 );
+
+/**
+ * Names whose canonical form is not recoverable from their own lowercase.
+ *
+ * `BRAND_CASING` is keyed by `value.toLowerCase()`, which works for `ChatGPT`
+ * and fails for anything whose slug drops punctuation — `ASP.NET` lowercases
+ * to `asp.net`, but the directory is `aspnet-core` and `titleCase` has already
+ * split on the dot by the time the map is consulted. Measured on
+ * `/openai/skills`, which set `Aspnet Core` at 46px on the chapter opener.
+ */
+const SLUG_CASING: Record<string, string> = {
+  aspnet: "ASP.NET",
+  dotnet: ".NET",
+  nextjs: "Next.js",
+  nodejs: "Node.js",
+  nuxtjs: "Nuxt",
+  vuejs: "Vue",
+  fastapi: "FastAPI",
+  graphiql: "GraphiQL",
+  jupyter: "Jupyter",
+  gitlab: "GitLab",
+  github: "GitHub",
+};
 
 export function titleCase(input: string): string {
   return input
@@ -258,7 +289,8 @@ export function titleCase(input: string): string {
     .split(/\s+/)
     .map((word) => {
       const lower = word.toLowerCase();
-      const canonical = BRAND_CASING[lower] ?? CANONICAL_CASING[lower];
+      const canonical =
+        SLUG_CASING[lower] ?? BRAND_CASING[lower] ?? CANONICAL_CASING[lower];
       if (canonical) return canonical;
 
       // An author who typed mixed case or full caps meant it.
@@ -293,6 +325,33 @@ function canonicalRank(path: string): number {
   return score;
 }
 
+/** The directory a `SKILL.md` sits in, which is the skill's name. */
+function skillName(skillMdPath: string): string {
+  return basename(dirname(skillMdPath)).toLowerCase();
+}
+
+/** Minimal disjoint set over paths, so grouping cannot depend on input order. */
+class UnionFind {
+  private parent = new Map<string, string>();
+
+  find(a: string): string {
+    const seen = this.parent.get(a);
+    if (seen === undefined || seen === a) {
+      this.parent.set(a, a);
+      return a;
+    }
+    const root = this.find(seen);
+    this.parent.set(a, root);
+    return root;
+  }
+
+  union(a: string, b: string): void {
+    const ra = this.find(a);
+    const rb = this.find(b);
+    if (ra !== rb) this.parent.set(rb, ra);
+  }
+}
+
 /**
  * Locate every skill in a repo tree and assign each a unique slug.
  *
@@ -311,22 +370,45 @@ export function discoverSkills(
     .sort((a, b) => a.path.localeCompare(b.path));
 
   /**
-   * Collapse duplicates on two keys: identical content anywhere in the repo,
-   * and identical position once a per-agent mirror prefix is removed. The
-   * second key is what catches near-identical copies that drifted apart.
+   * Collapse duplicates on two relations, in order of confidence.
+   *
+   *   1. **Same position once a per-agent mirror prefix is removed.** This is
+   *      the strong one: `.claude/skills/pdf` and `.cursor/skills/pdf` are one
+   *      skill published twice, even when the bytes drifted apart.
+   *   2. **Byte-identical content, *for the same skill name*.** The name guard
+   *      is not decoration. Merging on sha alone deleted real chapters: three
+   *      distinct directories that happen to share a placeholder body
+   *      (`skills/alpha`, `skills/beta`, `skills/gamma`) collapsed into one,
+   *      and — worse — the union was transitive, so `skills/b` sharing a sha
+   *      with `.claude/skills/a`, which shares a position with `skills/a`,
+   *      made `skills/b` vanish from the book entirely with no variant entry
+   *      pointing at it. Both cases are covered by unit tests.
    */
-  const groupsByKey = new Map<string, TreeEntry[]>();
-  const keyOf = new Map<string, string>();
+  const group = new UnionFind();
+  const byPosition = new Map<string, string>();
+  const bySha = new Map<string, string[]>();
 
   for (const entry of manifests) {
-    const contentKey = `sha:${entry.sha}`;
-    const positionKey = `pos:${stripMirror(entry.path).normalized}`;
-    // Reuse whichever key an earlier copy already claimed, so the two
-    // relations merge into one group rather than splitting it.
-    const key = keyOf.get(contentKey) ?? keyOf.get(positionKey) ?? contentKey;
-    keyOf.set(contentKey, key);
-    keyOf.set(positionKey, key);
+    const position = stripMirror(entry.path).normalized;
+    const claimed = byPosition.get(position);
+    if (claimed) group.union(claimed, entry.path);
+    else byPosition.set(position, entry.path);
 
+    const sameSha = bySha.get(entry.sha);
+    if (sameSha) sameSha.push(entry.path);
+    else bySha.set(entry.sha, [entry.path]);
+  }
+
+  for (const paths of bySha.values()) {
+    for (let i = 1; i < paths.length; i++) {
+      // Same content *and* same skill name: a republication, not a coincidence.
+      if (skillName(paths[0]) === skillName(paths[i])) group.union(paths[0], paths[i]);
+    }
+  }
+
+  const groupsByKey = new Map<string, TreeEntry[]>();
+  for (const entry of manifests) {
+    const key = group.find(entry.path);
     const list = groupsByKey.get(key);
     if (list) list.push(entry);
     else groupsByKey.set(key, [entry]);
@@ -360,7 +442,7 @@ export function discoverSkills(
   const slugger = new GithubSlugger();
   const dirToSlug = new Map<string, string>();
 
-  const stubs: SkillStub[] = chosen.map(({ entry, variants }) => {
+  const stubs: SkillStub[] = chosen.map(({ entry, variants }, index) => {
     const dir = dirname(entry.path);
     // A SKILL.md at the repo root describes the repo itself.
     const rawName = dir === "" ? repoName : basename(dir);
@@ -368,7 +450,15 @@ export function discoverSkills(
     const qualified =
       (nameCounts.get(rawName) ?? 0) > 1 && group ? `${group}-${rawName}` : rawName;
 
-    const slug = slugger.slug(qualified);
+    /*
+     * A directory name with no sluggable characters — `..`, `.`, `🚀` — slugs
+     * to `""` or to github-slugger's disambiguation stub `-1`, and an empty
+     * slug makes the chapter link `/owner/repo/`, which 308s back to the
+     * cover: a contents row that navigates to the book it is in. Fall back to
+     * the chapter's ordinal, which is always a usable URL.
+     */
+    let slug = slugger.slug(qualified);
+    if (slug === "" || /^-\d+$/.test(slug)) slug = slugger.slug(`chapter-${index + 1}`);
     dirToSlug.set(dir, slug);
     return { slug, dir, skillMdPath: entry.path, group, variants, parentSlug: null };
   });
@@ -443,12 +533,29 @@ export function collectResources(
 
 const WORDS_PER_MINUTE = 220;
 
-/** Extract ATX headings, skipping fenced code blocks. */
-export function extractHeadings(markdown: string): SkillHeading[] {
-  const slugger = new GithubSlugger();
-  const out: SkillHeading[] = [];
+/**
+ * Extract ATX headings, skipping fenced code blocks.
+ *
+ * **This must produce exactly what the page renders.** The JSON API publishes
+ * this list as `outline`, the chapter opener counts it as "N sections", and an
+ * agent turns each `id` into a `#anchor` against the HTML page. Measured across
+ * 78 real chapters before this was fixed: 38% had at least one id that matched
+ * no element on the page, 32% had the wrong number of entries, and 85% had the
+ * wrong level for the first heading — because the outline was read off the raw
+ * source while the page was rendered from a tree that had been smart-quoted,
+ * had its duplicate leading H1 stripped, and had its levels shifted and
+ * repaired.
+ *
+ * So this function performs the same three transforms, using the same shared
+ * helpers as the renderer, and `markdown.test.ts` asserts the two agree
+ * heading-for-heading on real documents.
+ */
+export function extractHeadings(markdown: string, title?: string): SkillHeading[] {
+  const raw: Array<{ depth: number; text: string }> = [];
   let inFence = false;
   let fenceMarker = "";
+  let leadingIndex = -1;
+  let seenContent = false;
 
   for (const line of markdown.split("\n")) {
     const fence = line.match(/^\s{0,3}(`{3,}|~{3,})/);
@@ -459,23 +566,52 @@ export function extractHeadings(markdown: string): SkillHeading[] {
       } else if (fence[1][0] === fenceMarker) {
         inFence = false;
       }
+      seenContent = true;
       continue;
     }
     if (inFence) continue;
 
     const m = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
-    if (!m) continue;
+    if (!m) {
+      if (line.trim() !== "") seenContent = true;
+      continue;
+    }
 
-    const text = m[2]
-      .replace(/`([^`]+)`/g, "$1")
-      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-      .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, "$1")
-      .trim();
-    if (!text) continue;
+    const text = smarten(
+      m[2]
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+        .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, "$1")
+        .trim(),
+    );
+    if (!text) {
+      seenContent = true;
+      continue;
+    }
 
-    out.push({ depth: m[1].length, text, id: slugger.slug(text) });
+    if (!seenContent && raw.length === 0) leadingIndex = 0;
+    seenContent = true;
+    raw.push({ depth: m[1].length, text });
   }
-  return out;
+
+  // The renderer drops a document-leading H1 that merely repeats the chapter
+  // title, because the page already prints that title as its only h1.
+  const kept =
+    title !== undefined &&
+    leadingIndex === 0 &&
+    raw.length > 0 &&
+    raw[0].depth === 1 &&
+    isSameTitle(raw[0].text, title)
+      ? raw.slice(1)
+      : raw;
+
+  const levels = normalizeOutlineLevels(kept.map((h) => h.depth));
+  const slugger = new GithubSlugger();
+  return kept.map((h, i) => ({
+    depth: levels[i],
+    text: h.text,
+    id: slugger.slug(h.text),
+  }));
 }
 
 function countWords(markdown: string): number {
@@ -563,7 +699,7 @@ export function parseSkill(
     group: stub.group,
     frontmatter,
     body: body.trim(),
-    headings: extractHeadings(body),
+    headings: extractHeadings(body, titleCase(name)),
     wordCount,
     readingMinutes: Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE)),
     resources,

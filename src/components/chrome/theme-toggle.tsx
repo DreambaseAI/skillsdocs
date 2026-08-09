@@ -20,6 +20,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useShortcut } from "@/hooks/use-shortcut";
 import { cn } from "@/lib/utils";
 
 export type ColorScheme = "light" | "dark" | "system";
@@ -153,6 +154,12 @@ export function ThemeToggleButton({ className }: ThemeToggleButtonProps) {
   const current = SCHEME_OPTIONS.find((o) => o.value === value) ?? SCHEME_OPTIONS[2];
   const next = SCHEME_ORDER[(SCHEME_ORDER.indexOf(value) + 1) % SCHEME_ORDER.length];
   const nextLabel = SCHEME_OPTIONS.find((o) => o.value === next)?.label ?? next;
+
+  // The `D` shortcut. Documented in the keymap since the beginning and, until
+  // now, subscribed by nothing: pressing `D` cancelled the keystroke and
+  // changed no theme. `change()` already announces the result, so the
+  // keyboard path and the pointer path say the same thing.
+  useShortcut("themeCycle", () => change(next));
 
   // Before mount we cannot know the resolved scheme, so show the neutral
   // system glyph rather than guessing and flipping.

@@ -20,6 +20,13 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   const probe = {} as RouteProbe;
   const names = Object.keys(ROUTES) as RouteName[];
 
+  /**
+   * Routes whose whole point is a non-200. `ok` means "rendered as designed" —
+   * the not-found shell is the page under test either way, and whether it also
+   * carries a 404 status is a separate (real) defect owned by the route.
+   */
+  const EXPECTED: Partial<Record<RouteName, number[]>> = { notFound: [200, 404] };
+
   for (const name of names) {
     const url = new URL(ROUTES[name], baseURL).href;
     try {
@@ -27,7 +34,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       // Read the body: streamed Suspense content is where the real work is,
       // and a 200 status alone does not mean the page rendered.
       const body = await res.text();
-      const ok = res.status === 200 && body.length > 0;
+      const ok = (EXPECTED[name] ?? [200]).includes(res.status) && body.length > 0;
       probe[name] = { status: res.status, ok };
     } catch (error) {
       probe[name] = { status: 0, ok: false };

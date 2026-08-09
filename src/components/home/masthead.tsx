@@ -27,8 +27,12 @@ export interface MastheadProps {
 
 export function Masthead({ palette, strapline }: MastheadProps) {
   return (
-    <header className="border-rule/70 bg-paper/85 sticky top-0 z-40 border-b backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-8">
+    // 94%, not 85%: at 15% translucency over a blur the body text underneath
+    // stayed legible as a grey smear inside the nameplate band. Chrome that you
+    // can read the page through is not chrome.
+    <header className="border-rule/70 bg-paper/94 sticky top-0 z-40 border-b backdrop-blur-md">
+      {/* Same gutter as every section of the page below it (`px-5 sm:px-8`). */}
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-5 sm:gap-3 sm:px-8">
         {/* Tighter and shrinkable below `sm`. At 320 CSS px — 1280 at 400%
             zoom, WCAG 1.4.10 — a nowrap `shrink-0` wordmark at 0.2em tracking
             measures 230px, which with the action cluster pushed the document

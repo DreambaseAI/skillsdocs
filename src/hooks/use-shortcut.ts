@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { onShortcut, type ShortcutAction } from "@/lib/shortcuts";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  hasShortcutListener,
+  onShortcut,
+  onShortcutRegistryChange,
+  type ShortcutAction,
+} from "@/lib/shortcuts";
 
 /**
  * Run `handler` when `action` fires.
@@ -9,6 +14,9 @@ import { onShortcut, type ShortcutAction } from "@/lib/shortcuts";
  * The handler is held in a ref so a caller can pass an inline closure without
  * resubscribing on every render — which matters here because most of these
  * closures capture reading preferences and those change on every slider frame.
+ *
+ * Subscribing also *registers* the action: the dispatcher will not swallow a
+ * key that has no subscriber, and the shortcuts dialog will not advertise one.
  */
 export function useShortcut(
   action: ShortcutAction,
@@ -25,8 +33,21 @@ export function useShortcut(
 
   useEffect(() => {
     if (!enabled) return;
-    return onShortcut((fired) => {
-      if (fired === action) ref.current();
-    });
+    return onShortcut(action, () => ref.current());
   }, [action, enabled]);
+}
+
+/**
+ * Whether anything on this page currently handles `action`.
+ *
+ * The server snapshot is `false` — nothing is subscribed until the client
+ * mounts — so the dialog renders its "not available here" state first and
+ * fills in, rather than claiming a shortcut works and then withdrawing it.
+ */
+export function useShortcutAvailable(action: ShortcutAction): boolean {
+  return useSyncExternalStore(
+    onShortcutRegistryChange,
+    () => hasShortcutListener(action),
+    () => false,
+  );
 }

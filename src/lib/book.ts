@@ -19,6 +19,7 @@ import {
   fetchRawTextBatch,
   fetchRepoMeta,
   fetchRepoTree,
+  GitHubError,
   type OwnerMeta,
   type RepoMeta,
   type TreeEntry,
@@ -52,6 +53,24 @@ export interface Book {
   parts: BookPart[];
   /** True when GitHub truncated the tree and skills may be missing. */
   truncated: boolean;
+  /**
+   * How many `SKILL.md` files the tree actually contains, before `MAX_SKILLS`
+   * and before unreadable bodies were dropped.
+   *
+   * `skills.length` is what we serve; this is what exists. They differ for
+   * `github/awesome-copilot` (419) and `ComposioHQ/awesome-claude-skills`
+   * (864), and every machine surface used to report the served number as if it
+   * were the real one.
+   */
+  skillsTotal: number;
+  /** True when `MAX_SKILLS` cut the chapter list short. */
+  capped: boolean;
+  /**
+   * Paths of chapters whose body could not be read (CDN blip, or over the
+   * 512 KB inline cap). Dropped from `skills`, but never silently: a missing
+   * chapter is a fact about this render, not about the repository.
+   */
+  unreadable: string[];
   totalWords: number;
   totalReadingMinutes: number;
   /** Distinct directory layouts observed, for the colophon. */
@@ -142,12 +161,17 @@ export function assembleBook(input: {
   theme: IssueTheme;
 }): Book {
   const { repo, entries } = input;
-  const stubs = discoverSkills(entries, repo.repo).slice(0, MAX_SKILLS);
+  const all = discoverSkills(entries, repo.repo);
+  const stubs = all.slice(0, MAX_SKILLS);
 
+  const unreadable: string[] = [];
   const skills = stubs
     .map((stub, i) => {
       const source = input.sources[i];
-      if (source === null || source === undefined) return null;
+      if (source === null || source === undefined) {
+        unreadable.push(stub.skillMdPath);
+        return null;
+      }
       return parseSkill(stub, source, collectResources(entries, stub));
     })
     .filter((s): s is Skill => s !== null);
@@ -159,6 +183,9 @@ export function assembleBook(input: {
     skills,
     parts: groupSkills(skills),
     truncated: input.truncated,
+    skillsTotal: all.length,
+    capped: all.length > stubs.length,
+    unreadable,
     totalWords: skills.reduce((n, s) => n + s.wordCount, 0),
     totalReadingMinutes: skills.reduce((n, s) => n + s.readingMinutes, 0),
     layouts: [...new Set(stubs.map((s) => layoutOf(s.skillMdPath)))],
@@ -176,14 +203,84 @@ export function skillPathsFor(entries: TreeEntry[], repoName: string): string[] 
     .map((s) => s.skillMdPath);
 }
 
+/**
+ * A book, or the reason there isn't one — as *data*.
+ *
+ * Failures are returned rather than thrown because this is the function behind
+ * the `"use cache"` boundary, and a rejection does not survive that boundary
+ * intact. In a production build Next replaces the rejection with a redacted
+ * `Error` ("The specific message is omitted in production builds…"), stripping
+ * `name`, `kind` and `status`. Every caller that classified on those fields
+ * therefore reported a nonexistent repository as `502 upstream_error`, told
+ * agents to retry a permanent condition forever, and published Next's internal
+ * error text as part of the JSON API contract. Measured on a production build:
+ * `/api/md/anthropics/does-not-exist-repo-xyz` → 502.
+ *
+ * A discriminated return value is plain data, so it crosses the boundary
+ * unharmed and `getBook` can raise a real `GitHubError` on the other side.
+ */
+type BookFetch =
+  | { ok: true; book: Book }
+  | {
+      ok: false;
+      kind: GitHubError["kind"];
+      status: number;
+      message: string;
+    };
+
+/**
+ * GitHub treats owners and repository names case-insensitively, so
+ * `/MattPocock/Skills` and `/mattpocock/skills` are the same book. Folding the
+ * key here is what stops them from minting separate cache entries under
+ * separate tags — which made `revalidateTag("repo:mattpocock/skills")`
+ * structurally unable to reach the entry a mixed-case URL created.
+ */
+export function cacheKeyFor(owner: string, repo: string): [string, string] {
+  return [owner.toLowerCase(), repo.toLowerCase()];
+}
+
 export async function getBook(
   ownerParam: string,
   repoParam: string,
 ): Promise<Book> {
+  const [owner, repo] = cacheKeyFor(ownerParam, repoParam);
+  const result = await fetchBook(owner, repo);
+  if (result.ok) return result.book;
+  // Thrown *outside* the cache scope, so `kind` and `status` reach the caller.
+  throw new GitHubError(result.message, result.status, result.kind);
+}
+
+async function fetchBook(
+  ownerParam: string,
+  repoParam: string,
+): Promise<BookFetch> {
   "use cache";
   cacheLife("repo");
   cacheTag("book", `repo:${ownerParam}/${repoParam}`);
 
+  try {
+    return { ok: true, book: await buildBook(ownerParam, repoParam) };
+  } catch (error) {
+    const kind = error instanceof GitHubError ? error.kind : "other";
+    const status = error instanceof GitHubError ? error.status : 0;
+    if (kind !== "not-found") {
+      // A quota reset or a network blip must not be pinned for six hours; a
+      // missing repository can be, and cheaply absorbs crawler traffic.
+      cacheLife({ stale: 0, revalidate: 60, expire: 300 });
+    }
+    return {
+      ok: false,
+      kind,
+      status,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function buildBook(
+  ownerParam: string,
+  repoParam: string,
+): Promise<Book> {
   // API call 1 of 2.
   const repo = await fetchRepoMeta(ownerParam, repoParam);
   const { owner, repo: name, defaultBranch: ref } = repo;
@@ -310,6 +407,15 @@ export function chapterNav(
  * book would hand back a trimmed, frontmatter-parsed body instead.
  */
 export async function getSkillRaw(
+  ownerParam: string,
+  repoParam: string,
+  slug: string,
+): Promise<string | null> {
+  const [owner, repo] = cacheKeyFor(ownerParam, repoParam);
+  return getSkillRawCached(owner, repo, slug);
+}
+
+async function getSkillRawCached(
   owner: string,
   repo: string,
   slug: string,

@@ -29,13 +29,25 @@ import { NextResponse, type NextRequest } from "next/server";
  * two entries we do not implement (`mcp-server-card`, `agent-card`) — a
  * dangling `rel` is worse than a missing one.
  */
-const DISCOVERY_LINK = [
+const DISCOVERY_RELATIONS = [
   '</llms.txt>; rel="llms-txt"',
-  '</.well-known/agent-skills/index.json>; rel="agent-skills"',
   '</.well-known/api-catalog>; rel="api-catalog"',
   '</api/v1/openapi.json>; rel="service-desc"',
+  '</api/v1/books>; rel="collection"',
   '</sitemap.xml>; rel="sitemap"',
+] as const;
+
+/** Everything, including the site's own manifest. For non-book URLs. */
+const DISCOVERY_LINK = [
+  '</.well-known/agent-skills/index.json>; rel="agent-skills"',
+  ...DISCOVERY_RELATIONS,
 ].join(", ");
+
+/**
+ * For a book or chapter URL, where the *book's* manifest is the one an agent
+ * wants and a second `rel="agent-skills"` would make it choose.
+ */
+const BOOK_DISCOVERY_LINK = DISCOVERY_RELATIONS;
 
 /**
  * `owner/repo` and `owner/repo/skill`.
@@ -43,9 +55,16 @@ const DISCOVERY_LINK = [
  * Owner follows GitHub's own rule (1–39 chars, alphanumerics and internal
  * hyphens). Repo and skill segments allow dots, which is exactly why the `.md`
  * check has to run against the *stripped* path rather than a negative lookahead.
+ *
+ * `api/` and `search/` are excluded because they are ours, not owners'.
+ * Without that, `/api/v1/health` matched as owner `api`, repo `v1`, chapter
+ * `health` — so the health endpoint advertised `</api/v1/health.md>` and
+ * `</api/v1/.well-known/agent-skills/index.json>`, and an `Accept:
+ * text/markdown` request to it would have been rewritten to
+ * `/api/md/api/v1/health`.
  */
 const READER_ROUTE =
-  /^\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}(?:\/[A-Za-z0-9._-]{1,100})?$/;
+  /^\/(?!api\/|search\/)[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}(?:\/[A-Za-z0-9._-]{1,100})?$/;
 
 /** `/{owner}/{repo}/.well-known/agent-skills/index.json` */
 const BOOK_MANIFEST =
@@ -121,8 +140,35 @@ function withDiscovery(res: NextResponse, options: { link?: boolean } = {}): Nex
   return res;
 }
 
+/**
+ * The pathname with percent-escapes resolved, for matching only.
+ *
+ * `request.nextUrl.pathname` is percent-encoded, and `%` is not in
+ * `READER_ROUTE`'s character class, so any non-ASCII slug failed to match and
+ * its `.md` twin was never rewritten — while `paths.chapterMarkdown()`
+ * percent-encodes the slug and prints exactly that URL in
+ * `<link rel="alternate">`, in `llms.txt`, in the book's table of contents and
+ * in the agent-skills manifest. Verified: `/anthropics/skills/skill-creator.md`
+ * → `text/markdown`, `/anthropics/skills/skill%2Dcreator.md` → `text/html`.
+ *
+ * Decoding can throw on a malformed escape; a path we cannot decode is a path
+ * we do not rewrite.
+ */
+export function decodedPath(pathname: string): string {
+  if (!pathname.includes("%")) return pathname;
+  try {
+    const decoded = decodeURIComponent(pathname);
+    // A `%2F` must not be allowed to invent a path segment.
+    const slashes = (s: string) => (s.match(/\//g) ?? []).length;
+    return slashes(decoded) === slashes(pathname) ? decoded : pathname;
+  } catch {
+    return pathname;
+  }
+}
+
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
+  const decoded = decodedPath(pathname);
 
   // 1. Per-book agent-skills manifest. Checked before the generic reader match
   //    because its path has more segments than a chapter URL.
@@ -142,8 +188,8 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   // 3. The canonical markdown twin: `/owner/repo.md`, `/owner/repo/skill.md`.
-  if (pathname.endsWith(".md")) {
-    const bare = pathname.slice(0, -3);
+  if (decoded.endsWith(".md")) {
+    const bare = decoded.slice(0, -3);
     if (READER_ROUTE.test(bare)) {
       const url = request.nextUrl.clone();
       url.pathname = `/api/md${bare}`;
@@ -153,14 +199,45 @@ export function proxy(request: NextRequest): NextResponse {
 
   // 4. Content negotiation on the HTML reader routes. A convenience path: the
   //    `.md` URL is canonical and carries the cache, this one carries `Vary`.
-  if (
-    READER_ROUTE.test(pathname) &&
-    prefersMarkdown(request.headers.get("accept") ?? "")
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = `/api/md${pathname}`;
-    const res = withDiscovery(NextResponse.rewrite(url), { link: false });
-    res.headers.set("Vary", "Accept");
+  if (READER_ROUTE.test(decoded)) {
+    if (prefersMarkdown(request.headers.get("accept") ?? "")) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/api/md${decoded}`;
+      const res = withDiscovery(NextResponse.rewrite(url), { link: false });
+      res.headers.set("Vary", "Accept");
+      return res;
+    }
+
+    // The HTML half of the same negotiation. `Vary: Accept` was set only on
+    // the markdown branch, so a shared cache that stored the HTML first would
+    // keep serving HTML to every later `Accept: text/markdown` request for the
+    // life of the `s-maxage=3600` entry. One URL, two media types, one `Vary`
+    // — it has to be on both.
+    //
+    // Book-specific relations go on the response too: `<link rel="alternate">`
+    // is in `<head>`, but an agent doing the cheap, correct thing — `HEAD`
+    // first — never parses the body, and until now got only the five
+    // site-wide relations that every URL carries.
+    const res = withDiscovery(NextResponse.next(), { link: false });
+    const [owner, repo] = pathname.split("/").filter(Boolean);
+    res.headers.set(
+      "Link",
+      [
+        `<${pathname}.md>; rel="alternate"; type="text/markdown"`,
+        // The *book's* manifest, not the site's. Two links with the same
+        // relation make the caller guess, so the site-wide `agent-skills`
+        // entry is dropped from `DISCOVERY_LINK` here — the same rule
+        // `lib/serialize.ts` follows on the routes that set their own `Link`.
+        `</${owner}/${repo}/.well-known/agent-skills/index.json>; rel="agent-skills"`,
+        `</api/v1/books/${owner}/${repo}>; rel="alternate"; type="application/json"`,
+        ...BOOK_DISCOVERY_LINK,
+      ].join(", "),
+    );
+    // `Vary: Accept` is *also* declared in `next.config.ts` `headers()`: Next
+    // rewrites the `Vary` of an app-router response after the proxy has run, so
+    // a value set here on `NextResponse.next()` does not survive. Measured —
+    // the header is kept on the rewrite branch above and lost on this one.
+    res.headers.append("Vary", "Accept");
     return res;
   }
 

@@ -14,6 +14,7 @@ import {
   isGitHubSource,
   parseOwnersPayload,
   parseSkillsPayload,
+  preferLive,
   scrapeLeaderboard,
   scrapeOfficialOwners,
   snapshotLeaderboard,
@@ -294,5 +295,34 @@ describe("buildRepoSignal", () => {
     expect(s.installs).toBe(999);
     expect(s.official).toBe(false);
     expect(s.weeklyInstalls).toEqual([]);
+  });
+});
+
+describe("preferLive", () => {
+  const snapshot = Array.from({ length: 100 }, (_, i) => i);
+
+  it("keeps the snapshot when the scrape returns nothing", () => {
+    expect(preferLive([], snapshot)).toBe(snapshot);
+  });
+
+  it("rejects a scrape that lost most of the corpus", () => {
+    // A shape change that still parses three rows out of 569 is a parser
+    // failure, not a smaller leaderboard.
+    expect(preferLive([1, 2, 3], snapshot)).toBe(snapshot);
+    expect(preferLive(snapshot.slice(0, 49), snapshot)).toBe(snapshot);
+  });
+
+  it("accepts a scrape at or above half the snapshot", () => {
+    const live = snapshot.slice(0, 50);
+    expect(preferLive(live, snapshot)).toBe(live);
+  });
+
+  it("accepts a scrape that grew", () => {
+    const live = [...snapshot, 100, 101];
+    expect(preferLive(live, snapshot)).toBe(live);
+  });
+
+  it("never blocks a live result when the snapshot is empty", () => {
+    expect(preferLive([1], [])).toEqual([1]);
   });
 });

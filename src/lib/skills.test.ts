@@ -183,6 +183,86 @@ describe("deduplication", () => {
     expect(found).toHaveLength(1);
     expect(found[0].variants).toHaveLength(2);
   });
+
+  /*
+   * Merging on a shared blob sha alone deleted published chapters. Both cases
+   * below were reproduced against the shipped code before the fix.
+   */
+  it("keeps differently-named skills that happen to share a body", () => {
+    const found = discoverSkills(
+      tree(
+        "same skills/alpha/SKILL.md",
+        "same skills/beta/SKILL.md",
+        "same skills/gamma/SKILL.md",
+      ),
+      "repo",
+    );
+    expect(found.map((s) => s.slug)).toEqual(["alpha", "beta", "gamma"]);
+    expect(found.every((s) => s.variants.length === 0)).toBe(true);
+  });
+
+  it("never lets a sha match chain through a mirror and swallow a third skill", () => {
+    // `skills/b` shares a sha with `.claude/skills/a`, which shares a mirror
+    // position with `skills/a`. Transitivity used to delete `skills/b`
+    // entirely — no chapter, no variant entry, no warning.
+    const found = discoverSkills(
+      tree("s1 skills/a/SKILL.md", "s2 .claude/skills/a/SKILL.md", "s2 skills/b/SKILL.md"),
+      "repo",
+    );
+    expect(found.map((s) => s.slug)).toEqual(["a", "b"]);
+    expect(found[0].variants.map((v) => v.path)).toEqual([".claude/skills/a/SKILL.md"]);
+  });
+
+  it("still collapses a byte-identical copy of the same-named skill", () => {
+    const found = discoverSkills(
+      tree("same skills/pdf/SKILL.md", "same plugins/docs/skills/pdf/SKILL.md"),
+      "repo",
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].variants).toHaveLength(1);
+  });
+
+  it("groups identically no matter what order the tree arrives in", () => {
+    const forward = discoverSkills(
+      tree("s1 skills/a/SKILL.md", "s2 .claude/skills/a/SKILL.md", "s2 skills/b/SKILL.md"),
+      "repo",
+    ).map((s) => s.slug);
+    const reversed = discoverSkills(
+      tree("s2 skills/b/SKILL.md", "s2 .claude/skills/a/SKILL.md", "s1 skills/a/SKILL.md"),
+      "repo",
+    ).map((s) => s.slug);
+    expect(reversed).toEqual(forward);
+  });
+});
+
+describe("degenerate directory names", () => {
+  /*
+   * `..` slugs to "", and an empty slug builds the URL `/owner/repo/`, which
+   * redirects back to the cover: a contents row that navigates to the book it
+   * lives in. `.` and emoji-only names slug to github-slugger's `-1`, `-2`
+   * disambiguation stubs, which are just as unusable.
+   */
+  it("falls back to an ordinal when a name has nothing to slug", () => {
+    const found = slugs(
+      tree("skills/../SKILL.md", "skills/./SKILL.md", "skills/🚀/SKILL.md"),
+      "repo",
+    );
+    expect(found).toEqual(["chapter-1", "chapter-2", "chapter-3"]);
+  });
+
+  it("keeps the sluggable part of a mixed name", () => {
+    expect(slugs(tree("skills/emoji-🚀-skill/SKILL.md"), "repo")).toEqual([
+      "emoji--skill",
+    ]);
+  });
+
+  it("never produces an empty slug for any name in the corpus of shapes", () => {
+    const found = discoverSkills(
+      tree("SKILL.md", "skills/../SKILL.md", "a/b/c/SKILL.md", "skills/-/SKILL.md"),
+      "repo",
+    );
+    expect(found.every((s) => s.slug !== "" && !/^-\d+$/.test(s.slug))).toBe(true);
+  });
 });
 
 describe("noise exclusion", () => {
@@ -293,10 +373,34 @@ describe("collectResources", () => {
 });
 
 describe("extractHeadings", () => {
-  it("collects ATX headings with slugged ids", () => {
+  // The depths are the *rendered* depths. The page prints the chapter title as
+  // its only h1, so the renderer shifts a document that opens at `#` down one
+  // level; an outline that still said "level 1" described a heading that does
+  // not exist on the page. `markdown.test.ts` pins the two together.
+  it("collects ATX headings with slugged ids, at their rendered levels", () => {
     expect(extractHeadings("# One\n\n## Two Words\n")).toEqual([
-      { depth: 1, text: "One", id: "one" },
-      { depth: 2, text: "Two Words", id: "two-words" },
+      { depth: 2, text: "One", id: "one" },
+      { depth: 3, text: "Two Words", id: "two-words" },
+    ]);
+  });
+
+  it("drops a leading H1 that repeats the chapter title, as the renderer does", () => {
+    expect(extractHeadings("# Skill Creator\n\n## Overview\n", "Skill Creator")).toEqual([
+      { depth: 2, text: "Overview", id: "overview" },
+    ]);
+  });
+
+  it("keeps a mid-document H1 that happens to match the title", () => {
+    const md = "Intro paragraph.\n\n# Skill Creator\n";
+    expect(extractHeadings(md, "Skill Creator").map((h) => h.text)).toEqual([
+      "Skill Creator",
+    ]);
+  });
+
+  it("smartens heading text before slugging, as the renderer does", () => {
+    // `--` between spaces becomes an en dash, which github-slugger drops.
+    expect(extractHeadings("## Don't Panic -- really")).toEqual([
+      { depth: 2, text: "Don’t Panic – really", id: "dont-panic--really" },
     ]);
   });
 

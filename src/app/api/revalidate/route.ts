@@ -70,12 +70,14 @@ export async function POST(request: Request): Promise<Response> {
         { status: 400 },
       );
     }
-    // Tags are case-sensitive and cached under the URL's casing, so purge the
-    // canonical form and the lowercase form a webhook may send.
+    // Every cache tag is written lower-cased (`repoTag`), because GitHub is
+    // case-insensitive and a mixed-case URL must not mint an unreachable
+    // entry. The as-sent form is purged too, so any tag written before that
+    // rule existed still clears.
     for (const form of new Set([repo, repo.toLowerCase()])) {
       revalidated.push(`repo:${form}`);
     }
-    revalidated.push(`owner:${repo.slice(0, repo.indexOf("/"))}`);
+    revalidated.push(`owner:${repo.slice(0, repo.indexOf("/")).toLowerCase()}`);
   }
 
   if (Array.isArray(tags)) {

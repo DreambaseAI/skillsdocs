@@ -64,7 +64,12 @@ const COLUMNS: Array<{ heading: string; links: FooterLink[] }> = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-rule/70 mt-24 border-t">
+    // `mt-24` used to sit *above* the top rule, so the index ended at y=6555,
+    // the footer began at 6731, and 176px of empty page sat between two
+    // horizontal rules with nothing in it — which reads as a module that
+    // failed to render, not as breathing room. The page container already
+    // contributes 80px of bottom padding; `mt-4` brings the total to 96.
+    <footer className="border-rule/70 mt-4 border-t">
       <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div className="max-w-sm">

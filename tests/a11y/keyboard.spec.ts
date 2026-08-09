@@ -198,14 +198,26 @@ test.describe("overlays return focus", () => {
     });
     expect(name, "the controls panel must have an accessible name").toBeTruthy();
 
-    // Touch screen-reader users have no Esc: a Close must live inside the popup.
+    /*
+     * Touch screen-reader users have no Esc: a Close must live inside the
+     * popup — for *every* dialog popup, not only `aria-modal="true"` ones.
+     *
+     * This assertion used to be gated on `aria-modal === "true"`, which
+     * neither the popover nor the drawer sets (both are deliberately
+     * non-modal, so the reader can watch the text reflow behind them). The
+     * gate was therefore never taken and the panel shipped with no Close at
+     * all: on iOS VoiceOver the only exits were a backdrop tap and an
+     * `aria-hidden`, drag-only swipe handle. Modality changes whether Esc is
+     * conventional; it does not change whether a touch user can find the way
+     * out.
+     */
     const closeInside = await panel
       .locator("[data-slot$='close'], button[aria-label*='Close' i], button:has-text('Close')")
       .count();
-    const modal = await panel.getAttribute("aria-modal");
-    if (modal === "true") {
-      expect(closeInside, "a modal popup needs a Close button inside it").toBeGreaterThan(0);
-    }
+    expect(
+      closeInside,
+      "a dialog popup needs a labelled Close inside it (ARCHITECTURE §7.2)",
+    ).toBeGreaterThan(0);
 
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();

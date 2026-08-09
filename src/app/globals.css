@@ -155,6 +155,33 @@
     color: var(--selection-fg);
   }
 
+  /*
+   * One highlight tint for the whole product.
+   *
+   * The search rows used to tint their `<mark>` with the row's own issue
+   * accent, so the swatch changed hue on every line — red, green, purple,
+   * orange, pink down six results. A highlight says "your query is here"; it
+   * is a reading aid, not branding, and it has to mean the same thing on every
+   * row. `--selection-bg` is the tint the reader already associates with
+   * "text I have marked", and it is contrast-audited on every paper mode.
+   */
+  .search-mark {
+    background-color: var(--selection-bg);
+    color: var(--selection-fg);
+    border-radius: 3px;
+    padding-inline: 0.1em;
+    /* A highlighted identifier at 320px must be able to break (WCAG 1.4.10). */
+    overflow-wrap: anywhere;
+  }
+
+  @media (forced-colors: active) {
+    .search-mark {
+      background-color: Highlight;
+      color: HighlightText;
+      forced-color-adjust: none;
+    }
+  }
+
   /* Next 16 removed automatic smooth scrolling; opt in, but never against
      an explicit reduced-motion preference. */
   @media (prefers-reduced-motion: no-preference) {

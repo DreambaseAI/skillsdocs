@@ -1,3 +1,4 @@
+import { InlineMarkup } from "@/components/book/deck";
 import { plural } from "@/components/book/format";
 import { AGENT_SKILLS_SPEC } from "@/lib/site";
 import { cn } from "@/lib/utils";
@@ -40,17 +41,24 @@ export function EditorNote({
   return (
     <aside
       className={cn("book-note", margin && "book-note--margin", className)}
-      aria-label={label ?? `Editor's ${plural(issues.length, "note")}`}
+      aria-label={label ?? `Editor\u2019s ${plural(issues.length, "note")}`}
     >
       <span className="book-note__label">
-        {label ?? `Editor's ${plural(issues.length, "note")}`}
+        {label ?? `Editor\u2019s ${plural(issues.length, "note")}`}
       </span>
+      {/* The notes name front-matter keys — `description`, `name` — so they
+          carry inline code spans, and printing the backticks was the same
+          defect the deck had. */}
       {issues.length === 1 ? (
-        <p className="m-0">{issues[0]}</p>
+        <p className="m-0">
+          <InlineMarkup text={issues[0]} />
+        </p>
       ) : (
         <ul>
           {issues.map((issue) => (
-            <li key={issue}>{issue}</li>
+            <li key={issue}>
+              <InlineMarkup text={issue} />
+            </li>
           ))}
         </ul>
       )}

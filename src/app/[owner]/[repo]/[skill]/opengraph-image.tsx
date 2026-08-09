@@ -11,6 +11,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
+import { probeRepoStatus } from "@/lib/upstream";
 import { findSkill, getBook } from "@/lib/book";
 import { formatHex, parseColor } from "@/lib/color";
 import { SITE_NAME } from "@/lib/site";
@@ -67,23 +68,18 @@ interface Card {
   accent: string;
 }
 
-async function cardFor(owner: string, repo: string, slug: string): Promise<Card> {
+/** `null` when there is no such repository, or no such chapter in it. */
+async function cardFor(
+  owner: string,
+  repo: string,
+  slug: string,
+): Promise<Card | null> {
   try {
     const book = await getBook(owner, repo);
     const skill = findSkill(book, slug);
+    // A card for a chapter that is not in the book is a fabricated record.
+    if (!skill) return null;
     const accent = toHex(book.theme.accentDark, FALLBACK_ACCENT);
-    if (!skill) {
-      return {
-        book: `${book.repo.owner}/${book.repo.repo}`,
-        part: null,
-        title: slug,
-        description: "This chapter is not in the book.",
-        position: null,
-        total: book.skills.length,
-        minutes: null,
-        accent,
-      };
-    }
     const part = book.parts.find((p) => p.skills.some((s) => s.slug === slug));
     return {
       book: `${book.repo.owner}/${book.repo.repo}`,
@@ -98,6 +94,9 @@ async function cardFor(owner: string, repo: string, slug: string): Promise<Card>
       accent,
     };
   } catch {
+    // See the book card: a cached rejection arrives stripped of its `kind`, so
+    // the only way to tell "missing" from "rate-limited" is to ask again.
+    if ((await probeRepoStatus(owner, repo)).kind === "not-found") return null;
     return {
       book: `${owner}/${repo}`,
       part: null,
@@ -119,6 +118,12 @@ export default async function Image({
   const [literata, geist, geistSemibold] = await FONTS;
   const { owner, repo, skill } = await params;
   const card = await cardFor(owner, repo, skill);
+  if (!card) {
+    return new Response("No such chapter.", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
 
   const eyebrow = [card.book, card.part].filter(Boolean).join("  ·  ");
   const footer = [

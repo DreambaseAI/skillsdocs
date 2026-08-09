@@ -1,3 +1,4 @@
+import { Deck } from "@/components/book/deck";
 import { folio, readingTime } from "@/components/book/format";
 import { EditorNote } from "@/components/book/editor-note";
 import type { Book } from "@/lib/book";
@@ -44,9 +45,14 @@ export function ChapterOpener({ book, skill, index }: ChapterOpenerProps) {
 
       <h1 id="chapter-title" className="book-opener__title mt-3">{skill.title}</h1>
 
-      {skill.description ? (
-        <p className="book-standfirst mt-4">{skill.description}</p>
-      ) : null}
+      {/*
+        The deck is bounded to one sentence / 180 characters and typeset
+        through the same punctuation and inline-markup pass as the body.
+        The *whole* description — which on `claude-api` runs to 1,068
+        characters of trigger conditions and a raw `grep -rE` — is a machine
+        instruction, and it is set as one in `SkillApparatus` under "Trigger".
+      */}
+      {skill.description ? <Deck text={skill.description} className="mt-4" /> : null}
 
       <p className="book-caption mt-3">
         {readingTime(skill.readingMinutes)} ·{" "}

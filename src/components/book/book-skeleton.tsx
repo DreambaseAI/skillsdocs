@@ -37,36 +37,45 @@ function Ghost({
   );
 }
 
-/** Widths that read as language rather than as a progress bar. */
-const TITLE_LINES = ["62%", "38%"];
-const STANDFIRST_LINES = ["94%", "88%", "51%"];
+/**
+ * Widths that read as language rather than as a progress bar.
+ *
+ * The rail used to be six equal-length full-width bars where the real rail is
+ * a ragged numbered list of seventeen, and the title was two rounded slabs
+ * that read as buttons rather than as one 96px display line. Ragged is the
+ * whole point: a placeholder whose silhouette matches the text it replaces
+ * makes hydration a fill rather than a jump.
+ */
+const RAIL_WIDTHS = [
+  "78%", "56%", "91%", "63%", "72%", "48%", "85%", "59%", "94%",
+  "67%", "55%", "81%", "70%", "88%", "61%", "76%", "52%",
+];
+const DECK_LINES = ["92%", "84%", "47%"];
 const ENTRY_TITLE_WIDTHS = ["46%", "58%", "39%", "63%", "44%", "52%"];
 const ENTRY_DEK_WIDTHS = ["92%", "78%", "86%", "70%", "89%", "74%"];
 
+/** The real folio, set in the real face — the one fact available for free. */
+function RailFolio({ n }: { n: number }) {
+  return (
+    <span className="text-ink-muted/50 font-display w-6 shrink-0 text-[0.7rem] tabular-nums">
+      {String(n).padStart(2, "0")}
+    </span>
+  );
+}
+
 export function BookSkeleton() {
   return (
-    <div
-      className="book-frame"
-      role="status"
-      aria-busy="true"
-      aria-label="Setting the issue"
-    >
+    <div role="status" aria-busy="true" aria-label="Setting the issue">
       <span className="sr-only">Setting the issue. One moment.</span>
 
-      <div aria-hidden="true" className="book-rail book-rail--left">
-        <Ghost className="h-2.5 w-24" />
-        <div className="mt-5 flex flex-col gap-3">
-          {[64, 48, 72, 56, 44, 68].map((w, i) => (
-            <Ghost key={i} className="h-3" pulse={i < 4} />
-          ))}
-        </div>
-      </div>
-
-      <div className="book-column">
-        {/* Cover */}
-        <div className="book-cover book-measure">
-          <div className="flex items-center gap-4">
-            <span className="book-mark" aria-hidden="true">
+      {/*
+        The cover band, at the real height, on the real (untinted, because the
+        accent has not resolved) paper. Everything below it is the real frame.
+      */}
+      <div className="book-coverband" aria-hidden="true">
+        <div className="book-coverband__inner">
+          <div className="book-coverband__masthead">
+            <span className="book-mark">
               <Ghost className="size-1/2 rounded-sm" />
             </span>
             <div className="flex flex-col gap-2">
@@ -75,57 +84,75 @@ export function BookSkeleton() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {TITLE_LINES.map((w) => (
-              <Ghost key={w} className="h-[clamp(2.5rem,8vw,5rem)] rounded-md" width={w} />
+          <Ghost className="h-4 w-32 rounded-sm" />
+          {/* One bar at the display line's own height, not two button-shaped
+              slabs. */}
+          <Ghost className="h-[clamp(3rem,11vw,6rem)] w-3/5 rounded-md" />
+
+          <hr className="book-rule book-rule--issue" />
+
+          <div className="flex max-w-[46rem] flex-col gap-2.5">
+            {DECK_LINES.map((w) => (
+              <Ghost key={w} className="h-5" width={w} />
             ))}
           </div>
 
-          <hr className="book-rule" />
-
-          <div className="flex flex-col gap-2.5">
-            {STANDFIRST_LINES.map((w) => (
-              <Ghost key={w} className="h-4" width={w} />
-            ))}
-          </div>
-
-          <div className="book-masthead mt-2">
-            {["Owner", "Licence", "Updated", "Stars"].map((label) => (
-              <div key={label} className="book-masthead__cell">
-                <span className="book-masthead__label">{label}</span>
-                <Ghost className="h-3.5 w-3/5" />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Contents */}
-        <div className="book-measure mt-10">
-          <div className="book-part__head">
-            <span className="book-eyebrow">Contents</span>
-          </div>
-          {ENTRY_TITLE_WIDTHS.map((titleWidth, i) => (
-            <div key={titleWidth} className="book-entry">
-              <Ghost className="h-3.5 w-7 justify-self-start" pulse={i < 4} />
-              <div className="flex flex-col gap-2">
-                <Ghost className="h-5" pulse={i < 4} width={titleWidth} />
-                <Ghost className="h-3" pulse={i < 4} width={ENTRY_DEK_WIDTHS[i]} />
-              </div>
-              <Ghost className="hidden h-3 w-12 md:block" pulse={i < 4} />
-            </div>
-          ))}
+          <Ghost className="h-3 w-64" />
         </div>
       </div>
 
-      <div aria-hidden="true" className="book-rail">
-        <Ghost className="h-2.5 w-20" />
-        <div className="mt-5 flex flex-col gap-3">
-          {[80, 62, 71].map((w, i) => (
-            <Ghost key={w} className="h-3" pulse={i < 2} />
-          ))}
+      <div className="book-frame">
+        <div aria-hidden="true" className="book-rail book-rail--left">
+          <Ghost className="h-2.5 w-24" />
+          <div className="mt-5 flex flex-col gap-2.5">
+            {RAIL_WIDTHS.map((w, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <RailFolio n={i + 1} />
+                <Ghost className="h-3 flex-none" pulse={i < 6} width={w} />
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="border-rule mt-8 border-t pt-5">
-          <Ghost className="h-16 w-full rounded-lg" pulse={false} />
+
+        <div className="book-column">
+          {/* Contents */}
+          <div className="book-measure pt-10">
+            <div className="book-part__head">
+              <span className="book-eyebrow">Contents</span>
+            </div>
+            {ENTRY_TITLE_WIDTHS.map((titleWidth, i) => (
+              <div key={titleWidth} className="book-entry">
+                <Ghost className="h-3.5 w-7 justify-self-start" pulse={i < 4} />
+                <div className="flex flex-col gap-2">
+                  <Ghost className="h-5" pulse={i < 4} width={titleWidth} />
+                  <Ghost className="h-3" pulse={i < 4} width={ENTRY_DEK_WIDTHS[i]} />
+                </div>
+                <Ghost className="hidden h-3 w-12 md:block" pulse={i < 4} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div aria-hidden="true" className="book-rail">
+          <Ghost className="h-2.5 w-20" />
+          <div className="mt-5 flex flex-col gap-3">
+            {["80%", "62%", "71%", "58%"].map((w, i) => (
+              <Ghost key={w} className="h-3" pulse={i < 2} width={w} />
+            ))}
+          </div>
+          {/* The real At-a-glance labels: five rows of a two-column table, not
+              one grey slab. */}
+          <div className="border-rule mt-7 border-t pt-4">
+            <span className="book-rail__title border-none pb-2">At a glance</span>
+            <div className="mt-1 flex flex-col gap-2.5">
+              {["Chapters", "Reading time", "Words", "Stars", "Installs"].map((label) => (
+                <div key={label} className="flex items-baseline justify-between gap-3">
+                  <span className="book-caption">{label}</span>
+                  <Ghost className="h-3 w-10" pulse={false} />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

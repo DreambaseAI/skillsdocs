@@ -1,7 +1,8 @@
 import "server-only";
 
 import { cacheLife, cacheTag } from "next/cache";
-import { findSkill, getBook } from "@/lib/book";
+import { cacheKeyFor, findSkill, getBook } from "@/lib/book";
+import { repoTag } from "@/lib/github";
 import { renderMarkdown, type RenderedMarkdown } from "@/lib/markdown";
 import { paths } from "@/lib/site";
 
@@ -27,14 +28,28 @@ import { paths } from "@/lib/site";
  * book on the inside.
  */
 
-/** The repository's README, rendered. `null` when the repo has no README. */
+/**
+ * The repository's README, rendered. `null` when the repo has no README.
+ *
+ * The exported form folds the case of the arguments before they become a cache
+ * key, so `/MattPocock/Skills` and `/mattpocock/skills` share one entry and one
+ * revalidation tag. See `cacheKeyFor`.
+ */
 export async function renderFrontMatter(
+  ownerParam: string,
+  repoParam: string,
+): Promise<RenderedMarkdown | null> {
+  const [owner, repo] = cacheKeyFor(ownerParam, repoParam);
+  return renderFrontMatterCached(owner, repo);
+}
+
+async function renderFrontMatterCached(
   owner: string,
   repo: string,
 ): Promise<RenderedMarkdown | null> {
   "use cache";
   cacheLife("repo");
-  cacheTag(`repo:${owner}/${repo}`, "book");
+  cacheTag(repoTag(owner, repo), "book");
 
   const book = await getBook(owner, repo);
   if (!book.readme) return null;
@@ -56,13 +71,22 @@ export async function renderFrontMatter(
 
 /** One chapter's body, rendered. `null` when the slug is not in the book. */
 export async function renderChapter(
+  ownerParam: string,
+  repoParam: string,
+  slug: string,
+): Promise<RenderedMarkdown | null> {
+  const [owner, repo] = cacheKeyFor(ownerParam, repoParam);
+  return renderChapterCached(owner, repo, slug);
+}
+
+async function renderChapterCached(
   owner: string,
   repo: string,
   slug: string,
 ): Promise<RenderedMarkdown | null> {
   "use cache";
   cacheLife("repo");
-  cacheTag(`repo:${owner}/${repo}`, `skill:${owner}/${repo}/${slug}`);
+  cacheTag(repoTag(owner, repo), `skill:${repoTag(owner, repo).slice(5)}/${slug}`);
 
   const book = await getBook(owner, repo);
   const skill = findSkill(book, slug);

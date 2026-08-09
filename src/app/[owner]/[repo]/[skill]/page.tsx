@@ -6,7 +6,7 @@ import { ChapterOpener } from "@/components/book/chapter-opener";
 import { ChapterRail } from "@/components/book/chapter-rail";
 import { ChapterSkeleton } from "@/components/book/book-skeleton";
 import { Colophon, describeRepair } from "@/components/book/colophon";
-import { shouldDropCap } from "@/components/book/dropcap";
+import { dropCapMode } from "@/components/book/dropcap";
 import { EditorNote } from "@/components/book/editor-note";
 import { InstallCommand } from "@/components/book/install-command";
 import { MobileContents } from "@/components/book/mobile-contents";
@@ -15,7 +15,8 @@ import { ChapterAnnouncer, RunningHead } from "@/components/book/running-head";
 import { SkillApparatus } from "@/components/book/skill-meta";
 import { RateLimited, UpstreamFailure } from "@/components/book/states";
 import { Markdown } from "@/components/reader/markdown";
-import { chapterNav, findSkill } from "@/lib/book";
+import { chapterNav, findSkill, getBook } from "@/lib/book";
+import { showcaseParams } from "@/lib/featured";
 import { chapterJsonLd, JsonLd } from "@/lib/jsonld";
 import {
   installCommand,
@@ -33,13 +34,34 @@ import { renderChapter } from "../render";
  * params, so the chapter skeleton is a prerendered shell for every skill in
  * every repository, not just the seeded ones.
  *
- * `generateStaticParams` is deliberately absent here. Enumerating skill slugs
- * costs a tree fetch per showcase repository at build time, and the reward
- * would be prerendering a few dozen chapters out of the millions this route
- * serves. The shell already paints instantly; the body streams and then caches
- * for an hour. Paying a build-time API budget for that trade is the wrong way
- * round.
+ * `generateStaticParams` enumerates the showcase books' chapters, and the
+ * reason is not build-time rendering — it is `Cache-Control`. A PPR-resumed
+ * response ships `private, no-cache, no-store, max-age=0, must-revalidate`, so
+ * before this every chapter view was origin-only: no CDN, no shared cache, no
+ * `stale-while-revalidate`. A prerendered chapter answers
+ * `s-maxage=3600, stale-while-revalidate=82800` instead. The objected-to cost —
+ * "a tree fetch per showcase repository" — is not paid: the book route already
+ * prerenders these nine repositories, so every `getBook` here is a warm
+ * `use cache` hit. Everything outside the showcase still streams.
  */
+
+export async function generateStaticParams(): Promise<
+  Array<{ owner: string; repo: string; skill: string }>
+> {
+  const books = await Promise.all(
+    showcaseParams().map(async ({ owner, repo }) => {
+      try {
+        const book = await getBook(owner, repo);
+        return book.skills.map((s) => ({ owner, repo, skill: s.slug }));
+      } catch {
+        // A rate-limited or unreachable build still ships: these are an
+        // optimisation, and `dynamicParams` covers every one of them.
+        return [];
+      }
+    }),
+  );
+  return books.flat();
+}
 
 export async function generateMetadata(
   props: PageProps<"/[owner]/[repo]/[skill]">,
@@ -162,7 +184,7 @@ async function ChapterBody({
 
           <Markdown
             rendered={rendered}
-            dropCap={shouldDropCap(rendered.tree)}
+            dropCap={dropCapMode(rendered.tree)}
             className="mt-8"
           />
 

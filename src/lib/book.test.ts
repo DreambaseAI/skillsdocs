@@ -358,6 +358,37 @@ describe("assembleBook", () => {
       theme: THEME,
     });
     expect(book.skills).toHaveLength(16);
+    // …and says so. A chapter that could not be read is a fact about this
+    // render; dropping it silently made the colophon describe chapters the
+    // book did not contain, and cached the deletion for an hour.
+    expect(book.unreadable).toEqual([paths[0]]);
+    expect(book.skillsTotal).toBe(17);
+    expect(book.capped).toBe(false);
+  });
+
+  it("reports the real chapter count when MAX_SKILLS cuts the list short", () => {
+    // 250 skills, capped at 200: `github/awesome-copilot` (419 real) and
+    // `ComposioHQ/awesome-claude-skills` (864 real) were both served as "200
+    // chapters" on every surface, with nothing marking the truncation.
+    const entries: TreeEntry[] = Array.from({ length: 250 }, (_, i) => ({
+      path: `skills/skill-${String(i).padStart(3, "0")}/SKILL.md`,
+      type: "blob" as const,
+      sha: `sha${i}`,
+      size: 100,
+    }));
+    const paths = skillPathsFor(entries, "skills");
+    const book = assembleBook({
+      repo: repoMeta("acme/skills"),
+      owner: null,
+      entries,
+      truncated: false,
+      readme: null,
+      sources: paths.map(() => body("x")),
+      theme: THEME,
+    });
+    expect(book.skills).toHaveLength(200);
+    expect(book.skillsTotal).toBe(250);
+    expect(book.capped).toBe(true);
   });
 
   it("records every distinct path layout for the colophon", () => {

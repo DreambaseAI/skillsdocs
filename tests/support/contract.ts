@@ -35,6 +35,12 @@ export const FIXTURE = {
 
 export const ROUTES = {
   home: "/",
+  /**
+   * `/search` and the 404 shell were audited by nothing until a review found a
+   * 1.4.10 reflow failure on the first and two dead skip links on the second.
+   * Every route the site actually serves belongs in the sweep.
+   */
+  search: "/search?q=react",
   book: `/${FIXTURE.owner}/${FIXTURE.repo}`,
   chapter: `/${FIXTURE.owner}/${FIXTURE.repo}/${FIXTURE.chapters[2]}`,
   chapterAlt: `/${FIXTURE.owner}/${FIXTURE.repo}/${FIXTURE.chapters[0]}`,
@@ -43,6 +49,8 @@ export const ROUTES = {
   roughOutline: `/${FIXTURE.owner}/${FIXTURE.rough.repo}/${FIXTURE.rough.chapters[1]}`,
   /** Missing alt text and vague link text in the source. */
   roughMedia: `/${FIXTURE.owner}/${FIXTURE.rough.repo}/${FIXTURE.rough.chapters[0]}`,
+  /** The not-found shell. Renders its own masthead, palette and skip links. */
+  notFound: `/${FIXTURE.owner}/${FIXTURE.repo}/no-such-chapter-at-all`,
 } as const;
 
 export type RouteName = keyof typeof ROUTES;
@@ -77,16 +85,28 @@ export const SEL = {
   /** Reading controls — ARCHITECTURE §5.5 "Panel UX". */
   controlsTrigger: "#reader-controls, [data-slot='controls-trigger']",
   controlsPanel:
-    "[data-slot='popover-popup'], [data-slot='drawer-popup'], [role='dialog']",
+    "[data-slot='popover-content'], [data-slot='drawer-popup'], [role='dialog']",
 
-  /** Every translucent surface that forced-colors mode can render unreadable. */
+  /**
+   * Every translucent surface that forced-colors mode can render unreadable.
+   *
+   * These are the `data-slot` values the components actually emit. The list
+   * used to say `popover-popup`, `dialog-popup`, `menu-popup`, `select-popup`,
+   * `tooltip-popup` — none of which exist anywhere in `components/ui`, so the
+   * "every visible translucent surface is opaque and bordered" check matched
+   * one element in the whole product (`drawer-popup`) and passed by finding
+   * nothing. `theme-modes.css` has always used the real names; only the
+   * contract was wrong, which is the worst way round.
+   */
   translucent: [
-    "[data-slot='popover-popup']",
-    "[data-slot='dialog-popup']",
+    "[data-slot='popover-content']",
+    "[data-slot='dialog-content']",
+    "[data-slot='sheet-content']",
     "[data-slot='drawer-popup']",
-    "[data-slot='menu-popup']",
-    "[data-slot='select-popup']",
-    "[data-slot='tooltip-popup']",
+    "[data-slot='dropdown-menu-content']",
+    "[data-slot='select-content']",
+    "[data-slot='tooltip-content']",
+    "[data-slot='hover-card-content']",
     ".translucent-surface",
   ].join(", "),
 } as const;

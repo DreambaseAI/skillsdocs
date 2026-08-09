@@ -152,7 +152,11 @@ export function RepoSwapField({
               value={value}
               onChange={(event) => setValue(event.target.value)}
               placeholder="github.com/anthropics/skills"
-              aria-describedby={`${hintId} ${statusId}`}
+              // The status node is empty until there is something to say, and
+              // an `aria-describedby` that resolves to an empty element is a
+              // description that silently disappears. Point at it only when it
+              // has text.
+              aria-describedby={status ? `${hintId} ${statusId}` : hintId}
               className="text-ink placeholder:text-ink-muted/60 h-full min-w-0 flex-1 bg-transparent text-base outline-none"
             />
           </div>

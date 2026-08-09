@@ -3,8 +3,9 @@
 import { Home01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ThemeToggleButton } from "@/components/chrome/theme-toggle";
+import { useHideOnScroll } from "@/hooks/use-hide-on-scroll";
 import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -23,42 +24,6 @@ import { cn } from "@/lib/utils";
  * them jump.
  */
 
-const HIDE_AFTER = 120;
-
-function useHideOnScroll(enabled: boolean): boolean {
-  const [hidden, setHidden] = useState(false);
-  const lastY = useRef(0);
-
-  useEffect(() => {
-    if (!enabled) return;
-    lastY.current = window.scrollY;
-
-    let frame = 0;
-    const onScroll = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        const y = window.scrollY;
-        const delta = y - lastY.current;
-        // A 4px dead-band: without it, momentum scrolling on iOS toggles the
-        // bar on every rubber-band frame.
-        if (Math.abs(delta) > 4) {
-          setHidden(y > HIDE_AFTER && delta > 0);
-          lastY.current = y;
-        }
-      });
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [enabled]);
-
-  return hidden;
-}
-
 export interface SiteHeaderProps {
   /** The identity slot — a server component streamed in by the route. */
   children?: ReactNode;
@@ -75,13 +40,20 @@ export function SiteHeader({ children, actions, pinned = false }: SiteHeaderProp
     <header
       data-print="hide"
       className={cn(
-        "bg-background/85 border-border sticky top-0 z-50 border-b transition-transform duration-200",
-        "supports-backdrop-filter:bg-background/70 supports-backdrop-filter:backdrop-blur-xl",
+        // 94/88, not 85/70. At 70% over a blur the body text underneath stayed
+        // legible as a grey smear inside the header band — measured on a scrolled
+        // chapter at 1440, worse in dark. A header is chrome; you should not be
+        // able to read the page through it.
+        "bg-background/94 border-border sticky top-0 z-50 border-b transition-transform duration-200",
+        "supports-backdrop-filter:bg-background/88 supports-backdrop-filter:backdrop-blur-xl",
         hidden ? "-translate-y-full lg:translate-y-0" : "translate-y-0",
       )}
       style={{ height: "var(--header-h)" }}
     >
-      <div className="mx-auto flex h-full max-w-[96rem] items-center gap-2 px-[max(0.75rem,3vw)] lg:px-6">
+      {/* Same box as `.book-frame` in book.css — 96rem wide, and the identical
+          gutter ladder — so the brand sits on the same vertical as the left
+          rail instead of 30px inside it. One gutter per page, not two. */}
+      <div className="mx-auto flex h-full max-w-[96rem] items-center gap-2 px-[max(1.25rem,5vw)] lg:px-10 xl:px-12">
         <Link
           href="/"
           className="text-foreground hover:bg-muted focus-visible:ring-ring/40 focus-visible:border-ring -ml-1.5 flex h-8 shrink-0 items-center gap-2 rounded-full border border-transparent px-2 text-sm font-medium focus-visible:ring-3"

@@ -62,11 +62,13 @@ export default function HomePage() {
 
       <main id="main" tabIndex={-1} className="bg-paper text-ink flex-1">
         {/* ------------------------------------------------------------ hero */}
-        <section
-          aria-labelledby="hero-heading"
-          className="border-rule/70 border-b px-5 py-14 sm:px-8 sm:py-20"
-        >
-          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start lg:gap-16">
+        {/* The gutter lives on the `max-w-6xl` box, not on the section around
+            it. With the padding outside, the hero's content started 32px left
+            of every other section on the page — `Your shelf`, `The index` and
+            the masthead all measured 176 at 1440 while the hero measured 144,
+            which reads as a misprint rather than as emphasis. */}
+        <section aria-labelledby="hero-heading" className="border-rule/70 border-b">
+          <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start lg:gap-16">
             <div>
               <p className="text-ink-muted text-[0.72rem] font-semibold tracking-[0.2em] uppercase">
                 One repo, one issue · One SKILL.md, one chapter

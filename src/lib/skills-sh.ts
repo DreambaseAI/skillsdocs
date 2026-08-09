@@ -271,15 +271,31 @@ export async function scrapeOfficialOwners(): Promise<SkillsShOwner[]> {
 
 /* -------------------------------------------------------------- cached API */
 
+/**
+ * How much of the committed snapshot a live scrape has to reproduce before we
+ * believe it.
+ *
+ * `live.length > 0` was too weak a test. A partial shape change that still
+ * parsed three rows out of 569 would have silently replaced the whole
+ * leaderboard, and the site would have looked like it had lost 99% of its
+ * corpus with nothing in the logs. A scrape that small is a parser failure, not
+ * a smaller leaderboard.
+ */
+const LIVE_FLOOR = 0.5;
+
+export function preferLive<T>(live: T[], snapshot: T[]): T[] {
+  if (live.length === 0) return snapshot;
+  return live.length >= Math.floor(snapshot.length * LIVE_FLOOR) ? live : snapshot;
+}
+
 export async function fetchLeaderboard(): Promise<SkillsShSkill[]> {
   "use cache";
   cacheLife("leaderboard");
   cacheTag("skills-sh", "leaderboard");
 
-  const live = await scrapeLeaderboard();
-  // An empty result means the shape moved or the site is down. Either way the
-  // committed snapshot is strictly better than showing zero installs.
-  return live.length > 0 ? live : SNAPSHOT.skills;
+  // An empty or implausibly small result means the shape moved or the site is
+  // down. Either way the committed snapshot is strictly better.
+  return preferLive(await scrapeLeaderboard(), SNAPSHOT.skills);
 }
 
 export async function fetchOfficialOwners(): Promise<SkillsShOwner[]> {
@@ -287,8 +303,7 @@ export async function fetchOfficialOwners(): Promise<SkillsShOwner[]> {
   cacheLife("leaderboard");
   cacheTag("skills-sh", "leaderboard");
 
-  const live = await scrapeOfficialOwners();
-  return live.length > 0 ? live : SNAPSHOT.owners;
+  return preferLive(await scrapeOfficialOwners(), SNAPSHOT.owners);
 }
 
 /** The last-good committed scrape. Never hits the network. */

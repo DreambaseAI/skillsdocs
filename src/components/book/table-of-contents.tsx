@@ -1,12 +1,13 @@
 import Link from "next/link";
+import { InlineMarkup } from "@/components/book/deck";
 import {
-  dek,
   folio,
   plural,
   roman,
   shortReadingTime,
 } from "@/components/book/format";
 import type { Book } from "@/lib/book";
+import { dekOf } from "@/lib/deck";
 import { paths } from "@/lib/site";
 
 /**
@@ -40,6 +41,8 @@ export function TableOfContents({
 }: TableOfContentsProps) {
   const PartHeading = headingLevel === 2 ? "h2" : "h3";
   const grouped = book.parts.length > 1 || book.parts[0]?.group !== "";
+
+  const anyNotes = book.skills.some((skill) => skill.issues.length > 0);
 
   // Chapter numbers run across the whole book, not within a part.
   let counter = 0;
@@ -91,8 +94,14 @@ export function TableOfContents({
                   <span className="sr-only">Chapter {number}: </span>
                   {skill.title}
                 </span>
+                {/* Through `dekOf`: a sentence, cut on a word boundary, with
+                    real apostrophes and inline code set as code. The old path
+                    printed straight quotes and raw backticks and cut
+                    mid-token — `Anthropic’s look-…`. */}
                 {skill.description ? (
-                  <span className="book-entry__dek">{dek(skill.description)}</span>
+                  <span className="book-entry__dek">
+                    <InlineMarkup text={dekOf(skill.description)} />
+                  </span>
                 ) : null}
                 {skill.variants.length > 0 ? (
                   <span className="book-caption mt-1 block text-[0.78rem]">
@@ -121,6 +130,17 @@ export function TableOfContents({
           ))}
         </section>
       ))}
+
+      {/* The mark had no key anywhere on the page. One line of legend is the
+          difference between an ornament and a glyph nobody can read. */}
+      {anyNotes ? (
+        <p className="book-caption mt-3">
+          <span className="text-issue-accent" aria-hidden="true">
+            ※
+          </span>{" "}
+          carries an editor&rsquo;s note.
+        </p>
+      ) : null}
     </nav>
   );
 }

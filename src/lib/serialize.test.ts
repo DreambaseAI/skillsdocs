@@ -6,6 +6,7 @@
  * permission. Every rule in the module header has an assertion here.
  */
 
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { assembleBook, type Book } from "./book";
 import type { IssueTheme } from "./design/types";
@@ -13,9 +14,12 @@ import type { RepoMeta, TreeEntry } from "./github";
 import {
   AGENT_SKILLS_SCHEMA,
   SITE_SKILL_MD,
+  absolutiseLinks,
   bookToAgentSkills,
   bookToMarkdown,
   chapterLicence,
+  classifyUpstreamError,
+  failureFromProbe,
   normaliseSpdx,
   repoLicence,
   siteLlmsTxt,
@@ -272,17 +276,19 @@ describe("bookToAgentSkills", () => {
     license: { key: "mit", name: "MIT License", spdxId: "MIT" },
   });
   const digests = new Map([
-    ["alpha", "a".repeat(64)],
-    ["beta", "b".repeat(64)],
+    ["alpha", { document: "a".repeat(64), source: "1".repeat(64) }],
+    ["beta", { document: "b".repeat(64), source: "2".repeat(64) }],
   ]);
 
-  it("emits only the five fields verified against a live manifest", () => {
+  it("emits the Mintlify-compatible fields plus the raw-source pair", () => {
     const manifest = bookToAgentSkills(licensed, digests);
     expect(manifest.$schema).toBe(AGENT_SKILLS_SCHEMA);
     expect(Object.keys(manifest.skills[0]).sort()).toEqual([
       "description",
       "digest",
       "name",
+      "source",
+      "sourceDigest",
       "type",
       "url",
     ]);
@@ -291,13 +297,47 @@ describe("bookToAgentSkills", () => {
     expect(manifest.skills[0].url).toBe(`${SITE_URL}/acme/skills/alpha.md`);
   });
 
+  /**
+   * The regression the whole entry shape exists for: `digest` used to hash the
+   * raw upstream bytes while `url` pointed at our `.md` twin, which prepends a
+   * provenance header. `curl <url> | shasum -a 256` failed on 16 of 16 entries
+   * for `anthropics/skills`, on every book, while our own published skill told
+   * agents to verify it.
+   */
+  it("pairs each URL with a digest of the bytes that URL serves", () => {
+    const document = createHash("sha256")
+      .update(skillToMarkdown(licensed, licensed.skills[0], { raw: RAW }), "utf8")
+      .digest("hex");
+    const source = createHash("sha256").update(SOURCE_ALPHA, "utf8").digest("hex");
+
+    const manifest = bookToAgentSkills(
+      licensed,
+      new Map([["alpha", { document, source }]]),
+    );
+    const entry = manifest.skills[0];
+
+    expect(entry.digest).toBe(`sha256:${document}`);
+    expect(entry.sourceDigest).toBe(`sha256:${source}`);
+    expect(entry.digest).not.toBe(entry.sourceDigest);
+    expect(entry.source).toBe(
+      "https://raw.githubusercontent.com/acme/skills/main/skills/alpha/SKILL.md",
+    );
+  });
+
+  it("advertises a $schema on a host that resolves", () => {
+    expect(AGENT_SKILLS_SCHEMA.startsWith(SITE_URL)).toBe(true);
+    expect(AGENT_SKILLS_SCHEMA).not.toContain("schemas.agentskills.io");
+  });
+
   it("omits unlicensed chapters entirely", () => {
     const manifest = bookToAgentSkills(makeBook(), digests);
     expect(manifest.skills.map((s) => s.name)).toEqual(["beta"]);
   });
 
   it("omits chapters whose bytes could not be hashed", () => {
-    const partial = new Map([["alpha", "c".repeat(64)]]);
+    const partial = new Map([
+      ["alpha", { document: "c".repeat(64), source: "d".repeat(64) }],
+    ]);
     const manifest = bookToAgentSkills(licensed, partial);
     expect(manifest.skills.map((s) => s.name)).toEqual(["alpha"]);
   });
@@ -349,5 +389,200 @@ describe("SITE_SKILL_MD", () => {
   it("never advertises the unverified per-skill install form", () => {
     expect(SITE_SKILL_MD).toContain("npx skills add <owner>/<repo>");
     expect(SITE_SKILL_MD).not.toMatch(/npx skills add <owner>\/<repo>\/<skill>/);
+  });
+});
+
+/* ------------------------------------------------------- agent-surface fixes */
+
+describe("book markdown is byte-stable and structurally chunkable", () => {
+  const licensed = makeBook({
+    license: { key: "mit", name: "MIT License", spdxId: "MIT" },
+  });
+
+  /**
+   * `generated: <now>` changed on every request, so two consecutive fetches of
+   * `/anthropics/skills.md` differed by one line and no `ETag` could ever
+   * match — 240 KB re-downloaded on every poll.
+   */
+  it("produces identical bytes on two calls a second apart", () => {
+    const a = bookToMarkdown(licensed, { raw: RAW, now: new Date(1_000) });
+    const b = bookToMarkdown(licensed, { raw: RAW, now: new Date(2_000) });
+    expect(a).toBe(b);
+    expect(a).not.toContain("generated:");
+    expect(a).toContain("updated: 2026-07-22T14:02:11Z");
+  });
+
+  it("puts an SPDX id or null in `license`, never a sentence", () => {
+    expect(bookToMarkdown(licensed, { raw: RAW })).toContain("license: MIT");
+    const md = bookToMarkdown(makeBook(), { raw: RAW });
+    expect(md).toContain("license: null");
+    expect(md).toContain('licenseName: "No licence detected"');
+    // …and the counts that the prose used to carry alone.
+    expect(md).toContain("chapters: 2");
+    expect(md).toContain("inlined: 1");
+    expect(md).toContain("withheld: 1");
+  });
+
+  it("marks every chapter boundary with a named comment", () => {
+    const md = bookToMarkdown(licensed, { raw: RAW });
+    expect(md).toContain("<!-- chapter:begin slug=alpha position=1 -->");
+    expect(md).toContain("<!-- chapter:end slug=alpha -->");
+    expect(md).toContain("<!-- chapter:end slug=beta -->");
+  });
+
+  it("declares the base a relative link resolves against", () => {
+    expect(bookToMarkdown(licensed, { raw: RAW })).toContain(
+      "base: https://github.com/acme/skills/blob/main/",
+    );
+  });
+
+  it("does not advertise an install command for a book with no skills", () => {
+    const empty = assembleBook({
+      repo: repoMeta("acme/empty"),
+      owner: null,
+      entries: [],
+      truncated: false,
+      readme: null,
+      sources: [],
+      theme: THEME,
+    });
+    const md = bookToMarkdown(empty);
+    expect(md).toContain("_This repository contains no Agent Skills._");
+    expect(md).not.toContain("npx skills add");
+  });
+});
+
+describe("absolutiseLinks", () => {
+  const base = "https://github.com/acme/skills/blob/main/";
+
+  it("resolves relative links against the repository tree", () => {
+    expect(absolutiseLinks("[a](./skills/x/SKILL.md)", base)).toBe(
+      "[a](https://github.com/acme/skills/blob/main/skills/x/SKILL.md)",
+    );
+    expect(absolutiseLinks("[a](docs/b.md)", base)).toBe(
+      "[a](https://github.com/acme/skills/blob/main/docs/b.md)",
+    );
+    expect(absolutiseLinks("![i](/logo.png)", base)).toBe(
+      "![i](https://github.com/acme/skills/blob/main/logo.png)",
+    );
+  });
+
+  it("leaves absolute URLs, anchors and titles alone", () => {
+    expect(absolutiseLinks("[a](https://x.dev/y)", base)).toBe("[a](https://x.dev/y)");
+    expect(absolutiseLinks("[a](#heading)", base)).toBe("[a](#heading)");
+    expect(absolutiseLinks("[a](//cdn.example/x.png)", base)).toBe(
+      "[a](//cdn.example/x.png)",
+    );
+    expect(absolutiseLinks('[a](x.md "T")', base)).toBe(
+      '[a](https://github.com/acme/skills/blob/main/x.md "T")',
+    );
+  });
+
+  it("rewrites the README inside the aggregate document", () => {
+    const book = assembleBook({
+      repo: repoMeta("acme/skills", { key: "mit", name: "MIT License", spdxId: "MIT" }),
+      owner: null,
+      entries: [
+        { path: "skills/alpha/SKILL.md", type: "blob", sha: "s0", size: 100 },
+      ],
+      truncated: false,
+      readme: "See [grill-me](./skills/alpha/SKILL.md).",
+      sources: [SOURCE_ALPHA],
+      theme: THEME,
+    });
+    expect(bookToMarkdown(book, { raw: RAW })).toContain(
+      "[grill-me](https://github.com/acme/skills/blob/main/skills/alpha/SKILL.md)",
+    );
+  });
+});
+
+describe("bundled files", () => {
+  const book = makeBook({
+    license: { key: "mit", name: "MIT License", spdxId: "MIT" },
+    extra: ["skills/alpha/references/schemas.md", "skills/alpha/scripts/init.py"],
+  });
+  const alpha = book.skills.find((s) => s.slug === "alpha")!;
+
+  /**
+   * Without this the `.md` twin is worse than raw GitHub for exactly the
+   * skills that need it most: `skill-creator` cites `references/…`,
+   * `assets/…` and `scripts/…` at nine call sites and our copy resolved none
+   * of them, where an agent on raw GitHub can list the sibling directory.
+   */
+  it("names each sibling file and its raw URL in the chapter header", () => {
+    const md = skillToMarkdown(book, alpha, { raw: RAW });
+    expect(md).toContain("Bundled files (2)");
+    expect(md).toContain("`references/schemas.md`");
+    expect(md).toContain(
+      "https://raw.githubusercontent.com/acme/skills/main/skills/alpha/scripts/init.py",
+    );
+  });
+
+  it("declares the base those relative paths resolve against", () => {
+    expect(skillToMarkdown(book, alpha, { raw: RAW })).toContain(
+      "Base for relative paths: https://raw.githubusercontent.com/acme/skills/main/skills/alpha/",
+    );
+  });
+
+  it("says nothing when a skill has no bundled files", () => {
+    const bare = makeBook({ license: { key: "mit", name: "MIT License", spdxId: "MIT" } });
+    const beta = bare.skills.find((s) => s.slug === "beta")!;
+    expect(skillToMarkdown(bare, beta, { raw: RAW })).not.toContain("Bundled files");
+  });
+});
+
+describe("upstream failure classification", () => {
+  /**
+   * The exact object a production build hands a route handler when `getBook`
+   * rejects and the handler read its params from `ctx.params`. Captured from
+   * `next build && next start`: React replaces the `GitHubError` wholesale, so
+   * `kind`, `status` and the message are all gone and only `digest` survives.
+   */
+  const REDACTED = Object.assign(
+    new Error(
+      "An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details. A digest property is included on this error instance which may provide additional details about the nature of the error.",
+    ),
+    { digest: "1349217415" },
+  );
+
+  it("cannot name the redacted error — which is why the probe exists", () => {
+    expect(classifyUpstreamError(REDACTED).status).toBe(502);
+  });
+
+  it("still names an error that survived intact", () => {
+    expect(
+      classifyUpstreamError(
+        Object.assign(new Error("Not found: /repos/a/b"), { kind: "not-found" }),
+      ).status,
+    ).toBe(404);
+  });
+
+  /**
+   * Every agent surface answered 502 for a repository that does not exist, so
+   * an agent saw a retryable 5xx for a permanent condition — and
+   * `openapi.json` declared a 404 that could never occur.
+   */
+  it("maps a probe of a missing repository to 404, not 502", () => {
+    const f = failureFromProbe({ kind: "not-found" }, "anthropics", "nope");
+    expect(f.status).toBe(404);
+    expect(f.code).toBe("not_found");
+    expect(f.message).toBe("No repository at github.com/anthropics/nope.");
+    expect(f.message).not.toContain("Server Components render");
+  });
+
+  it("maps an exhausted quota to 429 and names the reset", () => {
+    const f = failureFromProbe(
+      { kind: "rate-limited", resetAt: "2026-08-08T12:00:00Z" },
+      "a",
+      "b",
+    );
+    expect(f.status).toBe(429);
+    expect(f.message).toContain("2026-08-08T12:00:00Z");
+  });
+
+  it("keeps 502 for a repository that exists, and says where the fault was", () => {
+    const f = failureFromProbe({ kind: "ok" }, "anthropics", "skills");
+    expect(f.status).toBe(502);
+    expect(f.message).toContain("downstream of repository metadata");
   });
 });

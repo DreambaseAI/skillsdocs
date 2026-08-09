@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { BookCover } from "@/components/book/book-cover";
+import { BookCoverBand, BookMasthead } from "@/components/book/book-cover";
 import { BookRail } from "@/components/book/book-rail";
 import { BookSkeleton } from "@/components/book/book-skeleton";
 import { Colophon } from "@/components/book/colophon";
-import { shouldDropCap } from "@/components/book/dropcap";
+import { dropCapMode } from "@/components/book/dropcap";
 import { MobileContents } from "@/components/book/mobile-contents";
 import { BookContentsList, RailLeft } from "@/components/book/rail-left";
 import { EmptyBook, RateLimited, UpstreamFailure } from "@/components/book/states";
@@ -108,6 +108,7 @@ async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">
         repo={repo}
         description={book.repo.description}
         installs={book.signal?.installs}
+        avatar={book.repo.ownerAvatar}
       />
     );
   }
@@ -119,6 +120,7 @@ async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">
   const sections = [
     { id: "cover", label: "Cover" },
     { id: "contents", label: "Contents" },
+    { id: "masthead-title", label: "Install" },
     ...(front ? [{ id: "front-matter", label: "Front matter" }] : []),
     { id: "colophon", label: "Colophon" },
   ];
@@ -129,22 +131,25 @@ async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">
           every chapter, and only this branch knows the book resolved. */}
       <JsonLd data={bookJsonLd(book)} />
 
+      {/* The cover is a band, not a block: it escapes the three-track grid
+          entirely so the rails start where the contents does. See the note at
+          the top of `book-cover.tsx`. */}
+      <div className="reader">
+        <BookCoverBand book={book} />
+      </div>
+
       <div className="book-frame">
         <RailLeft book={book} />
 
         {/* `.reader` sits on the column, not the frame: WS-5 makes it the
             `reader` container query root, and the rails are not the column. */}
         <div className="book-column reader">
-          <div id="cover" className="scroll-mt-24">
-            <BookCover book={book} />
-          </div>
-
-          <div className="book-measure mt-6">
-            <hr className="book-rule" />
-          </div>
-
-          <div className="mt-10">
+          <div className="pt-10">
             <TableOfContents book={book} />
+          </div>
+
+          <div className="mt-16">
+            <BookMasthead book={book} />
           </div>
 
           {front ? (
@@ -168,7 +173,7 @@ async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">
               </div>
               <Markdown
                 rendered={front}
-                dropCap={shouldDropCap(front.tree)}
+                dropCap={dropCapMode(front.tree)}
                 className="mt-8"
               />
             </section>

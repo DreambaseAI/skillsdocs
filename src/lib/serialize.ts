@@ -50,8 +50,26 @@ import type { SeedRepo } from "./data/seed-repos";
 export const TAKEDOWN_CONTACT =
   process.env.NEXT_PUBLIC_TAKEDOWN_CONTACT ?? TAKEDOWN_URL;
 
-/** The Agent Skills discovery schema, taken verbatim from a live manifest. */
-export const AGENT_SKILLS_SCHEMA =
+/**
+ * The Agent Skills discovery schema.
+ *
+ * The field shape is Mintlify's, copied from a live manifest, and their
+ * `$schema` points at `https://schemas.agentskills.io/discovery/0.2.0/…`.
+ * That hostname does not resolve — measured 2026-08: `host
+ * schemas.agentskills.io` → NXDOMAIN, and `agentskills.io/schemas/…` → 404 — so
+ * an agent that dereferences it gets a DNS failure rather than a schema.
+ *
+ * A `$schema` an agent cannot fetch is worse than no `$schema`, so we publish
+ * our own copy of the shape we actually emit and point at that. The field
+ * *values* stay wire-compatible with Mintlify; only the URL is ours.
+ */
+export const AGENT_SKILLS_SCHEMA_PATH =
+  "/api/v1/schemas/agent-skills-index.json";
+
+export const AGENT_SKILLS_SCHEMA = absoluteUrl(AGENT_SKILLS_SCHEMA_PATH);
+
+/** The upstream field shape this manifest is compatible with. */
+export const AGENT_SKILLS_SCHEMA_UPSTREAM =
   "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
 
 /**
@@ -102,6 +120,58 @@ export function classifyUpstreamError(error: unknown): UpstreamFailure {
     return { status: 429, code: "rate_limited", message };
   }
   return { status: 502, code: "upstream_error", message };
+}
+
+/**
+ * What a direct, uncached probe of `GET /repos/{owner}/{repo}` found.
+ *
+ * Lives here rather than next to the probe itself so that the mapping below is
+ * pure and testable; `lib/upstream.ts` owns the network.
+ */
+export type RepoStatus =
+  | { kind: "ok" }
+  | { kind: "not-found" }
+  | { kind: "rate-limited"; resetAt: string | null }
+  | { kind: "error"; detail: string };
+
+/**
+ * Turn a probe result into the status an agent surface should answer with.
+ *
+ * Reached only when `classifyUpstreamError` could not name the failure —
+ * which, in a production build, is every failure that crossed a `"use cache"`
+ * boundary from a route handler with dynamic params.
+ */
+export function failureFromProbe(
+  probed: RepoStatus,
+  owner: string,
+  repo: string,
+): UpstreamFailure {
+  if (probed.kind === "not-found") {
+    return {
+      status: 404,
+      code: "not_found",
+      message: `No repository at github.com/${owner}/${repo}.`,
+    };
+  }
+  if (probed.kind === "rate-limited") {
+    return {
+      status: 429,
+      code: "rate_limited",
+      message: `GitHub API rate limit reached.${probed.resetAt ? ` Resets ${probed.resetAt}.` : ""} Set GITHUB_TOKEN to raise the limit.`,
+    };
+  }
+  if (probed.kind === "error") {
+    return { status: 502, code: "upstream_error", message: probed.detail };
+  }
+
+  // The repository exists, so the failure was somewhere downstream of it — the
+  // tree, a raw read, or our own pipeline. Say so rather than blaming GitHub
+  // for a message we were never handed.
+  return {
+    status: 502,
+    code: "upstream_error",
+    message: `Could not assemble ${owner}/${repo}. The repository exists upstream; the failure was downstream of repository metadata.`,
+  };
 }
 
 /* ----------------------------------------------------------------- licences */
@@ -367,6 +437,44 @@ function bullets(rows: ProvenanceLine[]): string {
 const UPSTREAM_MARKER =
   "<!-- Verbatim upstream SKILL.md follows, YAML frontmatter included. -->";
 
+/** How many bundled files a provenance header will name before summarising. */
+const MAX_LISTED_RESOURCES = 24;
+
+/**
+ * The files that sit next to a `SKILL.md` and that its body refers to.
+ *
+ * Without this our Markdown twin is strictly *worse* than raw GitHub for the
+ * skills that need it most: `anthropics/skills/skill-creator` cites
+ * `references/schemas.md`, `assets/eval_review.html`, `scripts/…` and
+ * `eval-viewer/generate_review.py` at nine separate call sites, and an agent
+ * reading our copy had no way to resolve any of them — where an agent on raw
+ * GitHub can at least list the sibling directory. The data was already in the
+ * JSON API (`resources[]`); it just never reached the document agents actually
+ * fetch.
+ */
+function bundledFiles(
+  book: Book,
+  skill: Skill,
+): string[] {
+  const { owner, repo: name, defaultBranch: ref } = book.repo;
+  const files = skill.resources.filter((r) => r.relPath !== "SKILL.md");
+  if (files.length === 0) return [];
+
+  const listed = files.slice(0, MAX_LISTED_RESOURCES);
+  const rows = listed.map(
+    (r) => `  - \`${r.relPath}\` — ${rawUrl(owner, name, ref, r.path)}`,
+  );
+  if (files.length > listed.length) {
+    rows.push(
+      `  - …and ${files.length - listed.length} more, listed in ${absoluteUrl(paths.chapterJson(owner, name, skill.slug))}`,
+    );
+  }
+  return [
+    `Bundled files (${files.length}), referenced from this skill's directory:`,
+    ...rows,
+  ];
+}
+
 /* ------------------------------------------------------------ book markdown */
 
 export interface SerializeOptions {
@@ -391,18 +499,29 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
   const included = book.skills.filter((s) => isRepublishable(book, s));
   const withheld = book.skills.filter((s) => !isRepublishable(book, s));
 
+  const base = `${external.repo(owner, name)}/blob/${ref}/`;
+
   const head = [
     "---",
     `title: ${yamlString(`${owner}/${name}`)}`,
     `description: ${yamlString(oneLine(repo.description ?? `Agent Skills from ${owner}/${name}.`))}`,
     `source: ${external.repo(owner, name)}`,
     `ref: ${ref}`,
-    `license: ${licence.spdx ?? yamlString(licence.name)}`,
+    // An SPDX id or nothing. `license: "No licence detected"` put a sentence
+    // where a machine expects an identifier, and it contradicted the document
+    // it headed: 16 of those 17 chapters were inlined under per-skill licences.
+    `license: ${licence.spdx ?? "null"}`,
+    `licenseName: ${yamlString(licence.name)}`,
     `canonical: ${bookUrl}`,
+    // Relative links inside the inlined README and chapter bodies resolve
+    // against this, not against the URL of this document.
+    `base: ${base}`,
     `chapters: ${book.skills.length}`,
+    `inlined: ${included.length}`,
+    `withheld: ${withheld.length}`,
     `words: ${book.totalWords}`,
+    `updated: ${repo.pushedAt ?? isoNow(options.now)}`,
     `generator: ${yamlString(SITE_NAME)}`,
-    `generated: ${isoNow(options.now)}`,
     "---",
   ].join("\n");
 
@@ -413,7 +532,11 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
     `Per-chapter Markdown: ${absoluteUrl(paths.book(owner, name))}/<skill>.md`,
     `Machine manifest: ${absoluteUrl(paths.bookManifest(owner, name))}`,
     `JSON: ${absoluteUrl(paths.bookJson(owner, name))}`,
-    `Install: \`${installCommand(owner, name)}\``,
+    // A repository with no SKILL.md has nothing to install; printing the
+    // command anyway told an agent to run something that does nothing.
+    ...(book.skills.length
+      ? [`Install: \`${installCommand(owner, name)}\``]
+      : []),
     `Upstream: ${external.repo(owner, name)} @ \`${ref}\``,
     `Licence: ${licenceLabel(licence)}`,
     "",
@@ -436,13 +559,42 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
       ].join("\n")
     : "_This repository contains no Agent Skills._";
 
+  // The README is *our* composition, not a skill body, so unlike a chapter it
+  // may be rewritten. Its relative links resolved against this document's URL
+  // and 404'd — `[grill-me](./skills/productivity/grill-me/SKILL.md)` in
+  // `mattpocock/skills.md` became `/mattpocock/skills/productivity/…`, which
+  // does not exist. Absolutising them against the repo tree is the only form
+  // that works from here.
   const frontMatter = book.readme
-    ? ["## Front matter", "", `_The repository README, verbatim._`, "", book.readme.trim()].join("\n")
+    ? [
+        "## Front matter",
+        "",
+        `_The repository README, verbatim except that relative links are resolved against ${base}._`,
+        "",
+        absolutiseLinks(book.readme.trim(), base),
+      ].join("\n")
     : "";
 
-  const chapters = book.skills.map((skill, i) =>
-    chapterSection(book, skill, i + 1, options),
-  );
+  // Part headings. `/api/v1/books/mattpocock/skills` reports four parts;
+  // the markdown flattened all 35 chapters into one `1.`–`35.` run and threw
+  // that structure away, which is exactly what a chunker needs most.
+  const partOf = new Map<string, string>();
+  if (book.parts.length > 1) {
+    for (const part of book.parts) {
+      for (const skill of part.skills) partOf.set(skill.slug, part.title);
+    }
+  }
+
+  let currentPart: string | null = null;
+  const chapters = book.skills.flatMap((skill, i) => {
+    const part = partOf.get(skill.slug) ?? null;
+    const section = chapterSection(book, skill, i + 1, options);
+    if (part && part !== currentPart) {
+      currentPart = part;
+      return [`---\n\n## Part: ${part}\n`, section];
+    }
+    return [section];
+  });
 
   const notice = withheld.length
     ? [
@@ -527,17 +679,33 @@ function chapterSection(
     },
   ];
 
+  const files = bundledFiles(book, skill);
+
+  // Explicit chunk boundaries. An inlined `SKILL.md` keeps its own `# ` H1 —
+  // "headings unshifted" is a promise we make in `llms.txt` and it is the right
+  // one — which leaves a heading-tree chunker looking at 74 top-level siblings
+  // of the document title in `anthropics/skills.md`. Splitting on `---` is no
+  // better: that is also the frontmatter delimiter of every inlined chapter.
+  // A named begin/end comment pair is unambiguous and costs the reader nothing.
+  const begin = `<!-- chapter:begin slug=${skill.slug} position=${position} -->`;
+  const end = `<!-- chapter:end slug=${skill.slug} -->`;
+
   if (!licence.redistributable) {
     return [
       "---",
+      "",
+      begin,
       "",
       `## ${position}. ${skill.name}`,
       "",
       skill.description ? oneLine(skill.description) : "",
       "",
       bullets(rows),
+      ...(files.length ? ["", files.join("\n")] : []),
       "",
       "_Body withheld: no licence could be detected for this skill. Read it upstream._",
+      "",
+      end,
       "",
     ].join("\n");
   }
@@ -545,15 +713,46 @@ function chapterSection(
   return [
     "---",
     "",
+    begin,
+    "",
     `## ${position}. ${skill.name}`,
     "",
     bullets(rows),
+    ...(files.length ? ["", files.join("\n")] : []),
     "",
     UPSTREAM_MARKER,
     "",
     chapterSource(skill, options.raw),
     "",
+    end,
+    "",
   ].join("\n");
+}
+
+/**
+ * Rewrite relative Markdown links and images to absolute URLs under `base`.
+ *
+ * Only ever applied to the README, never to a skill body — those are served
+ * verbatim, and that is a promise. Anchors, absolute URLs and protocol-relative
+ * URLs are left alone; a root-relative `/x` resolves against the repository
+ * root, which is what it means inside a repository.
+ */
+export function absolutiseLinks(markdown: string, base: string): string {
+  const root = base.replace(/\/+$/, "");
+  const resolve = (target: string): string => {
+    const trimmed = target.trim();
+    if (!trimmed) return target;
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(trimmed)) return target;
+    if (trimmed.startsWith("/")) return `${root}${trimmed}`;
+    return `${root}/${trimmed.replace(/^\.\//, "")}`;
+  };
+
+  // `[text](target)` and `![alt](target)`, with an optional "title" tail.
+  return markdown.replace(
+    /(!?\[[^\]]*\]\()([^)\s]+)((?:\s+"[^"]*")?\))/g,
+    (_m, head: string, target: string, tail: string) =>
+      `${head}${resolve(target)}${tail}`,
+  );
 }
 
 /* --------------------------------------------------------- chapter markdown */
@@ -577,22 +776,32 @@ export function skillToMarkdown(
   const licence = chapterLicence(book, skill);
   const raw = rawUrl(owner, name, ref, skill.skillMdPath);
 
-  const pointer = blockquote([
-    `**${skill.name}** — chapter ${position} of ${book.skills.length} in [${owner}/${name}](${absoluteUrl(paths.book(owner, name))}).`,
-    "",
-    `Book (all chapters, one file): ${absoluteUrl(paths.bookMarkdown(owner, name))}`,
-    `Machine manifest: ${absoluteUrl(paths.bookManifest(owner, name))}`,
-    `Install the book: \`${installCommand(owner, name)}\``,
-    `Upstream: ${external.file(owner, name, ref, skill.skillMdPath)} @ \`${ref}\``,
-    `Raw bytes, no header: ${raw}`,
-    `Licence: ${licenceLabel(licence)}${licence.url ? ` — ${licence.url}` : ""}`,
-    "",
-    `Content © its authors, served unmodified. Takedown: ${TAKEDOWN_CONTACT}`,
-  ]);
+  const dir = skill.skillMdPath.replace(/\/?SKILL\.md$/i, "");
+  const files = bundledFiles(book, skill);
+
+  const head = (redistributable: boolean): string =>
+    blockquote([
+      `**${skill.name}** — chapter ${position} of ${book.skills.length} in [${owner}/${name}](${absoluteUrl(paths.book(owner, name))}).`,
+      "",
+      `Book (all chapters, one file): ${absoluteUrl(paths.bookMarkdown(owner, name))}`,
+      `Machine manifest: ${absoluteUrl(paths.bookManifest(owner, name))}`,
+      `Install the book: \`${installCommand(owner, name)}\``,
+      `Upstream: ${external.file(owner, name, ref, skill.skillMdPath)} @ \`${ref}\``,
+      `Raw bytes, no header: ${raw}`,
+      // Relative paths inside the body — `references/schemas.md`,
+      // `scripts/init.py` — resolve against this, not against this URL.
+      `Base for relative paths: ${rawUrl(owner, name, ref, dir)}/`,
+      `Licence: ${licenceLabel(licence)}${licence.url ? ` — ${licence.url}` : ""}`,
+      ...(files.length ? ["", ...files] : []),
+      "",
+      redistributable
+        ? `Content © its authors, served unmodified. Takedown: ${TAKEDOWN_CONTACT}`
+        : `Content © its authors. This chapter's body is not served here; the links above are. Takedown: ${TAKEDOWN_CONTACT}`,
+    ]);
 
   if (!licence.redistributable) {
     return [
-      pointer,
+      head(false),
       "",
       `# ${skill.name}`,
       "",
@@ -604,6 +813,8 @@ export function skillToMarkdown(
       "",
     ].join("\n");
   }
+
+  const pointer = head(true);
 
   // An HTML comment, not a `---` rule: the upstream file opens with its own
   // `---` frontmatter delimiter, and two rules in a row read as a parsing bug.
@@ -674,6 +885,11 @@ ${list([
     note: "Every agent-facing endpoint, machine-readable.",
   },
   {
+    name: "Book catalog",
+    url: absoluteUrl("/api/v1/books"),
+    note: "Every book we index, paginated. Start here to enumerate the site.",
+  },
+  {
     name: "Book JSON",
     url: absoluteUrl("/api/v1/books/{owner}/{repo}"),
     note: "Book manifest: chapters, digests, licence, install commands.",
@@ -733,8 +949,16 @@ export interface AgentSkillEntry {
   name: string;
   type: "skill-md";
   description: string;
+  /** Our Markdown twin. `digest` is over *these* bytes. */
   url: string;
   digest: string;
+  /**
+   * The unheadered bytes on raw.githubusercontent, and their digest.
+   *
+   * Absent on the one skill this site authors, which has no upstream.
+   */
+  source?: string;
+  sourceDigest?: string;
 }
 
 export interface AgentSkillsManifest {
@@ -742,36 +966,57 @@ export interface AgentSkillsManifest {
   skills: AgentSkillEntry[];
 }
 
+/** The two hashes one manifest entry needs. Both hex sha256, no prefix. */
+export interface ChapterDigests {
+  /** sha256 of the exact bytes served at the entry's `url`. */
+  document: string;
+  /** sha256 of the raw upstream `SKILL.md`. */
+  source: string;
+}
+
 /**
  * The per-book discovery manifest.
  *
- * Fields are limited to the five verified against a live Mintlify manifest —
- * `name`, `type`, `description`, `url`, `digest`. The 0.2.0 JSON Schema could
- * not be fetched during research, so nothing beyond those is invented.
+ * **`digest` must verify against `url`.** It did not: the entry paired our
+ * `.md` twin — which prepends a ~1.1 KB provenance blockquote — with a hash of
+ * the *raw upstream* bytes, so `curl <url> | shasum -a 256` failed on 16 of 16
+ * entries for `anthropics/skills`, on every book. Our own published skill tells
+ * an agent to "verify the digest before writing a skill to disk", so an agent
+ * that obeyed us concluded we had tampered with every chapter, and the manifest
+ * gave it no raw URL to fall back to. Mintlify, whose field shape this is,
+ * hashes the bytes at `url`; so do we now.
  *
- * `digests` maps slug to a hex sha256 of the raw upstream bytes. A chapter with
- * no digest, or no detectable licence, is omitted: a manifest entry is an
- * invitation to install, and we only extend it for content we can both verify
- * and lawfully redistribute.
+ * The raw hash is still useful — it is what `shasum` of the GitHub file gives —
+ * so it is kept, next to the URL it actually describes, as
+ * `source` / `sourceDigest`.
+ *
+ * A chapter with no digests, or no detectable licence, is omitted: a manifest
+ * entry is an invitation to install, and we only extend it for content we can
+ * both verify and lawfully redistribute.
  */
 export function bookToAgentSkills(
   book: Book,
-  digests: ReadonlyMap<string, string>,
+  digests: ReadonlyMap<string, ChapterDigests>,
 ): AgentSkillsManifest {
-  const { owner, repo: name } = book.repo;
+  const { owner, repo: name, defaultBranch: ref } = book.repo;
 
   const skills = book.skills
     .filter((skill) => isRepublishable(book, skill) && digests.has(skill.slug))
-    .map((skill) => ({
-      name: skill.name,
-      type: "skill-md" as const,
-      description: truncate(
-        skill.description || `${skill.name} — from ${owner}/${name}.`,
-        1024,
-      ),
-      url: absoluteUrl(`${paths.chapter(owner, name, skill.slug)}.md`),
-      digest: `sha256:${digests.get(skill.slug)}`,
-    }));
+    .map((skill) => {
+      const pair = digests.get(skill.slug)!;
+      return {
+        name: skill.name,
+        type: "skill-md" as const,
+        description: truncate(
+          skill.description || `${skill.name} — from ${owner}/${name}.`,
+          1024,
+        ),
+        url: absoluteUrl(`${paths.chapter(owner, name, skill.slug)}.md`),
+        digest: `sha256:${pair.document}`,
+        source: rawUrl(owner, name, ref, skill.skillMdPath),
+        sourceDigest: `sha256:${pair.source}`,
+      };
+    });
 
   return { $schema: AGENT_SKILLS_SCHEMA, skills };
 }
@@ -809,10 +1054,19 @@ prefer content negotiation.
    chapter, bodies verbatim with their YAML frontmatter intact, in reading order.
 2. \`GET ${SITE_URL}/<owner>/<repo>/<skill>.md\` — one chapter, when you know the slug.
 3. \`GET ${SITE_URL}/<owner>/<repo>/.well-known/agent-skills/index.json\` — a discovery
-   manifest with one entry per chapter, each carrying a \`sha256:\` digest computed over
-   the raw upstream bytes. Verify the digest before writing a skill to disk.
+   manifest with one entry per chapter. Each entry carries \`url\` + \`digest\` (sha256 of
+   the exact bytes served at \`url\`) and \`source\` + \`sourceDigest\` (sha256 of the raw
+   upstream \`SKILL.md\` on raw.githubusercontent). Verify whichever pair you fetch
+   before writing a skill to disk; the two digests differ because our \`.md\` twin
+   prepends a provenance header.
+
+Every \`.md\` and JSON response carries a strong \`ETag\`. Send \`If-None-Match\` when you
+poll and you will get a 304 instead of the document.
 
 ## Finding a repository
+
+\`GET ${SITE_URL}/api/v1/books\` lists every book in the catalog, paginated, with the
+Markdown, JSON and manifest URL of each. That is the answer to "what do you have?".
 
 \`GET ${SITE_URL}/api/v1/search?q=<query>\` searches the indexed catalog and the
 skills.sh install index. Results carry the book, the skill slug, the Markdown URL, and
@@ -831,6 +1085,7 @@ Do not invent a per-skill install argument. To install a single skill, fetch its
 
 ## JSON, if you want structure instead of prose
 
+- \`GET ${SITE_URL}/api/v1/books\` — the whole catalog, paginated (\`limit\`, \`cursor\`).
 - \`GET ${SITE_URL}/api/v1/books/<owner>/<repo>\` — chapters, digests, licence, stats.
 - \`GET ${SITE_URL}/api/v1/books/<owner>/<repo>/skills/<skill>\` — one chapter with its
   content and heading outline.
@@ -891,6 +1146,11 @@ export function apiCatalog(): object {
             href: absoluteUrl("/.well-known/agent-skills/index.json"),
             type: "application/json",
           },
+        ],
+        // The enumeration entry point. Without it a client that starts from the
+        // catalog document has no way to ask what books exist.
+        collection: [
+          { href: absoluteUrl("/api/v1/books"), type: "application/json" },
         ],
         status: [
           { href: absoluteUrl("/api/v1/health"), type: "application/json" },

@@ -13,6 +13,7 @@ import {
   buildKeymap,
   CHORD_WINDOW_MS,
   emitShortcut,
+  hasShortcutListener,
   normalizeKey,
   type ShortcutAction,
   type ShortcutSettings,
@@ -44,6 +45,15 @@ const PREVENT_DEFAULT: ReadonlySet<ShortcutAction> = new Set([
   "help",
 ]);
 
+/** Arming `g` is only worth stealing the key for if some branch is handled. */
+function chordIsLive(branch: Map<string, ShortcutAction> | undefined): boolean {
+  if (!branch) return false;
+  for (const action of branch.values()) {
+    if (hasShortcutListener(action)) return true;
+  }
+  return false;
+}
+
 export interface ReaderShortcutsState {
   /** The armed first key of a chord, e.g. `"g"`, or null. Render it as a hint. */
   pending: string | null;
@@ -63,9 +73,21 @@ export function useReaderShortcuts(settings: ShortcutSettings): ReaderShortcutsS
   useEffect(() => {
     const { direct, chords } = buildKeymap(settings);
 
-    function fire(action: ShortcutAction, event: KeyboardEvent) {
+    /**
+     * Fire an action, or decline it.
+     *
+     * Returns false when nothing on this page handles the action, and in that
+     * case the browser keeps the keystroke. This is the difference between a
+     * shortcut that is unavailable here and a shortcut that steals the key and
+     * does nothing: `/` used to be in `PREVENT_DEFAULT` with no subscriber
+     * anywhere, so pressing it cancelled the browser's own quick-find and left
+     * the reader with neither.
+     */
+    function fire(action: ShortcutAction, event: KeyboardEvent): boolean {
+      if (!hasShortcutListener(action)) return false;
       if (PREVENT_DEFAULT.has(action)) event.preventDefault();
       emitShortcut(action);
+      return true;
     }
 
     function onKeyDown(event: KeyboardEvent) {
@@ -89,21 +111,15 @@ export function useReaderShortcuts(settings: ShortcutSettings): ReaderShortcutsS
       if (armed) {
         const action = chords.get(armed)?.get(key);
         clearChord();
-        if (action) {
-          fire(action, event);
-          return;
-        }
+        if (action && fire(action, event)) return;
         // A chord that did not resolve falls through: `g` then `t` should open
         // the contents rather than silently eating the keystroke.
       }
 
       const action = direct.get(key);
-      if (action) {
-        fire(action, event);
-        return;
-      }
+      if (action && fire(action, event)) return;
 
-      if (chords.has(key)) {
+      if (chords.has(key) && chordIsLive(chords.get(key))) {
         event.preventDefault();
         pendingRef.current = key;
         setPending(key);

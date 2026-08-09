@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { announce } from "@/components/chrome/live-regions";
 import { folio } from "@/components/book/format";
 import type { RailHeading } from "@/components/book/rail-right";
+import { ReadingProgress } from "@/components/reader/reading-progress";
 import { useActiveHeading } from "@/hooks/use-active-heading";
 
 /**
@@ -61,10 +62,50 @@ export function RunningHead({
   const section = usable.find((h) => h.id === active)?.text ?? null;
 
   return (
+    <>
+      {/*
+        The 2px progress bar is §5.1's very first desktop element and it was
+        built, tested and then never mounted — querying
+        `[role=progressbar], progress, [class*=progress]` on an 8,011-word
+        chapter scrolled to 45% returned `[]`. It lives here rather than in the
+        layout because "45% read" has to mean 45% of *this chapter*, which is
+        what the running head beside it claims to be measuring.
+      */}
+      <ReadingProgress />
+      <RunningHeadBar
+        revealed={revealed}
+        index={index}
+        total={total}
+        chapter={chapter}
+        section={section}
+      />
+    </>
+  );
+}
+
+function RunningHeadBar({
+  revealed,
+  index,
+  total,
+  chapter,
+  section,
+}: {
+  revealed: boolean;
+  index: number;
+  total: number;
+  chapter: string;
+  section: string | null;
+}) {
+  return (
     <div
       data-print="hide"
       aria-hidden="true"
-      className="book-runninghead border-rule bg-paper supports-backdrop-filter:bg-paper/85 pointer-events-none -mx-1 flex items-baseline gap-3 border-b px-1 py-2.5 transition-opacity duration-200 supports-backdrop-filter:backdrop-blur-md"
+      // 95%, not 85%. At 15% over a blur the paragraph passing underneath
+      // stayed legible *inside* the running head — measured at 1024 with the
+      // line "…figure out how they want to evaluate" crossing the head's own
+      // rule. A running head is the page's furniture; the page must not show
+      // through it.
+      className="book-runninghead border-rule bg-paper supports-backdrop-filter:bg-paper/95 pointer-events-none -mx-1 flex items-baseline gap-3 border-b px-1 py-2.5 transition-opacity duration-200 supports-backdrop-filter:backdrop-blur-md"
       style={{
         opacity: revealed ? 1 : 0,
         visibility: revealed ? "visible" : "hidden",

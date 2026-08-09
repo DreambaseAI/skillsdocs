@@ -97,14 +97,14 @@ export function fileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Trim a description to a dek without cutting mid-word. */
-export function dek(text: string, max = 180): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  if (clean.length <= max) return clean;
-  const cut = clean.slice(0, max);
-  const space = cut.lastIndexOf(" ");
-  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[,;:.\s]+$/, "")}…`;
-}
+/*
+ * `dek()` used to live here. It has moved to `@/lib/deck` as `dekOf`, which
+ * cuts on a sentence boundary before it falls back to a character budget,
+ * never leaves a trailing hyphen, and runs the text through the same
+ * smart-punctuation pass the body gets. One truncation rule for every surface
+ * that shows a `description`: the contents, the index, the search results and
+ * the chapter deck.
+ */
 
 /**
  * The licence as a reader needs it: a name, or the honest absence of one.

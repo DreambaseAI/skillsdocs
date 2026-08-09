@@ -82,6 +82,8 @@ export default function robots(): MetadataRoute.Robots {
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
-    host: SITE_URL,
+    // `Host:` (a Yandex directive) takes a bare hostname, not a URL — we were
+    // emitting `Host: http://localhost:3000`. `Sitemap:` does take the URL.
+    host: new URL(SITE_URL).host,
   };
 }

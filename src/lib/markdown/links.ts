@@ -22,7 +22,17 @@ export interface LinkContext {
 const ABSOLUTE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 
 export function joinPath(baseDir: string, rel: string): string {
-  const stack = baseDir ? baseDir.split("/").filter(Boolean) : [];
+  /*
+   * A leading slash means "from the repository root", the same as it does on
+   * github.com. Resolving `/logo.png` against the skill's own directory
+   * produced `skills/x/logo.png` and a broken image on every chapter that used
+   * the root-relative form.
+   */
+  const stack = rel.startsWith("/")
+    ? []
+    : baseDir
+      ? baseDir.split("/").filter(Boolean)
+      : [];
   for (const seg of rel.split("/")) {
     if (seg === "" || seg === ".") continue;
     if (seg === "..") stack.pop();

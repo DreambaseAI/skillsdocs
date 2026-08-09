@@ -85,13 +85,29 @@ export function PrefSlider({
       </div>
 
       <SliderPrimitive.Control className="relative flex h-5 w-full touch-none items-center select-none data-disabled:opacity-50">
-        <SliderPrimitive.Track className="bg-input/90 relative h-1.5 w-full grow overflow-hidden rounded-full select-none">
-          <SliderPrimitive.Indicator className="bg-issue-accent h-full select-none" />
+        {/* The `data-slot` hooks are what `theme-modes.css` redraws the
+            control from under `forced-colors: active`, where a control made of
+            backgrounds and a box-shadow renders as nothing at all. */}
+        <SliderPrimitive.Track
+          data-slot="slider-track"
+          className="bg-input/90 relative h-1.5 w-full grow overflow-hidden rounded-full select-none"
+        >
+          <SliderPrimitive.Indicator
+            data-slot="slider-indicator"
+            className="bg-issue-accent h-full select-none"
+          />
         </SliderPrimitive.Track>
         <SliderPrimitive.Thumb
+          data-slot="slider-thumb"
           aria-describedby={warning ? warningId : undefined}
           getAriaValueText={(_formatted, raw) => text(raw)}
-          className="ring-foreground/15 hover:ring-ring/40 focus-visible:ring-ring/40 block size-4 shrink-0 rounded-full bg-white shadow-md ring-1 transition-shadow select-none not-dark:bg-clip-padding hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden"
+          /* `ring-foreground/70`, not `/15`. A white thumb ringed at 15% over a
+             white popover measured 1.02:1 against its surroundings and 1.22:1
+             against its own track — sampled from a rendered screenshot — so in
+             light mode the only moving part of the control had no visible
+             boundary at all (WCAG 1.4.11 wants 3:1). At 70% the ring measures
+             ~7:1 against the thumb and ~5:1 against the track. */
+          className="ring-foreground/70 hover:ring-ring/40 focus-visible:ring-ring/40 block size-4 shrink-0 rounded-full bg-white shadow-md ring-1 transition-shadow select-none not-dark:bg-clip-padding hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden"
         />
       </SliderPrimitive.Control>
 

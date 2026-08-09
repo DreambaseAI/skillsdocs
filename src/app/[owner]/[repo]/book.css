@@ -72,10 +72,29 @@
 
   /* 1024px: the right rail earns its keep first — it is the one that changes
      as you scroll, and it is the cheaper of the two in width. */
+  /*
+   * Between 1024 and 1280 only the right rail exists, so the reading column is
+   * pinned to the left gutter while 358px of furniture sits on the right —
+   * measured, the column's left edge was at x=59 with the rail plus its gutter
+   * taking 358px. A left-heavy composition with one rail is not a spread, it
+   * is a page that slid. Reserving a *phantom* left track the width of the
+   * right rail's overhang re-centres the (column + rail) group.
+   */
   @media (min-width: 64rem) {
     .book-frame {
       --book-gutter: 2.5rem;
-      grid-template-columns: minmax(var(--book-col-min), 1fr) minmax(0, var(--rail-w-right));
+      grid-template-columns:
+        minmax(0, 6rem)
+        minmax(var(--book-col-min), 1fr)
+        minmax(0, var(--rail-w-right));
+    }
+
+    .book-frame:not(.book-frame--solo) > .book-column {
+      grid-column: 2;
+    }
+
+    .book-frame:not(.book-frame--solo) > .book-rail:not(.book-rail--left) {
+      grid-column: 3;
     }
   }
 
@@ -97,6 +116,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  @media (min-width: 64rem) {
+    .book-frame--solo {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   /* The reading column. `--reader-bleed` is the outer bound because code and
      tables are allowed 118% of the measure; prose itself stays at the measure
      via prose.css. */
@@ -106,6 +131,18 @@
     max-inline-size: var(--reader-bleed);
     margin-inline: auto;
     padding-block-end: 6rem;
+  }
+
+  /*
+   * Below `lg` the `.book-pill` is fixed over the foot of the column, so the
+   * column has to reserve the space the pill occupies — its own height, the
+   * gap under it, and the home-indicator inset — or the last lines of a
+   * chapter sit permanently underneath it.
+   */
+  @media (max-width: 63.999rem) {
+    .book-column {
+      padding-block-end: calc(6rem + 2.75rem + var(--safe-b));
+    }
   }
 
   /* Furniture aligns to the text measure, not to the bleed, or the eyebrow
@@ -232,6 +269,21 @@
     background: var(--ink-strong);
   }
 
+  /* The cover's title rule. The largest single piece of accent ink on the
+     site, and the cheapest: one 2px band across the full measure says which
+     issue you are in from across the room. */
+  .book-rule--issue {
+    block-size: 2px;
+    background: var(--issue-accent);
+  }
+
+  @media (forced-colors: active) {
+    .book-rule--issue {
+      background: CanvasText;
+      forced-color-adjust: none;
+    }
+  }
+
   .book-standfirst {
     font-family: var(--reader-font-family);
     font-size: 1.25em;
@@ -240,14 +292,49 @@
     font-weight: 350;
     color: var(--ink);
     text-wrap: pretty;
+    /*
+     * A deck never hyphenates. `hyphens: auto` is inherited from the reading
+     * surface, and at 390px it produced three hyphenated line-ends in nine
+     * lines on `skill-creator` — `…skill per-` above `…skill perfor-`.
+     */
+    hyphens: manual;
+    /*
+     * No `line-clamp` here on purpose. The bound is applied server-side by
+     * `deckOf` — one sentence, 180 characters — so the deck is at most four
+     * lines at the narrowest measure. Clamping in CSS as well would hide text
+     * under the WCAG 1.4.12 text-spacing override, which is a barrier; a
+     * server-side character budget is not.
+     */
   }
 
-  /* At 44 characters per line a 1.25em standfirst runs to ten lines before the
-     body starts. 1.15em is the measured mobile value and buys back two. */
+  /* At 44 characters per line a 1.25em standfirst runs long before the body
+     starts. 1.15em is the measured mobile value and buys back two lines. */
   @media (max-width: 30rem) {
     .book-standfirst {
       font-size: 1.15em;
     }
+  }
+
+  /*
+   * The verbatim frontmatter `description`, in the chapter's apparatus.
+   *
+   * Mono, small, and quiet: this is the string a router matches on, and
+   * setting it in the reading face at reading size is what made a 1,068-
+   * character regex look like an opening paragraph.
+   */
+  .book-trigger {
+    font-family: var(--reader-code-family);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.75rem;
+    margin: 0;
+    overflow-wrap: anywhere;
+    hyphens: manual;
+    text-wrap: initial;
   }
 
   .book-caption {
@@ -260,21 +347,118 @@
 
   /* ═══════════════════════════════════════════════════════════════ cover */
 
-  .book-cover {
+  /*
+   * The cover band.
+   *
+   * Full-bleed and outside `.book-frame`, so the two rails — which together
+   * were the largest text mass on the first screen — begin at the contents
+   * instead of flanking the title. It is the one surface on the site where the
+   * issue's accent does real work rather than tinting four words: the paper
+   * itself is washed 4% accent, the rule under the title is accent, and the
+   * owner's mark sits on an accent plate. Measured before that, accent ink was
+   * 0.06–0.5% of the page area on four of the five test issues.
+   *
+   * `min-block-size` is one viewport *less the header*, and the scroll cue at
+   * the foot sits inside it — a band that exactly fills the screen with nothing
+   * at its edge tells the reader the page has ended.
+   */
+  .book-coverband {
+    --band-gutter: max(1.25rem, 5vw);
+    position: relative;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: clamp(1.5rem, 3vw, 2.5rem);
-    /* Not a full 100dvh: a cover that exactly fills the viewport gives the
-       reader no signal that anything is below it. Leaving the top of the
-       contents visible is the oldest trick in magazine layout. */
-    min-block-size: min(78dvh, 46rem);
-    padding-block: clamp(2.5rem, 7vh, 5.5rem) clamp(2rem, 5vh, 4rem);
+    min-block-size: min(calc(100dvh - var(--header-h)), 52rem);
+    padding-block: clamp(3rem, 9vh, 6.5rem) clamp(4.5rem, 10vh, 7rem);
+    background: color-mix(in oklab, var(--issue-accent) 6%, var(--paper));
+    border-block-end: 1px solid var(--rule);
+  }
+
+  @media (min-width: 64rem) {
+    .book-coverband {
+      --band-gutter: 2.5rem;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .book-coverband {
+      --band-gutter: 3rem;
+    }
+  }
+
+  .book-coverband__inner {
+    inline-size: 100%;
+    max-inline-size: 96rem;
+    margin-inline: auto;
+    padding-inline: var(--band-gutter);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1.25rem, 2.6vw, 2rem);
+  }
+
+  .book-coverband__masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+  }
+
+  /* The deck is second in the visual order and set larger than a chapter's:
+     on a cover it is the sentence that has to earn the whole issue. */
+  .book-coverband__deck {
+    font-size: clamp(1.15rem, 1.9vw, 1.563rem);
+    max-inline-size: 46rem;
+    margin: 0;
+  }
+
+  .book-coverband__scale {
+    margin: 0;
+  }
+
+  /*
+   * Below `lg` the floating contents pill occupies exactly this spot and
+   * already says "Contents", so the cue would be a second copy of the same
+   * control sitting on top of the first.
+   */
+  .book-coverband__cue {
+    display: none;
+    position: absolute;
+    inset-block-end: clamp(1.25rem, 3vh, 2.25rem);
+    inset-inline-start: 50%;
+    translate: -50% 0;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--ink-muted);
+    text-decoration: none;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--paper) 70%, transparent);
+  }
+
+  @media (min-width: 64rem) {
+    .book-coverband__cue {
+      display: inline-flex;
+    }
+  }
+
+  .book-coverband__cue:hover {
+    color: var(--ink-strong);
+    border-color: var(--issue-accent);
+  }
+
+  @media (forced-colors: active) {
+    .book-coverband {
+      background: Canvas;
+    }
   }
 
   .book-cover__title {
     font-family: var(--font-display);
-    font-size: clamp(2.75rem, 9vw, 6rem);
+    /* The ceiling is per-name-length; `--cover-cap` is set inline by
+       `book-cover.tsx` so two lowercase letters are not set at 96px in an
+       otherwise empty line. */
+    font-size: clamp(3rem, 11vw, var(--cover-cap, 6rem));
     line-height: 0.95;
     letter-spacing: -0.03em;
     font-weight: 400;
@@ -316,18 +500,43 @@
     flex: none;
     border: 1px solid var(--rule);
     border-radius: calc(var(--radius) * 0.5);
-    background: var(--paper-raised);
+    /* An accent-tinted plate, not bare paper. Several owner marks are
+       near-white — `stripe` renders as a pale grey square that vanishes on
+       cream — and the tint is also the fourth job the issue accent does on
+       the cover. */
+    background: color-mix(in oklab, var(--issue-accent) 8%, var(--paper-raised));
     overflow: hidden;
   }
 
-  .book-mark::after {
-    /* An inner hairline: the debossed edge of a printing plate. */
-    content: "";
+  /*
+   * No inner hairline.
+   *
+   * Most owner avatars already carry a frame of their own — a rounded square,
+   * a ring, a border in the artwork — and a plate rule *plus* a debossed inner
+   * rule around that produced a visible double border on every mark measured.
+   * The accent-tinted plate above is what separates a pale mark from the
+   * paper; a second rule was doing the same job twice and reading as a mistake.
+   */
+
+  /*
+   * A state page's watermark. Large, ghosted, in the issue's own colour —
+   * the opposite of the 38px boxed icon it replaces, which was identical on
+   * the empty state and the 404 and made the two indistinguishable.
+   */
+  .book-state__glyph {
     position: absolute;
-    inset: 3px;
-    border: 1px solid color-mix(in oklab, var(--rule) 55%, transparent);
-    border-radius: calc(var(--radius) * 0.35);
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    inline-size: clamp(6rem, 18vw, 12rem);
+    block-size: clamp(6rem, 18vw, 12rem);
+    color: color-mix(in oklab, var(--issue-accent) 12%, transparent);
     pointer-events: none;
+  }
+
+  @media (forced-colors: active) {
+    .book-state__glyph {
+      display: none;
+    }
   }
 
   .book-mark img {
@@ -461,17 +670,32 @@
     border-radius: var(--radius-sm);
   }
 
+  /*
+   * Folios in the issue accent.
+   *
+   * Seventeen numerals down the left of the contents is the largest repeating
+   * element on the page, and giving them the issue's colour is what takes the
+   * accent from "four coloured words" to something a reader can name. Measured
+   * before this, accent ink was 0.164% of the page area on `anthropics/skills`
+   * and 0.059% on `microsoft/azure-skills`.
+   */
   .book-entry__folio {
     font-family: var(--font-display);
     font-size: 1.1rem;
     line-height: 1.2;
-    color: var(--ink-muted);
+    color: var(--issue-accent);
     font-variant-numeric: lining-nums tabular-nums;
     letter-spacing: 0.02em;
   }
 
   .book-entry:hover .book-entry__folio {
-    color: var(--issue-accent);
+    color: var(--ink-strong);
+  }
+
+  @media (forced-colors: active) {
+    .book-entry__folio {
+      color: CanvasText;
+    }
   }
 
   .book-entry__title {
@@ -484,6 +708,19 @@
     text-wrap: balance;
   }
 
+  /*
+   * No `line-clamp`. It used to clamp to two lines at a fixed 46px, and
+   * measured against real content that clipped 17 of 17 entries on
+   * `anthropics/skills` — 34 of 37 on `microsoft/azure-skills` — with the
+   * worst entry hiding 45 of its 91px. Under the WCAG 1.4.12 text-spacing
+   * override the hidden fraction roughly doubled, and at 200% text-only zoom
+   * it reached 83%. On a page where the dek is the only thing distinguishing
+   * `Azure Aigateway` from `Azure App Onboard Prereq`, that is a barrier.
+   *
+   * The bound is a character budget applied server-side by `dekOf`, on a word
+   * boundary, which is roughly two lines at this size and cannot hide text
+   * that a reader has asked to be able to read.
+   */
   .book-entry__dek {
     margin-block-start: 0.3rem;
     font-family: var(--reader-font-family);
@@ -491,12 +728,6 @@
     line-height: 1.5;
     color: var(--ink-muted);
     text-wrap: pretty;
-    /* Two lines is a dek; three is the article. */
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
   }
 
   .book-entry__meta {
@@ -868,6 +1099,36 @@
     display: flex;
     justify-content: center;
     pointer-events: none;
+    transition: transform 200ms var(--ease-out-quint), opacity 200ms var(--ease-out-quint);
+  }
+
+  /*
+   * Out of the way while the reader is reading.
+   *
+   * The header already does this below `lg`; a floating control that stays put
+   * while the text under it moves is the one piece of furniture guaranteed to
+   * be over a line of prose at any given moment. Mirroring the header means
+   * scrolling *down* — reading — clears the page, and any scroll up brings the
+   * control back with the bar it belongs to.
+   */
+  .book-pill[data-hidden="true"] {
+    transform: translateY(calc(100% + 1.25rem + var(--safe-b)));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* A keyboard user who arrives here via the skip link, or tabs in while the
+     page happens to be scrolling, must not be sent to an invisible control. */
+  .book-pill[data-hidden="true"]:focus-within {
+    transform: none;
+    opacity: 1;
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .book-pill {
+      transition: none;
+    }
   }
 
   @media (min-width: 64rem) {
@@ -876,6 +1137,15 @@
     }
   }
 
+  /*
+   * 97%, not 86%.
+   *
+   * At 86% over a 20px blur the pill did not occlude the prose behind it, it
+   * smeared it: measured on `skill-creator` at 768px, the words "come up with"
+   * were half-dissolved mid-sentence under the pill. Three per cent
+   * translucency reads as a material; fourteen reads as a rendering fault. The
+   * blur comes down to match — it is now an edge treatment, not the effect.
+   */
   .book-pill__inner {
     pointer-events: auto;
     display: flex;
@@ -884,13 +1154,13 @@
     padding: 0.3rem;
     border: 1px solid var(--rule);
     border-radius: 999px;
-    background: color-mix(in oklab, var(--paper) 86%, transparent);
+    background: color-mix(in oklab, var(--paper) 97%, transparent);
     box-shadow: 0 6px 24px -8px oklch(0 0 0 / 0.35);
   }
 
   @supports (backdrop-filter: blur(1px)) {
     .book-pill__inner {
-      backdrop-filter: blur(20px) saturate(1.4);
+      backdrop-filter: blur(8px) saturate(1.2);
     }
   }
 

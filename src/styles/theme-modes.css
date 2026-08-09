@@ -152,15 +152,51 @@
 
   /* Selected state is conveyed only by colour in the default styling, and
      forced colours would flatten it away. Highlight/HighlightText is the
-     system's own selection pair, so opting out here is safe and required. */
+     system's own selection pair, so opting out here is safe and required.
+
+     The `:has()` arm is not belt-and-braces. Every radio in the reading-
+     controls panel — six presets, twelve typefaces, four measures, three
+     colour schemes, nine groups in all — puts `data-checked` on an `sr-only`
+     input and styles a sibling `<label>` with `has-data-checked:`. The
+     attribute selectors above match the invisible element, so under forced
+     colours all six preset cards rendered identically and nothing on the
+     panel showed which option was active. Verified with element screenshots
+     at `forced-colors: active` against `forced-colors: none`. */
   [aria-current="page"],
   [aria-selected="true"],
   [data-selected],
   [data-checked],
   [data-state="on"],
-  [data-highlighted] {
+  [data-highlighted],
+  label:has(> [data-checked]),
+  label:has(> [data-selected]),
+  label:has(> [data-state="on"]) {
     background: Highlight;
     color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  /* A range control drawn entirely out of background colours and a box-shadow
+     disappears here: track, filled indicator and thumb are all `background`,
+     and the thumb's only edge is a `ring`. All three of the panel's sliders
+     were absent under forced colours — not dimmed, gone — so the reader could
+     neither see the value nor find the control. Redraw them from system
+     colours. */
+  [data-slot="slider-track"] {
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+    background: Canvas;
+  }
+
+  [data-slot="slider-indicator"] {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+
+  [data-slot="slider-thumb"] {
+    background: ButtonFace;
+    border: 2px solid ButtonText;
+    box-shadow: none;
     forced-color-adjust: none;
   }
 

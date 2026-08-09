@@ -8,12 +8,20 @@
  * No `export const revalidate` — Cache Components owns freshness. `getBook` is
  * a `use cache` function on the `repo` profile, so the expensive half is shared
  * with the HTML route; the `Cache-Control` below is for the CDN in front of us.
+ *
+ * The response carries a strong `ETag` and honours `If-None-Match`. That was
+ * only possible once the front matter stopped stamping `generated:` with
+ * `new Date()` — two consecutive requests differed by one line, so no validator
+ * could ever have matched, and an agent polling `anthropics/skills.md` was
+ * re-downloading 240 KB / ~60k tokens every time.
  */
 
 import { getBook } from "@/lib/book";
 import { fetchRawTextBatch } from "@/lib/github";
-import { DISCOVERY_LINK, bookToMarkdown, classifyUpstreamError } from "@/lib/serialize";
+import { serveBody } from "@/lib/http";
+import { DISCOVERY_LINK, bookToMarkdown } from "@/lib/serialize";
 import { absoluteUrl, isValidOwner, isValidRepo, paths } from "@/lib/site";
+import { resolveUpstreamFailure } from "@/lib/upstream";
 
 const MARKDOWN_HEADERS: Record<string, string> = {
   "content-type": "text/markdown; charset=utf-8",
@@ -32,8 +40,30 @@ function textError(message: string, status: number): Response {
   });
 }
 
+/**
+ * The repository this URL meant.
+ *
+ * `isValidRepo` accepts a name ending in `.md` — `bitwikiorg/skills.md` and
+ * `futantan/agent-skills.md` are both real repositories — but the proxy strips
+ * the suffix before it gets here, so those books resolved to a repo that does
+ * not exist and answered 502. Try the stripped name first (that is the common
+ * case by a wide margin), then the literal one. Only the *miss* costs the extra
+ * lookup, and a GitHub 404 does not consume core quota.
+ */
+async function resolveBook(owner: string, repo: string) {
+  try {
+    return { book: await getBook(owner, repo), repo };
+  } catch (error) {
+    try {
+      return { book: await getBook(owner, `${repo}.md`), repo: `${repo}.md` };
+    } catch {
+      throw error;
+    }
+  }
+}
+
 export async function GET(
-  _request: Request,
+  request: Request,
   ctx: RouteContext<"/api/md/[owner]/[repo]">,
 ): Promise<Response> {
   const { owner, repo } = await ctx.params;
@@ -44,7 +74,7 @@ export async function GET(
   let body: string;
   let meta: { owner: string; repo: string };
   try {
-    const book = await getBook(owner, repo);
+    const { book } = await resolveBook(owner, repo);
     meta = { owner: book.repo.owner, repo: book.repo.repo };
 
     // Verbatim upstream bytes so frontmatter survives byte-for-byte. Every one
@@ -63,7 +93,7 @@ export async function GET(
 
     body = bookToMarkdown(book, { raw });
   } catch (error) {
-    const failure = classifyUpstreamError(error);
+    const failure = await resolveUpstreamFailure(error, owner, repo);
     return textError(
       failure.code === "not_found"
         ? `No repository at github.com/${owner}/${repo}.`
@@ -72,19 +102,17 @@ export async function GET(
     );
   }
 
-  return new Response(body, {
-    headers: {
-      ...MARKDOWN_HEADERS,
-      link: [
-        `<${absoluteUrl(paths.book(meta.owner, meta.repo))}>; rel="canonical"`,
-        `<${absoluteUrl(paths.bookManifest(meta.owner, meta.repo))}>; rel="agent-skills"`,
-        `<${absoluteUrl(paths.bookJson(meta.owner, meta.repo))}>; rel="alternate"; type="application/json"`,
-        ...DISCOVERY_LINK,
-      ].join(", "),
-      // Lets an agent budget context before it downloads the body. ~4 chars
-      // per token is the usual rule of thumb; this is an estimate, not a count.
-      "x-content-tokens": String(Math.ceil(body.length / 4)),
-    },
+  return serveBody(request, body, {
+    ...MARKDOWN_HEADERS,
+    link: [
+      `<${absoluteUrl(paths.book(meta.owner, meta.repo))}>; rel="canonical"`,
+      `<${absoluteUrl(paths.bookManifest(meta.owner, meta.repo))}>; rel="agent-skills"`,
+      `<${absoluteUrl(paths.bookJson(meta.owner, meta.repo))}>; rel="alternate"; type="application/json"`,
+      ...DISCOVERY_LINK,
+    ].join(", "),
+    // Lets an agent budget context before it downloads the body. ~4 chars
+    // per token is the usual rule of thumb; this is an estimate, not a count.
+    "x-content-tokens": String(Math.ceil(body.length / 4)),
   });
 }
 

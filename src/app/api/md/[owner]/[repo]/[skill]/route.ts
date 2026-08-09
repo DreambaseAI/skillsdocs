@@ -5,17 +5,26 @@
  * blockquote followed by the upstream `SKILL.md` verbatim, frontmatter
  * included. An agent that needs byte-exact input with no header at all follows
  * the `X-Skill-Raw` header straight to raw.githubusercontent.
+ *
+ * Three headers exist so an agent never has to parse English to know what it
+ * got: `x-skill-body` says whether a body was served at all, and
+ * `x-skill-license-scope` distinguishes "MIT at the repo root" from "a
+ * LICENSE.txt inside this skill" from "nothing, so no body". Before them, the
+ * only way to tell a served chapter from a withheld one was to look for the
+ * sentence "so its body is not reproduced here" in the prose.
  */
 
-import { findSkill, getBook } from "@/lib/book";
+import { findSkill, getBook, type Book } from "@/lib/book";
 import { fetchRawText, rawUrl } from "@/lib/github";
+import { serveBody } from "@/lib/http";
 import {
   DISCOVERY_LINK,
   chapterLicence,
-  classifyUpstreamError,
   skillToMarkdown,
 } from "@/lib/serialize";
+import type { Skill } from "@/lib/skills";
 import { absoluteUrl, isValidOwner, isValidRepo, paths } from "@/lib/site";
+import { resolveUpstreamFailure } from "@/lib/upstream";
 
 const MARKDOWN_HEADERS: Record<string, string> = {
   "content-type": "text/markdown; charset=utf-8",
@@ -34,8 +43,17 @@ function textError(message: string, status: number): Response {
   });
 }
 
+/**
+ * A slug may itself end in `.md` — the proxy strips the suffix before it gets
+ * here, so a skill directory literally named `foo.md` was unreachable. Same
+ * resolution order as the book route: stripped first, literal second.
+ */
+function resolveSkill(book: Book, slug: string): Skill | undefined {
+  return findSkill(book, slug) ?? findSkill(book, `${slug}.md`);
+}
+
 export async function GET(
-  _request: Request,
+  request: Request,
   ctx: RouteContext<"/api/md/[owner]/[repo]/[skill]">,
 ): Promise<Response> {
   const { owner, repo, skill: slug } = await ctx.params;
@@ -45,7 +63,7 @@ export async function GET(
 
   try {
     const book = await getBook(owner, repo);
-    const skill = findSkill(book, slug);
+    const skill = resolveSkill(book, slug);
     if (!skill) {
       const known = book.skills.map((s) => s.slug).join(", ") || "none";
       return textError(
@@ -61,25 +79,28 @@ export async function GET(
 
     const chapterUrl = absoluteUrl(paths.chapter(o, r, skill.slug));
     const licence = chapterLicence(book, skill);
+    const body = skillToMarkdown(book, skill, { raw });
 
-    return new Response(skillToMarkdown(book, skill, { raw }), {
-      headers: {
-        ...MARKDOWN_HEADERS,
-        link: [
-          `<${chapterUrl}>; rel="canonical"`,
-          `<${absoluteUrl(paths.bookMarkdown(o, r))}>; rel="llms-full-txt"`,
-          `<${absoluteUrl(paths.bookManifest(o, r))}>; rel="agent-skills"`,
-          `<${absoluteUrl(paths.chapterJson(o, r, skill.slug))}>; rel="alternate"; type="application/json"`,
-          ...DISCOVERY_LINK,
-        ].join(", "),
-        "x-skill-raw": rawUrl(o, r, ref, skill.skillMdPath),
-        // SPDX id only. The free-text fallback is third-party controlled and
-        // may hold non-ASCII, which throws when set as a header value.
-        "x-skill-license": licence.spdx ?? "unidentified",
-      },
+    return serveBody(request, body, {
+      ...MARKDOWN_HEADERS,
+      link: [
+        `<${chapterUrl}>; rel="canonical"`,
+        `<${absoluteUrl(paths.bookMarkdown(o, r))}>; rel="llms-full-txt"`,
+        `<${absoluteUrl(paths.bookManifest(o, r))}>; rel="agent-skills"`,
+        `<${absoluteUrl(paths.chapterJson(o, r, skill.slug))}>; rel="alternate"; type="application/json"`,
+        `<${rawUrl(o, r, ref, skill.skillMdPath)}>; rel="describedby"; type="text/markdown"`,
+        ...DISCOVERY_LINK,
+      ].join(", "),
+      "x-skill-raw": rawUrl(o, r, ref, skill.skillMdPath),
+      // SPDX id only. The free-text fallback is third-party controlled and
+      // may hold non-ASCII, which throws when set as a header value.
+      "x-skill-license": licence.spdx ?? "unidentified",
+      "x-skill-license-scope": licence.scope,
+      "x-skill-body": licence.redistributable ? "inlined" : "omitted",
+      "x-content-tokens": String(Math.ceil(body.length / 4)),
     });
   } catch (error) {
-    const failure = classifyUpstreamError(error);
+    const failure = await resolveUpstreamFailure(error, owner, repo);
     return textError(
       failure.code === "not_found"
         ? `No repository at github.com/${owner}/${repo}.`

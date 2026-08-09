@@ -110,7 +110,11 @@ export function Tooltip({
                 <span className="ml-auto pl-2 text-foreground">
                   {valueFormatter
                     ? valueFormatter(item.value, item.name)
-                    : item.value.toLocaleString()}
+                    /* Pinned to en-GB like every other figure in the product.
+                       A bare `toLocaleString()` follows the viewer's OS locale,
+                       so this one number rendered `1.234,5` next to neighbours
+                       that said `1,234.5`. */
+                    : item.value.toLocaleString("en-GB")}
                 </span>
               </div>
             ))}

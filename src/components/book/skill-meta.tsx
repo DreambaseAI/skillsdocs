@@ -1,5 +1,6 @@
 import { fileSize, plural } from "@/components/book/format";
 import type { Book } from "@/lib/book";
+import { deckOf } from "@/lib/deck";
 import type { Skill, SkillResource } from "@/lib/skills";
 import { external } from "@/lib/site";
 
@@ -47,7 +48,17 @@ export function SkillApparatus({ book, skill }: SkillApparatusProps) {
     skill.license !== null ||
     skill.variants.length > 0;
 
-  if (!hasFacts && byKind.length === 0) return null;
+  /*
+   * The chapter opener shows a bounded, typeset deck. This is the other half:
+   * the frontmatter `description` exactly as written, set in mono, because it
+   * is not prose — it is the condition on which an agent loads this skill.
+   * Showing it only when the deck did not already say all of it keeps short
+   * descriptions from being printed twice on one page.
+   */
+  const trigger = (skill.description ?? "").trim();
+  const showTrigger = trigger !== "" && deckOf(trigger).length < trigger.length;
+
+  if (!hasFacts && byKind.length === 0 && !showTrigger) return null;
 
   return (
     <section
@@ -59,6 +70,18 @@ export function SkillApparatus({ book, skill }: SkillApparatusProps) {
           About this skill
         </h2>
       </div>
+
+      {showTrigger ? (
+        <div className="mt-4">
+          <h3 className="book-eyebrow m-0">Trigger</h3>
+          <p className="book-trigger mt-1.5">{trigger}</p>
+          <p className="book-caption mt-1.5">
+            The verbatim <code>description</code> from this skill&rsquo;s front
+            matter — the string an agent matches on to decide whether to load
+            it.
+          </p>
+        </div>
+      ) : null}
 
       {hasFacts ? (
         <dl className="book-colophon mt-4">

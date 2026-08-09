@@ -458,6 +458,57 @@
     }
   }
 
+  /*
+   * A scrollable panel has to say it scrolls.
+   *
+   * The controls panel ended mid-card — the "Newsreader" and "EB Garamond"
+   * font previews were cut in half at y=730 — with no fade, no shadow and no
+   * visible scrollbar. A 24px mask on the bottom edge turns a cut into a
+   * horizon: the last row dissolves instead of being guillotined, which is the
+   * one affordance that reads as "there is more" without occupying layout.
+   *
+   * The mask is removed once the panel is scrolled to its end, where there is
+   * nothing left to promise.
+   */
+  .reader-panel--scroll {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      currentcolor 0,
+      currentcolor calc(100% - 1.5rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      currentcolor 0,
+      currentcolor calc(100% - 1.5rem),
+      transparent 100%
+    );
+  }
+
+  @supports (animation-timeline: scroll(self block)) {
+    .reader-panel--scroll {
+      animation: reader-panel-fade-end linear both;
+      animation-timeline: scroll(self block);
+      animation-range: contain;
+    }
+
+    @keyframes reader-panel-fade-end {
+      to {
+        -webkit-mask-image: linear-gradient(to bottom, currentcolor 0, currentcolor 100%);
+        mask-image: linear-gradient(to bottom, currentcolor 0, currentcolor 100%);
+      }
+    }
+  }
+
+  /* A mask hides content a high-contrast reader cannot recover. */
+  @media (forced-colors: active), (prefers-contrast: more) {
+    .reader-panel--scroll {
+      -webkit-mask-image: none;
+      mask-image: none;
+      animation: none;
+    }
+  }
+
   /* Translucency and forced colours are incompatible by definition. */
   @media (forced-colors: active) {
     .reader-panel {

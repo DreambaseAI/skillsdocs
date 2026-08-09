@@ -334,8 +334,21 @@
     letter-spacing: -0.01em;
     font-style: italic;
     color: var(--ink-strong);
-    /* Optical margin alignment: the 90% of hanging punctuation that ships
-       everywhere, unlike `hanging-punctuation`. */
+  }
+
+  /*
+   * Optical margin alignment, applied where it can actually land.
+   *
+   * `text-indent: -0.42em` used to sit on the blockquote, and `.prose p`
+   * immediately reset `text-indent` to `--reader-para-indent` on the child
+   * paragraph — measured, the pull quote's text left edge was 426.8px, exactly
+   * the body's. The rule never did anything for the whole life of the file.
+   *
+   * It is also gated on the quote actually opening with a quotation mark:
+   * hanging a hyphen or a capital `T` into the margin is not optical
+   * alignment, it is a misaligned first line.
+   */
+  .prose .prose-quote[data-pull="true"] > p:first-child {
     text-indent: -0.42em;
   }
 
@@ -501,16 +514,39 @@
     text-decoration: none;
   }
 
-  /* Above ~1440px the reading column has an empty right gutter. Float the note
-     into it, where a printed book would set it. */
-  @container prose (min-width: 46rem) {
+  /*
+   * Float the note into the right gutter, where a printed book sets it.
+   *
+   * The threshold used to be `46rem` = 736px against a prose container that
+   * measures **692px at 1440 and 716px at 1920** at the default 68 characters
+   * per line. The query could not fire at any viewport on any monitor: the
+   * marginalia feature was dead code at the shipped defaults and every
+   * footnote rendered inline with a left rule.
+   *
+   * 44rem is the first container width at which the note has somewhere to go.
+   * Measured, the room between the text measure's right edge and the right
+   * rail is 56px at 1280, 99px at 1440 and 147px from 1600 up — so a 12.5rem
+   * note never fits anywhere, a 8rem note fits from 1600, and at 1440 the only
+   * note that would clear the rail is 76px of content, which is a ribbon, not
+   * marginalia. Below the threshold the note stays inline with its rule, which
+   * is a correct treatment rather than a degraded one.
+   */
+  @container prose (min-width: 44rem) {
     .prose .margin-note {
       float: inline-end;
       clear: inline-end;
-      inline-size: 12.5rem;
-      margin-inline-end: -14.5rem;
+      inline-size: 8rem;
+      /*
+       * The overhang is measured from `.prose`'s own edge — the 118% bleed —
+       * not from the text measure, which is where the first attempt at this
+       * went wrong and put the note 44px on top of the right rail at 1920.
+       * 5rem clears the bleed and still lands inside the gutter: measured
+       * right edge 1408 against a rail at 1420 (1920), 1248 against 1260
+       * (1600).
+       */
+      margin-inline-end: -5rem;
       margin-block: 0.2em 0.8em;
-      padding-inline-start: 0;
+      padding-inline-start: 0.85rem;
       border-inline-start: none;
     }
   }
@@ -549,7 +585,7 @@
    * implementation — but Firefox has zero support and has had zero support for
    * a decade, so the float fallback is not optional.
    */
-  .prose[data-dropcap="true"] > p:first-of-type::first-letter {
+  .prose[data-dropcap="sunk"] > p:first-of-type::first-letter {
     font-family: var(--font-display);
     font-weight: 400;
     color: var(--issue-accent);
@@ -560,7 +596,7 @@
   }
 
   @supports not (initial-letter: 3) {
-    .prose[data-dropcap="true"] > p:first-of-type::first-letter {
+    .prose[data-dropcap="sunk"] > p:first-of-type::first-letter {
       float: inline-start;
       /*
        * Make the *cap height* equal three line boxes, which is what
@@ -586,10 +622,54 @@
   }
 
   /* Never on a phone: three sunk lines out of a 44-character measure leaves a
-     column of two-word lines. */
+     column of two-word lines. The raised initial below takes over there. */
   @container prose (max-width: 30rem) {
-    .prose[data-dropcap="true"] > p:first-of-type::first-letter {
+    .prose[data-dropcap="sunk"] > p:first-of-type::first-letter {
       all: unset;
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 2.1em;
+      line-height: 1;
+      color: var(--issue-accent);
+      font-variant-numeric: lining-nums;
+    }
+  }
+
+  /*
+   * The raised initial — the other half of the opening.
+   *
+   * A sunk cap needs three lines of text beside it to sit in. Roughly two
+   * thirds of the corpus opens on a sentence too short for that, and before
+   * this rule those chapters opened on nothing at all: a decorated chapter 01
+   * next to a bare chapter 02 reads as a bug, not as restraint. A raised
+   * initial sits on the baseline instead of sinking into the block, so it
+   * costs no lines of measure and works at any paragraph length and any
+   * column width — including the phone, where the sunk cap is switched off.
+   *
+   * Same family, same accent, same weight as the sunk cap: one house style,
+   * two sizes, chosen by the paragraph rather than by luck.
+   */
+  .prose[data-dropcap="raised"] > p:first-of-type::first-letter {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 2.4em;
+    line-height: 1;
+    color: var(--issue-accent);
+    font-variant-numeric: lining-nums;
+    padding-inline-end: 0.03em;
+  }
+
+  @container prose (max-width: 30rem) {
+    .prose[data-dropcap="raised"] > p:first-of-type::first-letter {
+      font-size: 2.1em;
+    }
+  }
+
+  /* An initial is decoration. Under forced colours it must not be the only
+     thing carrying meaning, and `Highlight` on one letter reads as selection. */
+  @media (forced-colors: active) {
+    .prose[data-dropcap] > p:first-of-type::first-letter {
+      color: CanvasText;
     }
   }
 

@@ -73,7 +73,10 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-9 bg-input/50">
+      {/* The input itself is `outline-hidden`, so the focus ring lives on the
+          group. Without it the palette's only focus stop changed zero pixels
+          when focused — measured across eight tab stops. */}
+      <InputGroup className="h-9 bg-input/50 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-ring/40 has-[input:focus-visible]:ring-3">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(

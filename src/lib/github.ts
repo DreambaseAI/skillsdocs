@@ -38,6 +38,23 @@ export const REVALIDATE = {
   owner: 60 * 60 * 24,
 } as const;
 
+/**
+ * The cache tag for one repository, always lower-cased.
+ *
+ * GitHub is case-insensitive on both owner and name, so `MattPocock/Skills`
+ * and `mattpocock/skills` are one repository with one webhook. Tagging with
+ * whatever casing the URL happened to carry produced entries that
+ * `revalidateTag("repo:mattpocock/skills")` could never reach — verified: three
+ * casings of the same repo each took a cold path and each got its own entry.
+ */
+export function repoTag(owner: string, repo: string): string {
+  return `repo:${owner.toLowerCase()}/${repo.toLowerCase()}`;
+}
+
+export function ownerTag(login: string): string {
+  return `owner:${login.toLowerCase()}`;
+}
+
 export class GitHubError extends Error {
   constructor(
     message: string,
@@ -182,7 +199,7 @@ export async function fetchRepoMeta(
 ): Promise<RepoMeta> {
   "use cache";
   cacheLife("repo");
-  cacheTag(`repo:${owner}/${repo}`);
+  cacheTag(repoTag(owner, repo));
 
   const r = await ghJson<RawRepo>(
     `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
@@ -221,7 +238,7 @@ export async function fetchRepoTree(
 ): Promise<RepoTree> {
   "use cache";
   cacheLife("repo");
-  cacheTag(`repo:${owner}/${repo}`);
+  cacheTag(repoTag(owner, repo));
 
   const data = await ghJson<{
     tree: Array<{ path: string; type: string; size?: number; sha: string }>;
@@ -243,7 +260,7 @@ export async function fetchRepoTree(
 export async function fetchOwnerMeta(login: string): Promise<OwnerMeta | null> {
   "use cache";
   cacheLife("repo");
-  cacheTag(`owner:${login}`);
+  cacheTag(ownerTag(login));
 
   try {
     const u = await ghJson<{
@@ -324,7 +341,7 @@ export async function fetchRawText(
     revalidate: REVALIDATE.content,
     expire: REVALIDATE.content * 2,
   });
-  cacheTag(`repo:${owner}/${repo}`);
+  cacheTag(repoTag(owner, repo));
 
   try {
     const res = await fetch(rawUrl(owner, repo, ref, path), {

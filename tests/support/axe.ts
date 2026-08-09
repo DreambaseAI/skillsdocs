@@ -95,8 +95,40 @@ export async function auditChrome(
   }
 
   expect(summarise(ours), formatViolations(ours)).toEqual([]);
+
+  /*
+   * `incomplete` is reported, never discarded — and never gated on.
+   *
+   * axe marks a result incomplete when it could not decide. For the modality
+   * rules that is almost always Base UI's own machinery: the `aria-hidden`
+   * `tabindex="0"` sentinels either side of a popup, and the page behind an
+   * open modal, which the dialog marks `aria-hidden` while its focus trap —
+   * not an attribute axe can see — is what actually keeps focus out.
+   *
+   * The suite used to read only `violations`, so an open dialog's
+   * `aria-hidden-focus: incomplete 1` looked exactly like a pass. Failing on it
+   * is the wrong correction: it goes red on a framework idiom in two different
+   * components, and the question axe could not answer — *is the hidden content
+   * reachable?* — is one this suite can answer directly. So these are attached
+   * to the report and printed, and focus containment is asserted for real in
+   * `keyboard.spec.ts` and `overlays.spec.ts`.
+   */
+  const undecided = results.incomplete.filter((r) => MODALITY_RULES.includes(r.id));
+  if (undecided.length > 0) {
+    await info.attach("axe-chrome-incomplete.json", {
+      body: JSON.stringify(undecided, null, 2),
+      contentType: "application/json",
+    });
+    process.stdout.write(
+      `[a11y] axe could not decide ${summarise(undecided).join(", ")} on ${page.url()} — see the attached report; containment is asserted separately.\n`,
+    );
+  }
+
   return results;
 }
+
+/** Rules whose "incomplete" is worth printing rather than silently dropping. */
+const MODALITY_RULES = ["aria-hidden-focus", "aria-hidden-body", "focus-order-semantics"];
 
 /** Violations with at least one node outside the rendered markdown. */
 async function partitionOurs(page: Page, violations: Result[]): Promise<Result[]> {

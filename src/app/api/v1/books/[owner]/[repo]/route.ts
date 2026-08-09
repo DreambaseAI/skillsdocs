@@ -9,12 +9,13 @@
 import { createHash } from "node:crypto";
 import { getBook } from "@/lib/book";
 import { fetchRawTextBatch, fetchRepoTree } from "@/lib/github";
+import { serveJson } from "@/lib/http";
 import {
   chapterLicence,
-  classifyUpstreamError,
   repoLicence,
   TAKEDOWN_CONTACT,
 } from "@/lib/serialize";
+import { resolveUpstreamFailure } from "@/lib/upstream";
 import {
   absoluteUrl,
   external,
@@ -40,7 +41,7 @@ function fail(status: number, code: string, message: string, hint?: string) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   ctx: RouteContext<"/api/v1/books/[owner]/[repo]">,
 ): Promise<Response> {
   const { owner, repo } = await ctx.params;
@@ -109,7 +110,9 @@ export async function GET(
         frontmatter: skill.frontmatter,
         allowedTools: skill.allowedTools,
         compatibility: skill.compatibility,
-        headings: skill.headings.length,
+        // A count, not the outline — `headings` read like the array that
+        // `/skills/{skill}` returns as `outline`, which is a different thing.
+        headingCount: skill.headings.length,
         resources: {
           scripts: skill.resources.filter((x) => x.kind === "script").map((x) => x.relPath),
           references: skill.resources.filter((x) => x.kind === "reference").map((x) => x.relPath),
@@ -155,6 +158,15 @@ export async function GET(
       },
       stats: {
         skillCount: book.skills.length,
+        /**
+         * What the repository actually contains, which is not always what we
+         * serve: we read at most 200 chapters. `github/awesome-copilot` has
+         * 419 and `ComposioHQ/awesome-claude-skills` has 864, and both were
+         * published as "200 chapters" with nothing marking the cut.
+         */
+        skillTotal: book.skillsTotal,
+        truncated: book.capped || book.unreadable.length > 0,
+        unreadable: book.unreadable.length,
         republishable: chapters.filter((c) => c.license.redistributable).length,
         totalWords: book.totalWords,
         totalReadingMinutes: book.totalReadingMinutes,
@@ -183,25 +195,26 @@ export async function GET(
         upstream: external.repo(o, r),
         takedown: TAKEDOWN_CONTACT,
       },
-      generatedAt: new Date().toISOString(),
+      // No `generatedAt`. It changed on every request, which made the payload
+      // byte-unstable and an `ETag` impossible; `source.pushedAt` already
+      // reports the only timestamp that means anything about this content.
     };
 
-    return Response.json(payload, {
-      headers: {
-        ...JSON_HEADERS,
-        link: [
-          `<${absoluteUrl(paths.book(o, r))}>; rel="canonical"`,
-          `<${absoluteUrl(paths.bookMarkdown(o, r))}>; rel="alternate"; type="text/markdown"`,
-          `<${absoluteUrl(paths.bookManifest(o, r))}>; rel="agent-skills"`,
-          `<${absoluteUrl("/api/v1/openapi.json")}>; rel="service-desc"`,
-        ].join(", "),
-        "x-skills-withheld": String(
-          book.skills.length - chapters.filter((c) => c.license.redistributable).length,
-        ),
-      },
+    return serveJson(request, payload, {
+      ...JSON_HEADERS,
+      link: [
+        `<${absoluteUrl(paths.book(o, r))}>; rel="canonical"`,
+        `<${absoluteUrl(paths.bookMarkdown(o, r))}>; rel="alternate"; type="text/markdown"`,
+        `<${absoluteUrl(paths.bookManifest(o, r))}>; rel="agent-skills"`,
+        `<${absoluteUrl("/api/v1/books")}>; rel="collection"`,
+        `<${absoluteUrl("/api/v1/openapi.json")}>; rel="service-desc"`,
+      ].join(", "),
+      "x-skills-withheld": String(
+        book.skills.length - chapters.filter((c) => c.license.redistributable).length,
+      ),
     });
   } catch (error) {
-    const failure = classifyUpstreamError(error);
+    const failure = await resolveUpstreamFailure(error, owner, repo);
     const hint =
       failure.code === "not_found"
         ? `Open ${absoluteUrl(paths.book(owner, repo))} to index it, or check the spelling.`

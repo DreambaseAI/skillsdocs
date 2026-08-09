@@ -33,6 +33,38 @@ export interface HeadingNormalizeOptions {
 
 const HEADING = /^h([1-6])$/;
 
+/**
+ * The level each heading ends up at, given the levels it started at.
+ *
+ * Pulled out of the rehype plugin because two callers have to agree exactly:
+ * the renderer, which produces the anchors a reader clicks, and
+ * `extractHeadings`, which produces the outline the JSON API publishes. They
+ * disagreed on 85% of chapters — the API called the first heading level 1
+ * while the page rendered an `h2` — because the outline was computed from the
+ * raw source and the page from the normalised tree. One function, one answer.
+ */
+export function normalizeOutlineLevels(
+  depths: number[],
+  pageHeadingDepth = 1,
+): number[] {
+  if (depths.length === 0) return [];
+  const minDepth = Math.min(...depths);
+  const shift = Math.max(0, pageHeadingDepth + 1 - minDepth);
+
+  let previous = pageHeadingDepth;
+  return depths.map((depth) => {
+    const shifted = Math.min(6, depth + shift);
+    const repaired = Math.min(shifted, previous + 1);
+    previous = repaired;
+    return repaired;
+  });
+}
+
+/** Loose comparison used to spot a leading H1 that repeats the chapter title. */
+export function isSameTitle(a: string, b: string): boolean {
+  return sameTitle(a, b);
+}
+
 function depthOf(node: Element): number | null {
   const m = HEADING.exec(node.tagName);
   return m ? Number(m[1]) : null;
@@ -83,6 +115,10 @@ export function rehypeHeadingNormalize(options: HeadingNormalizeOptions) {
     if (remaining.length === 0) return;
 
     // 2. Shift the whole document down so nothing competes with the page H1.
+    const levels = normalizeOutlineLevels(
+      remaining.map((h) => h.depth),
+      pageHeadingDepth,
+    );
     const minDepth = Math.min(...remaining.map((h) => h.depth));
     const shift = Math.max(0, pageHeadingDepth + 1 - minDepth);
     if (shift > 0) {
@@ -98,10 +134,9 @@ export function rehypeHeadingNormalize(options: HeadingNormalizeOptions) {
 
     // 3. Repair skipped levels. A heading may never be more than one level
     //    deeper than the heading before it; the page H1 is the starting point.
-    let previous = pageHeadingDepth;
-    for (const heading of remaining) {
+    remaining.forEach((heading, i) => {
       const shifted = Math.min(6, heading.depth + shift);
-      const repaired = Math.min(shifted, previous + 1);
+      const repaired = levels[i];
       if (repaired !== shifted) {
         sink.push({
           kind: "level-repaired",
@@ -111,8 +146,7 @@ export function rehypeHeadingNormalize(options: HeadingNormalizeOptions) {
         });
       }
       heading.node.tagName = `h${repaired}`;
-      previous = repaired;
-    }
+    });
   };
 }
 

@@ -19,7 +19,9 @@ export default defineConfig({
   },
   test: {
     root,
-    include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
+    // `.tsx` too: a component contract (the chart's data-table fallback) is
+    // only worth asserting against the component's real output.
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/.next/**", "tests/fixtures/**"],
     environment: "node",
     reporters: process.env.CI ? ["default", "github-actions"] : ["default"],

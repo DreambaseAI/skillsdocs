@@ -5,16 +5,21 @@
  * product has a Level A accessibility defect, not a rough edge.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   bindingsFor,
   buildKeymap,
   conflictFor,
   DEFAULT_SHORTCUT_SETTINGS,
+  emitShortcut,
   formatKey,
+  hasShortcutListener,
   isEditableTarget,
   normalizeKey,
+  onShortcut,
+  onShortcutRegistryChange,
   parseBindings,
+  resetShortcutListeners,
   serializeBindings,
   SHORTCUTS,
   type ShortcutAction,
@@ -99,12 +104,75 @@ describe("the keymap", () => {
   });
 
   it("keeps the browser's own chords free", () => {
-    // `Cmd+=` must stay browser zoom, which is why size stepping is Shift.
+    // `Cmd+=` must stay browser zoom, which is why size stepping is unmodified.
     const bound = SHORTCUTS.flatMap((s) => s.keys);
-    expect(bound).toContain("shift+=");
-    expect(bound).toContain("shift+-");
     expect(bound).not.toContain("mod+=");
     expect(bound).not.toContain("mod+-");
+  });
+
+  /**
+   * The round trip that would have caught the dead size shortcuts.
+   *
+   * `sizeUp` was bound to `"shift+="`, which `normalizeKey` can never produce:
+   * Shift is only recorded for keys whose character does not already encode it,
+   * so a US keyboard emits `"+"`. Two independent snapshot tests — one
+   * asserting the binding string, one asserting the normalisation rule — were
+   * both green while the feature was broken. Synthesising the event and looking
+   * the result up in the keymap is the only test that cannot pass while the key
+   * is dead.
+   */
+  it("every default binding is reachable from a real keyboard event", () => {
+    const { direct, chords } = buildKeymap(ON);
+
+    /** The KeyboardEvent a browser emits for a normalised binding token. */
+    const eventFor = (token: string): KeyboardEvent => {
+      // `"+"` is a binding, not a separator, so a one-character token is the
+      // key itself.
+      const parts = token.length === 1 ? [token] : token.split("+");
+      const base = parts[parts.length - 1];
+      const mods = {
+        metaKey: parts.includes("mod"),
+        altKey: parts.includes("alt"),
+        shiftKey: parts.includes("shift"),
+      };
+      const literal =
+        base === "space"
+          ? " "
+          : base === "arrowleft"
+            ? "ArrowLeft"
+            : base === "arrowright"
+              ? "ArrowRight"
+              : base;
+      return key(literal, mods);
+    };
+
+    for (const def of SHORTCUTS) {
+      for (const binding of def.keys) {
+        const [first, second] = binding.split(" ");
+        expect(
+          normalizeKey(eventFor(first)),
+          `${def.action}: "${first}" does not normalise to itself`,
+        ).toBe(first);
+        if (second === undefined) {
+          expect(direct.get(first), `${def.action}: "${binding}" is unreachable`).toBe(
+            def.action,
+          );
+        } else {
+          expect(normalizeKey(eventFor(second))).toBe(second);
+          expect(chords.get(first)?.get(second)).toBe(def.action);
+        }
+      }
+    }
+  });
+
+  it("steps the text size from the characters a US keyboard actually sends", () => {
+    const { direct } = buildKeymap(ON);
+    // Shift+Equal emits "+", Shift+Minus emits "_".
+    expect(direct.get(normalizeKey(key("+", { shiftKey: true })))).toBe("sizeUp");
+    expect(direct.get(normalizeKey(key("_", { shiftKey: true })))).toBe("sizeDown");
+    // …and the unshifted characters work too, for layouts where they are.
+    expect(direct.get(normalizeKey(key("=")))).toBe("sizeUp");
+    expect(direct.get(normalizeKey(key("-")))).toBe("sizeDown");
   });
 
   it("routes both chords through the same first key", () => {
@@ -230,11 +298,19 @@ describe("escape (a): shortcuts are inert where a character is a character", () 
 });
 
 describe("escape (b): the global switch", () => {
-  it("silences everything, chords included", () => {
+  it("silences every single-character shortcut, chords included", () => {
     const off: ShortcutSettings = { enabled: false, bindings: {} };
     expect(shouldHandle(key("t"), off)).toBe(false);
-    expect(shouldHandle(key("k", { metaKey: true }), off)).toBe(false);
     expect(shouldHandle(key("g"), off)).toBe(false);
+    expect(shouldHandle(key("/"), off)).toBe(false);
+  });
+
+  it("leaves modifier combos alone — 2.1.4 is about single characters", () => {
+    // The hazard the switch exists for is a speech-input user saying a word
+    // made of keys. ⌘K cannot be said by accident, and it is the only keyboard
+    // route into search; silencing it made the switch cost more than it saved.
+    const off: ShortcutSettings = { enabled: false, bindings: {} };
+    expect(shouldHandle(key("k", { metaKey: true }), off)).toBe(true);
   });
 
   it("defaults to on", () => {
@@ -290,5 +366,59 @@ describe("shouldHandle", () => {
 
   it("ignores an event something else already claimed", () => {
     expect(shouldHandle(key("t", {}, { defaultPrevented: true }), ON)).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------- dispatch */
+
+describe("the listener registry", () => {
+  afterEach(() => resetShortcutListeners());
+
+  it("reports whether an action has an owner", () => {
+    expect(hasShortcutListener("toc")).toBe(false);
+    const off = onShortcut("toc", () => {});
+    expect(hasShortcutListener("toc")).toBe(true);
+    off();
+    expect(hasShortcutListener("toc")).toBe(false);
+  });
+
+  it("only runs the listeners for the action that fired", () => {
+    const fired: string[] = [];
+    onShortcut("toc", () => fired.push("toc"));
+    onShortcut("search", () => fired.push("search"));
+    emitShortcut("search");
+    expect(fired).toEqual(["search"]);
+  });
+
+  it("tells the caller when nothing handled the action", () => {
+    // This is what stops the dispatcher from cancelling a keystroke it cannot
+    // act on: `/` used to suppress the browser's own quick-find and then do
+    // nothing, because no component subscribed to `search`.
+    expect(emitShortcut("nextChapter")).toBe(false);
+    onShortcut("nextChapter", () => {});
+    expect(emitShortcut("nextChapter")).toBe(true);
+  });
+
+  it("survives a listener that unsubscribes another mid-dispatch", () => {
+    const fired: string[] = [];
+    const off = onShortcut("help", () => fired.push("second"));
+    onShortcut("help", () => {
+      off();
+      fired.push("first");
+    });
+    expect(() => emitShortcut("help")).not.toThrow();
+    expect(fired).toContain("first");
+  });
+
+  it("notifies watchers when availability changes", () => {
+    let changes = 0;
+    const stop = onShortcutRegistryChange(() => changes++);
+    const off = onShortcut("immersive", () => {});
+    expect(changes).toBe(1);
+    off();
+    expect(changes).toBe(2);
+    stop();
+    onShortcut("immersive", () => {});
+    expect(changes).toBe(2);
   });
 });

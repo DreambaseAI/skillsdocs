@@ -6,22 +6,30 @@
  * because a literal `.well-known` directory under `app/` is not a routable
  * segment.
  *
- * The digest is a real sha256 over the raw upstream bytes — the same bytes the
- * matching `.md` route serves after its provenance header, and the same bytes
- * `shasum -a 256` produces against raw.githubusercontent. A chapter whose bytes
- * we could not read is dropped rather than listed with a digest we invented.
+ * Each entry carries two verifiable pairs: `url` + `digest` over the bytes this
+ * site serves, and `source` + `sourceDigest` over the raw upstream file. Both
+ * are real sha256s of documents an agent can fetch, which is the whole point —
+ * the previous shape hashed the raw bytes and attached the hash to the `.md`
+ * twin, so `curl <url> | shasum -a 256` failed on every entry of every book.
+ * A chapter whose bytes we could not read is dropped rather than listed with a
+ * digest we invented.
  */
 
 import { createHash } from "node:crypto";
 import { getBook } from "@/lib/book";
 import { fetchRawTextBatch } from "@/lib/github";
+import { serveJson } from "@/lib/http";
 import {
   DISCOVERY_LINK,
   bookToAgentSkills,
-  classifyUpstreamError,
   isRepublishable,
+  skillToMarkdown,
+  type ChapterDigests,
 } from "@/lib/serialize";
 import { absoluteUrl, isValidOwner, isValidRepo, paths } from "@/lib/site";
+import { resolveUpstreamFailure } from "@/lib/upstream";
+
+const sha256 = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 
 const JSON_HEADERS: Record<string, string> = {
   "content-type": "application/json; charset=utf-8",
@@ -44,7 +52,7 @@ function fail(
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   ctx: RouteContext<"/api/well-known/agent-skills/[owner]/[repo]">,
 ): Promise<Response> {
   const { owner, repo } = await ctx.params;
@@ -56,10 +64,14 @@ export async function GET(
       "Expected /{owner}/{repo}/.well-known/agent-skills/index.json.",
     );
   }
-  return build(owner, repo);
+  return build(request, owner, repo);
 }
 
-async function build(owner: string, repo: string): Promise<Response> {
+async function build(
+  request: Request,
+  owner: string,
+  repo: string,
+): Promise<Response> {
   try {
     const book = await getBook(owner, repo);
     const { owner: o, repo: r, defaultBranch: ref } = book.repo;
@@ -72,36 +84,37 @@ async function build(owner: string, repo: string): Promise<Response> {
       eligible.map((s) => s.skillMdPath),
     );
 
-    const digests = new Map<string, string>();
+    const digests = new Map<string, ChapterDigests>();
     eligible.forEach((skill, i) => {
       const source = bodies[i];
       if (source == null) return;
-      digests.set(
-        skill.slug,
-        createHash("sha256").update(source, "utf8").digest("hex"),
-      );
+      // The bytes at `url`. `skillToMarkdown` is what the `.md` route serves,
+      // so hashing its output here is hashing the response an agent will get.
+      const raw = new Map([[skill.slug, source]]);
+      digests.set(skill.slug, {
+        document: sha256(skillToMarkdown(book, skill, { raw })),
+        source: sha256(source),
+      });
     });
 
     const manifest = bookToAgentSkills(book, digests);
     const omitted = book.skills.length - manifest.skills.length;
 
-    return Response.json(manifest, {
-      headers: {
-        ...JSON_HEADERS,
-        link: [
-          `<${absoluteUrl(paths.book(o, r))}>; rel="canonical"`,
-          `<${absoluteUrl(paths.bookMarkdown(o, r))}>; rel="llms-full-txt"`,
-          `<${absoluteUrl(paths.bookJson(o, r))}>; rel="describedby"`,
-          ...DISCOVERY_LINK,
-        ].join(", "),
-        // Chapters dropped for a missing licence or unreadable bytes. Zero is
-        // the happy path; a non-zero value is why a chapter you can see in the
-        // reader is not listed here.
-        "x-skills-omitted": String(omitted),
-      },
+    return serveJson(request, manifest, {
+      ...JSON_HEADERS,
+      link: [
+        `<${absoluteUrl(paths.book(o, r))}>; rel="canonical"`,
+        `<${absoluteUrl(paths.bookMarkdown(o, r))}>; rel="llms-full-txt"`,
+        `<${absoluteUrl(paths.bookJson(o, r))}>; rel="describedby"`,
+        ...DISCOVERY_LINK,
+      ].join(", "),
+      // Chapters dropped for a missing licence or unreadable bytes. Zero is
+      // the happy path; a non-zero value is why a chapter you can see in the
+      // reader is not listed here.
+      "x-skills-omitted": String(omitted),
     });
   } catch (error) {
-    const failure = classifyUpstreamError(error);
+    const failure = await resolveUpstreamFailure(error, owner, repo);
     const hint =
       failure.code === "not_found"
         ? `Check the owner and repository name, or open ${absoluteUrl(paths.book(owner, repo))} to index it.`

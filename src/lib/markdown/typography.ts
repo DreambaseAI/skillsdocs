@@ -66,7 +66,19 @@ function curlyQuotes(input: string): string {
   return out;
 }
 
-function smarten(value: string): string {
+/**
+ * Exported because frontmatter never enters the remark pipeline.
+ *
+ * A skill's `description` is rendered as a deck, as a TOC entry and as an
+ * index row without ever passing through `remarkSmartypants`, so `skill's`
+ * arrived at 24px with a U+0027 two inches above a body that set `user’s`
+ * with a U+2019. One transform, both paths.
+ */
+export function smartenText(value: string): string {
+  return isMachineText(value) ? value : smarten(value);
+}
+
+export function smarten(value: string): string {
   return curlyQuotes(
     value
       .replace(/---/g, EM_DASH)

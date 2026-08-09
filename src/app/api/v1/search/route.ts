@@ -91,6 +91,23 @@ function isLiteralMatch(doc: SearchDoc, tokens: string[]): boolean {
   );
 }
 
+/**
+ * Which text a snippet should be cut from, given the field that matched.
+ *
+ * Falls back through the fields in weight order so a `headings` hit still
+ * produces something when the heading text is shorter than the window.
+ */
+function snippetSource(
+  matchedOn: string,
+  skill: { description: string; body: string; headings: Array<{ text: string }> },
+): string {
+  if (matchedOn === "body") return skill.body;
+  if (matchedOn === "headings") {
+    return `${skill.headings.map((h) => h.text).join(" · ")}\n\n${skill.body}`;
+  }
+  return skill.description || skill.body;
+}
+
 /** A window of `text` around the first token hit, with the hit emphasised. */
 function snippet(text: string, tokens: string[], width = 180): string | null {
   const flat = text.replace(/\s+/g, " ").trim();
@@ -125,10 +142,12 @@ export async function GET(request: Request): Promise<Response> {
   const limit = Number.isFinite(rawLimit)
     ? Math.min(MAX_LIMIT, Math.max(1, rawLimit))
     : DEFAULT_LIMIT;
-  const cursor = Math.max(
-    0,
-    Number.parseInt(url.searchParams.get("cursor") ?? "0", 10) || 0,
-  );
+  // A cursor is an offset. A corrupt or stale one used to be coerced to 0 and
+  // silently return page 1 with `nextCursor: "10"` — a resumable crawler that
+  // persisted a cursor across a deploy re-ingested from the top forever.
+  const rawCursor = url.searchParams.get("cursor");
+  const cursorInvalid = rawCursor !== null && rawCursor !== "" && !/^\d{1,7}$/.test(rawCursor);
+  const cursor = rawCursor && /^\d{1,7}$/.test(rawCursor) ? Number(rawCursor) : 0;
 
   if (!q) {
     return fail(
@@ -149,6 +168,14 @@ export async function GET(request: Request): Promise<Response> {
   }
   if (kind && kind !== "book" && kind !== "skill") {
     return fail(400, "bad_request", "`kind` must be `book` or `skill`.");
+  }
+  if (cursorInvalid) {
+    return fail(
+      400,
+      "invalid_cursor",
+      "`cursor` must be a non-negative integer taken from a previous `nextCursor`.",
+      "Omit it to start from the beginning of the result set.",
+    );
   }
 
   const tokens = tokenize(q);
@@ -220,7 +247,11 @@ export async function GET(request: Request): Promise<Response> {
           description: skill.description || null,
           score: Number(best.toFixed(3)),
           matchedOn,
-          snippet: snippet(skill.description || skill.body, tokens),
+          // Cut from whatever actually matched. `description` almost always
+          // exists, so a `snippet(description || body)` never reached the
+          // body — a query for `pdfplumber` came back with a description that
+          // does not contain the word, and nothing highlighted.
+          snippet: snippet(snippetSource(matchedOn, skill), tokens),
           html: chapterUrl,
           markdown: `${chapterUrl}.md`,
           json: absoluteUrl(paths.chapterJson(o, r, skill.slug)),

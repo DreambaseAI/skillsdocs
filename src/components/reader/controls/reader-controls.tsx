@@ -19,6 +19,8 @@
  * is a settings button most people never press.
  */
 
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { announce } from "@/components/chrome/live-regions";
@@ -136,6 +138,15 @@ export function ReaderControls({ className }: ReaderControlsProps) {
   useShortcut("controls", () => setOpen((wasOpen) => !wasOpen));
   useShortcut("help", () => setShortcutsOpen(true));
 
+  // `Z` — hide the chrome. Advertised in the keymap with a key cap since the
+  // beginning and subscribed by nothing, so the key was cancelled and nothing
+  // happened. This component already owns the switch.
+  useShortcut("immersive", () => {
+    const next = !extras.focusMode;
+    setFocusMode(next);
+    announce(next ? "Focus mode on. Press Escape to exit." : "Focus mode off.");
+  });
+
   const stepSize = useCallback(
     (delta: number) => {
       const next = Math.min(
@@ -177,6 +188,10 @@ export function ReaderControls({ className }: ReaderControlsProps) {
                 size="icon-sm"
                 className={className}
                 aria-label={TITLE}
+                // The trigger opens a `role="dialog"`; without this a screen
+                // reader announces "expanded" with no hint of what expands.
+                // `MobileContents` already did this and these did not.
+                aria-haspopup="dialog"
               />
             }
           >
@@ -186,11 +201,17 @@ export function ReaderControls({ className }: ReaderControlsProps) {
             align="end"
             side="bottom"
             sideOffset={8}
-            className="reader-panel w-[min(24rem,calc(100vw-2rem))] max-h-[min(76dvh,44rem)] overflow-y-auto overscroll-contain"
+            // `76dvh` left 170px of a 900px viewport unused while cutting the
+            // "Newsreader" and "EB Garamond" cards in half, with no fade, no
+            // shadow and no visible scrollbar to say there was more. The panel
+            // now takes everything under the header, and `reader-panel--scroll`
+            // masks its bottom edge so the cut always reads as "continues".
+            className="reader-panel reader-panel--scroll w-[min(24rem,calc(100vw-2rem))] max-h-[calc(100dvh-var(--header-h)-2rem)] overflow-y-auto overscroll-contain"
           >
-            <PopoverHeader>
+            <PopoverHeader className="relative">
               <PopoverTitle>{TITLE}</PopoverTitle>
               <PopoverDescription>{DESCRIPTION}</PopoverDescription>
+              <ClosePanelButton onClose={() => setOpen(false)} />
             </PopoverHeader>
             {panel}
           </PopoverContent>
@@ -207,6 +228,7 @@ export function ReaderControls({ className }: ReaderControlsProps) {
                 size="sm"
                 aria-label={TITLE}
                 aria-expanded={open}
+                aria-haspopup="dialog"
                 className={cn(
                   // Inside the pill it has to match its neighbours' 44px tap
                   // target (2.5.5 AAA), which `size="sm"` alone does not give.
@@ -231,11 +253,15 @@ export function ReaderControls({ className }: ReaderControlsProps) {
             snapPoints={[0.4, 0.92]}
           >
             <DrawerContent className="reader-panel">
-              <DrawerHeader>
+              {/* Left-aligned on every width. The drawer centred its title on
+                  a phone while the popover left-aligned the identical string,
+                  so the same control had two different layouts. */}
+              <DrawerHeader className="relative text-left group-data-[swipe-axis=y]/drawer-popup:text-left">
                 <DrawerTitle>{TITLE}</DrawerTitle>
                 <DrawerDescription>{DESCRIPTION}</DrawerDescription>
+                <ClosePanelButton onClose={() => setOpen(false)} />
               </DrawerHeader>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+              <div className="reader-panel--scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                 {panel}
               </div>
             </DrawerContent>
@@ -249,6 +275,31 @@ export function ReaderControls({ className }: ReaderControlsProps) {
           every reading route and to already own the switch that turns it on. */}
       <FocusMode enabled={extras.focusMode} onExit={() => setFocusMode(false)} />
     </>
+  );
+}
+
+/**
+ * The labelled way out, inside the popup.
+ *
+ * ARCHITECTURE §7.2 requires a `Close` *inside* every dialog/drawer popup, and
+ * this panel was the one surface that shipped without one: the only ways out
+ * were a backdrop tap and an `aria-hidden`, drag-only swipe handle. On iOS
+ * VoiceOver there is no Escape key and no discoverable exit, so a reader who
+ * opened the panel by touch had no announced way to leave it. `MobileContents`
+ * got this right; these two did not.
+ */
+function ClosePanelButton({ onClose }: { onClose: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Close reading controls"
+      className="absolute top-0 right-0"
+      onClick={onClose}
+    >
+      <HugeiconsIcon icon={Cancel01Icon} aria-hidden />
+    </Button>
   );
 }
 

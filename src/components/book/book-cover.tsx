@@ -1,6 +1,7 @@
-import { CheckmarkBadge01Icon, StarIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, CheckmarkBadge01Icon, StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
+import { Deck } from "@/components/book/deck";
 import {
   compactCount,
   editorialDate,
@@ -14,24 +15,161 @@ import type { Book } from "@/lib/book";
 import { external, installCommand, marketplaceCommand } from "@/lib/site";
 
 /**
- * The cover and masthead.
+ * The cover, and the masthead that follows it.
  *
- * A cover has one job: to say what this is, whose it is, and why it is worth
- * the next ten minutes — and to do it at a scale that a contents list cannot.
- * Everything here is set against the reading surface, so an issue's accent
- * appears exactly three times (issue number, rule, install sigil) and nowhere
- * else. Restraint is the whole effect; an accent used five times is a theme,
- * used twice it is a signature.
+ * ## Why the cover is a band and not a block
+ *
+ * It used to be a headline inside the reading column: the same 692px measure
+ * as body text, flanked on the left by a 17-item contents rail and on the
+ * right by a stats rail of comparable visual mass. Measured, the title block
+ * occupied 3.8% of the first viewport at 1920 and the composition was
+ * byte-identical at 1024, 1440 and 1920 apart from the margins — zero art
+ * direction. The eye path on `/anthropics/skills` went: 96px title, then the
+ * 17-line rail (the largest text mass on screen), then the stats table, and
+ * only *fourth* the one sentence that says what the book is.
+ *
+ * So the cover now escapes the three-track grid entirely. It is a full-bleed
+ * band rendered above `.book-frame`, which means the rails do not exist inside
+ * it — they begin where the contents begins, which is where they are useful.
+ * Order on the band is: mark and issue line, title, accent rule, standfirst,
+ * one line of scale, scroll cue. The install commands and the masthead table
+ * are demoted below it, into the column, where a reader who has decided to
+ * stay can find them.
+ *
+ * ## Why the title has a step-down
+ *
+ * `clamp()` alone does not know how many characters it is setting. At
+ * `stripe/ai` a two-letter repo name at the clamp ceiling left 85% of the line
+ * empty while the rule beneath still ran the full width. `--cover-cap` is a
+ * per-length ceiling so a short name is set large but not absurd, and a
+ * 24-character name is set to fit.
  */
 
 export interface BookCoverProps {
   book: Book;
 }
 
-export function BookCover({ book }: BookCoverProps) {
-  const { repo, owner, signal, marketplace, theme } = book;
-  const updated = editorialDate(repo.pushedAt);
+/**
+ * Ceiling for the display title, by name length.
+ *
+ * Two decisions in one table: very short names must not float in an empty
+ * line, and very long ones must not need three lines at 1440. The break points
+ * were read off the real corpus — `ai` (2), `skills` (6), `azure-skills` (12),
+ * `agent-toolkit-for-aws` (21).
+ */
+function titleCap(name: string): string {
+  const n = name.length;
+  if (n <= 4) return "7rem";
+  if (n <= 10) return "9rem";
+  if (n <= 16) return "7rem";
+  if (n <= 24) return "5.5rem";
+  return "4.25rem";
+}
+
+export function BookCoverBand({ book }: BookCoverProps) {
+  const { repo, owner, signal } = book;
   const chapters = book.skills.length;
+
+  return (
+    <header
+      id="cover"
+      className="book-coverband scroll-mt-24"
+      style={{ "--cover-cap": titleCap(repo.repo) } as React.CSSProperties}
+    >
+      <div className="book-coverband__inner">
+        <div className="book-coverband__masthead">
+          <span className="book-mark">
+            {repo.ownerAvatar ? (
+              <Image
+                src={repo.ownerAvatar}
+                alt=""
+                width={128}
+                height={128}
+                priority
+                unoptimized={false}
+              />
+            ) : (
+              <span className="book-mark__fallback" aria-hidden="true">
+                {repo.owner.slice(0, 2)}
+              </span>
+            )}
+          </span>
+
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {/* The issue number is a magazine affectation and says so: it is a
+                stable hash of owner/repo, not a sequence anyone can count. */}
+            <span className="book-eyebrow book-eyebrow--accent">
+              Issue No.&nbsp;{book.issueNumber}
+            </span>
+            <span className="text-ink-muted truncate text-sm">
+              {owner?.name ?? repo.owner}
+              {signal?.official ? (
+                <>
+                  {" · "}
+                  <span className="text-ink-strong inline-flex items-center gap-1 align-baseline">
+                    <HugeiconsIcon
+                      icon={CheckmarkBadge01Icon}
+                      className="size-3.5 translate-y-0.5"
+                      aria-hidden
+                    />
+                    Official
+                  </span>
+                </>
+              ) : null}
+            </span>
+          </div>
+        </div>
+
+        <h1 className="book-cover__title">
+          <span className="book-cover__owner">{repo.owner} /</span>
+          {repo.repo}
+        </h1>
+
+        {/* The rule is the issue's, not the house's. It is the single largest
+            piece of accent ink on the page and it costs nothing. */}
+        <hr className="book-rule book-rule--issue" />
+
+        {/* Second in the visual order now, and set larger: this is the one
+            sentence that says what the book *is*, and it used to land fourth. */}
+        {repo.description ? (
+          <Deck text={repo.description} max={220} className="book-coverband__deck" />
+        ) : (
+          <p className="book-standfirst book-coverband__deck text-ink-muted">
+            {chapters > 0
+              ? `${chapters} ${plural(chapters, "skill")} published from this repository. No description was given upstream, so this issue takes its voice from the chapters themselves.`
+              : "This repository publishes no description."}
+          </p>
+        )}
+
+        {chapters > 0 ? (
+          <p className="book-caption book-coverband__scale">
+            {chapters} {plural(chapters, "chapter")} · {readingTime(book.totalReadingMinutes)}{" "}
+            · {book.totalWords.toLocaleString("en-GB")} words
+            {book.parts.length > 1 ? ` · ${book.parts.length} parts` : ""}
+          </p>
+        ) : null}
+      </div>
+
+      {/* A band this tall has to say that something follows it. */}
+      <a href="#contents" className="book-coverband__cue">
+        <span className="book-eyebrow m-0">Contents</span>
+        <HugeiconsIcon icon={ArrowDown01Icon} className="size-4" aria-hidden />
+      </a>
+    </header>
+  );
+}
+
+/**
+ * The masthead: install commands, provenance, and the install curve.
+ *
+ * Split out of the cover so the band above can be a cover. Stars and installs
+ * are deliberately *not* repeated here — the right rail's At-a-glance table
+ * already states both, and printing five numbers three times on one page is
+ * how a masthead turns into a dashboard.
+ */
+export function BookMasthead({ book }: BookCoverProps) {
+  const { repo, signal, marketplace, theme } = book;
+  const updated = editorialDate(repo.pushedAt);
 
   const rows = [
     { label: "Install command", command: installCommand(repo.owner, repo.repo) },
@@ -47,74 +185,10 @@ export function BookCover({ book }: BookCoverProps) {
   ];
 
   return (
-    <header className="book-cover book-measure">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="book-mark">
-          {repo.ownerAvatar ? (
-            <Image
-              src={repo.ownerAvatar}
-              alt=""
-              width={128}
-              height={128}
-              priority
-              unoptimized={false}
-            />
-          ) : (
-            <span className="book-mark__fallback" aria-hidden="true">
-              {repo.owner.slice(0, 2)}
-            </span>
-          )}
-        </span>
-
-        <div className="flex min-w-0 flex-col gap-0.5">
-          {/* The issue number is a magazine affectation and says so: it is a
-              stable hash of owner/repo, not a sequence anyone can count. */}
-          <span className="book-eyebrow book-eyebrow--accent">
-            Issue No.&nbsp;{book.issueNumber}
-          </span>
-          <span className="text-ink-muted truncate text-sm">
-            {owner?.name ?? repo.owner}
-            {signal?.official ? (
-              <>
-                {" · "}
-                <span className="text-ink-strong inline-flex items-center gap-1 align-baseline">
-                  <HugeiconsIcon
-                    icon={CheckmarkBadge01Icon}
-                    className="size-3.5 translate-y-0.5"
-                    aria-hidden
-                  />
-                  Official
-                </span>
-              </>
-            ) : null}
-          </span>
-        </div>
-      </div>
-
-      <h1 className="book-cover__title">
-        <span className="book-cover__owner">{repo.owner} /</span>
-        {repo.repo}
-      </h1>
-
-      <hr className="book-rule book-rule--strong" />
-
-      {repo.description ? (
-        <p className="book-standfirst">{repo.description}</p>
-      ) : (
-        <p className="book-standfirst text-ink-muted">
-          {chapters > 0
-            ? `${chapters} ${plural(chapters, "skill")} published from this repository. No description was given upstream, so this issue takes its voice from the chapters themselves.`
-            : "This repository publishes no description."}
-        </p>
-      )}
-
-      {chapters > 0 ? (
-        <p className="book-caption">
-          {chapters} {plural(chapters, "chapter")} · {readingTime(book.totalReadingMinutes)}{" "}
-          · {book.totalWords.toLocaleString("en-GB")} words
-          {book.parts.length > 1 ? ` · ${book.parts.length} parts` : ""}
-        </p>
-      ) : null}
+    <section className="book-measure flex flex-col gap-6" aria-labelledby="masthead-title">
+      <h2 id="masthead-title" className="book-eyebrow m-0">
+        Install and provenance
+      </h2>
 
       <InstallCommand rows={rows} />
 
@@ -139,24 +213,6 @@ export function BookCover({ book }: BookCoverProps) {
           )}
         </MastheadCell>
 
-        <MastheadCell label="Stars">
-          <span className="inline-flex items-center gap-1.5">
-            <HugeiconsIcon
-              icon={StarIcon}
-              className="text-ink-muted size-3.5"
-              aria-hidden
-            />
-            {compactCount(repo.stars)}
-          </span>
-        </MastheadCell>
-
-        {signal && signal.installs > 0 ? (
-          <MastheadCell label="Installs">
-            {compactCount(signal.installs)}
-            <span className="text-ink-muted text-xs"> via skills.sh</span>
-          </MastheadCell>
-        ) : null}
-
         <MastheadCell label="Published from">
           <a
             className="hover:text-issue-accent underline-offset-4 hover:underline"
@@ -168,6 +224,22 @@ export function BookCover({ book }: BookCoverProps) {
             {repo.repo}
           </a>
         </MastheadCell>
+
+        {/* Archived and fork are provenance a reader evaluating a repository
+            needs, and nothing on the page said either. */}
+        {repo.archived ? (
+          <MastheadCell label="Status">
+            <span className="text-ink-strong">Archived upstream</span>
+            <span className="text-ink-muted"> — read-only on GitHub</span>
+          </MastheadCell>
+        ) : null}
+
+        {repo.isFork ? (
+          <MastheadCell label="Status">
+            <span className="text-ink-strong">A fork</span>
+            <span className="text-ink-muted"> — the skills here originate elsewhere</span>
+          </MastheadCell>
+        ) : null}
       </dl>
 
       {signal && signal.weeklyInstalls.length > 1 ? (
@@ -178,7 +250,14 @@ export function BookCover({ book }: BookCoverProps) {
               label={`Weekly installs of ${repo.fullName}`}
             />
           </div>
-          <p className="book-caption shrink-0">Eight weeks of installs</p>
+          <p className="book-caption shrink-0">
+            Eight weeks · {compactCount(repo.stars)}{" "}
+            <HugeiconsIcon
+              icon={StarIcon}
+              className="text-ink-muted inline size-3 translate-y-[-1px]"
+              aria-label="stars"
+            />
+          </p>
         </div>
       ) : null}
 
@@ -188,7 +267,7 @@ export function BookCover({ book }: BookCoverProps) {
           <span className="text-ink-strong">{describeOrigin(theme.origin)}</span>.
         </p>
       ) : null}
-    </header>
+    </section>
   );
 }
 

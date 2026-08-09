@@ -52,6 +52,8 @@ const CHAPTER = "WS-4 (src/app/[owner]/[repo]/[skill]/page.tsx)";
 
 const OWNER: Record<RouteName, string> = {
   home: "WS-9 (src/app/page.tsx)",
+  search: "WS-9 (src/app/search/page.tsx)",
+  notFound: "WS-4 (src/app/[owner]/[repo]/[skill]/page.tsx)",
   book: BOOK,
   chapter: CHAPTER,
   chapterAlt: CHAPTER,

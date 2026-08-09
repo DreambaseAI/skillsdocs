@@ -165,7 +165,25 @@ test.describe("forced colors", () => {
 
     const charts = page.locator("figure svg, [role='img'] svg, svg[data-chart]");
     const count = await charts.count();
-    test.skip(count === 0, "no charts rendered yet — WS-7 (src/components/charts/)");
+    /*
+     * This skip has never not been taken: nothing under `src/app` imports
+     * `components/charts/`, so the pack renders on no route and this check has
+     * executed zero times since it was written. A vacuous skip reads exactly
+     * like a pass in the report, which is the failure mode an accessibility
+     * suite can least afford.
+     *
+     * The structural half of the contract — figure, named `role="img"` leaf,
+     * always-present data table — is therefore asserted directly against the
+     * component in `src/components/charts/accessible-chart.test.tsx`, which
+     * cannot skip itself. What is left here is the half that needs a real
+     * forced-colours browser, and it starts running the day a route mounts a
+     * chart.
+     */
+    test.skip(
+      count === 0,
+      "charts render on no route yet (src/components/charts/ is imported by nothing); " +
+        "the structural contract is covered by accessible-chart.test.tsx",
+    );
 
     for (let i = 0; i < count; i += 1) {
       const chart = charts.nth(i);

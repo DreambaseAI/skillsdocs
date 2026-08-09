@@ -11,9 +11,17 @@
  * a deliberate choice to inherit someone else's editorial judgement rather
  * than invent ours: `featuredRepo`/`featuredSkill` is maintained by the people
  * who run the install registry, and it moves.
+ *
+ * ## The index is banded
+ *
+ * Eighty-nine rows at one weight is a wall, not an index. It is now a lead
+ * band — the issues that carry the catalogue, given room to be read — and then
+ * a set-solid index in two columns under band rules by order of magnitude. The
+ * bands come from the install figures themselves rather than from a rank
+ * cutoff, so the label a row sits under is a fact about the row.
  */
 
-import { FeatureCard, IndexRow, LeadStory } from "@/components/home/book-card";
+import { FeatureCard, IndexLeadRow, IndexTailRow, LeadStory } from "@/components/home/book-card";
 import { compact } from "@/components/home/format";
 import type { FeaturedBook } from "@/lib/featured";
 
@@ -27,6 +35,60 @@ function pickLead(books: FeaturedBook[]): FeaturedBook {
   return books.find((book) => book.featuredSkill && book.skillCount > 1) ?? books[0];
 }
 
+/* ------------------------------------------------------------------ bands */
+
+/** The lead band never collapses to nothing and never swallows the index. */
+const LEAD_MIN = 6;
+const LEAD_MAX = 12;
+
+interface Band {
+  id: string;
+  label: string;
+  /** Inclusive floor, in installs. */
+  floor: number;
+}
+
+const BANDS: Band[] = [
+  { id: "millions", label: "Millions", floor: 1_000_000 },
+  { id: "hundred-thousands", label: "Hundreds of thousands", floor: 100_000 },
+  { id: "ten-thousands", label: "Tens of thousands", floor: 10_000 },
+  { id: "long-tail", label: "The long tail", floor: 0 },
+];
+
+function bandOf(installs: number): Band {
+  return BANDS.find((band) => installs >= band.floor) ?? BANDS[BANDS.length - 1];
+}
+
+/**
+ * How many books go in the lead band.
+ *
+ * Everything above a million installs, clamped, so the split is a property of
+ * the catalogue rather than a number someone typed. With the current data that
+ * is eleven; if skills.sh moves, the band moves with it and never becomes a
+ * lone row or half the page.
+ */
+function leadCount(books: FeaturedBook[]): number {
+  const millions = books.filter((book) => book.installs >= 1_000_000).length;
+  return Math.min(LEAD_MAX, Math.max(LEAD_MIN, millions));
+}
+
+/** The column header a table this dense needs and did not have. */
+function IndexHeader() {
+  return (
+    <div
+      className="border-rule bg-paper/94 text-ink-muted sticky top-14 z-10 flex items-baseline gap-2 border-b py-1.5 pr-1 pl-1 text-[0.62rem] font-semibold tracking-[0.14em] uppercase backdrop-blur-sm"
+      aria-hidden
+    >
+      <span className="w-6 shrink-0" />
+      <span>Repository</span>
+      <span className="flex-1" />
+      <span className="w-10 shrink-0 text-right">Ch</span>
+      <span className="w-12 shrink-0 text-right">Installs</span>
+      <span className="w-9 shrink-0 sm:w-8" />
+    </div>
+  );
+}
+
 export function Contents({ books }: ContentsProps) {
   const lead = pickLead(books);
   const rank = new Map(books.map((book, i) => [`${book.owner}/${book.repo}`, i + 1]));
@@ -35,6 +97,15 @@ export function Contents({ books }: ContentsProps) {
   const chapters = books.reduce((sum, book) => sum + book.skillCount, 0);
   const installs = books.reduce((sum, book) => sum + book.installs, 0);
   const live = books.some((book) => book.live);
+
+  const split = leadCount(books);
+  const front = books.slice(0, split);
+  const tail = books.slice(split);
+
+  const grouped = BANDS.map((band) => ({
+    band,
+    rows: tail.filter((book) => bandOf(book.installs) === band),
+  })).filter((group) => group.rows.length > 0);
 
   return (
     <div className="flex flex-col gap-16 sm:gap-20">
@@ -47,24 +118,27 @@ export function Contents({ books }: ContentsProps) {
       </section>
 
       {/* --------------------------------------------------------- features */}
+      {/*
+        "Also in this issue" was wrong on its own terms: one repo is one issue,
+        so three other repos are three other issues, and the cards under that
+        heading each printed their own global folio — `01`, `03`, `04` — under
+        a section that had just called itself `ISSUE 02`. The skipped number
+        read as a card that failed to render.
+      */}
       <section aria-labelledby="features-heading" className="flex flex-col gap-5">
         <div className="border-rule flex items-baseline justify-between gap-4 border-b pb-3">
           <h2
             id="features-heading"
             className="font-display text-ink-strong text-2xl tracking-[-0.015em]"
           >
-            Also in this issue
+            Also on the shelf
           </h2>
           <p className="text-ink-muted text-xs tracking-[0.12em] uppercase">Most installed</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          {features.map((book) => (
-            <FeatureCard
-              key={`${book.owner}/${book.repo}`}
-              book={book}
-              issue={rank.get(`${book.owner}/${book.repo}`) ?? 0}
-            />
+          {features.map((book, i) => (
+            <FeatureCard key={`${book.owner}/${book.repo}`} book={book} issue={i + 1} />
           ))}
         </div>
       </section>
@@ -86,20 +160,69 @@ export function Contents({ books }: ContentsProps) {
           </p>
         </div>
 
-        <ul className="flex flex-col">
-          {books.map((book) => (
-            <IndexRow
-              key={`${book.owner}/${book.repo}`}
-              book={book}
-              issue={rank.get(`${book.owner}/${book.repo}`) ?? 0}
-            />
-          ))}
-        </ul>
+        {/* --------------------------------------------------- the lead band */}
+        <section aria-labelledby="index-lead-heading">
+          <h3
+            id="index-lead-heading"
+            className="text-ink-muted mb-1 text-[0.66rem] font-semibold tracking-[0.16em] uppercase"
+          >
+            The front of the book · {front.length} most installed
+          </h3>
+          <ul className="flex flex-col">
+            {front.map((book) => (
+              <IndexLeadRow
+                key={`${book.owner}/${book.repo}`}
+                book={book}
+                issue={rank.get(`${book.owner}/${book.repo}`) ?? 0}
+              />
+            ))}
+          </ul>
+        </section>
 
-        <p className="text-ink-muted text-xs">
+        {/* ------------------------------------------------ the set-solid index */}
+        {grouped.length > 0 && (
+          <section aria-labelledby="index-rest-heading" className="mt-6">
+            <h3 id="index-rest-heading" className="sr-only">
+              The rest of the index
+            </h3>
+            <IndexHeader />
+
+            {grouped.map(({ band, rows }) => (
+              <section key={band.id} aria-labelledby={`band-${band.id}`} className="mt-5">
+                <h4
+                  id={`band-${band.id}`}
+                  className="border-rule text-ink-muted flex items-baseline justify-between gap-3 border-b pb-1 text-[0.66rem] font-semibold tracking-[0.16em] uppercase"
+                >
+                  <span>{band.label}</span>
+                  <span className="text-ink-muted tabular-nums">{rows.length}</span>
+                </h4>
+                {/*
+                  Two columns, not three. At 1152px three columns leave 384px a
+                  row, and a 30-character repo name plus a leader plus two
+                  figures does not fit in it. CSS columns keep DOM order, so
+                  find-in-page and the accessibility tree still read straight
+                  down the list.
+                */}
+                <ul className="mt-1 lg:columns-2 lg:gap-x-10">
+                  {rows.map((book) => (
+                    <IndexTailRow
+                      key={`${book.owner}/${book.repo}`}
+                      book={book}
+                      issue={rank.get(`${book.owner}/${book.repo}`) ?? 0}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </section>
+        )}
+
+        <p className="text-ink-muted mt-2 text-xs">
           Chapter counts are verified against each repository&rsquo;s tree. Install counts come
           from skills.sh
           {live ? " and are live." : " and are the last good snapshot — the live feed is unreachable."}
+          {" "}Arrows are the direction of the last eight weeks: <span aria-hidden>↑</span> up,{" "}
+          <span aria-hidden>↓</span> down, <span aria-hidden>→</span> level within 5%.
         </p>
       </section>
     </div>

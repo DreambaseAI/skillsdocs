@@ -49,20 +49,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: Entry[] = [
     { url: `${SITE_URL}/`, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/llms.txt`, changeFrequency: "daily", priority: 0.5 },
+    { url: `${SITE_URL}/api/v1/books`, changeFrequency: "daily", priority: 0.5 },
   ];
 
-  const bookRoutes: Entry[] = seeds.flatMap(({ owner, repo }) => [
-    {
-      url: `${SITE_URL}${paths.book(owner, repo)}`,
-      changeFrequency: "weekly" as const,
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}${paths.bookMarkdown(owner, repo)}`,
-      changeFrequency: "weekly" as const,
-      priority: 0.5,
-    },
-  ]);
+  // Book HTML only. The `.md` twin of every book used to be listed too, but
+  // each of those responses carries `Link: <html>; rel="canonical"` — so the
+  // sitemap was telling crawlers to index URLs that disown themselves. They
+  // stay discoverable through that `Link`, through `<link rel="alternate">` in
+  // the page head, and through `llms.txt`.
+  const bookRoutes: Entry[] = seeds.map(({ owner, repo }) => ({
+    url: `${SITE_URL}${paths.book(owner, repo)}`,
+    changeFrequency: "weekly" as const,
+    priority: 0.8,
+  }));
 
   // A repo can appear in both lists; the last write wins and URLs stay unique.
   const byUrl = new Map<string, Entry>();

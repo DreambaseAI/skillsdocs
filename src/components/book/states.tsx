@@ -5,6 +5,7 @@ import {
   Clock01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -21,30 +22,64 @@ import { external, SITE_NAME } from "@/lib/site";
  * reads as a crash even when it is expected.
  */
 
+/**
+ * The shared frame for every not-a-book page.
+ *
+ * Two things changed here after the visual audit.
+ *
+ * **The eyebrow is `--ink-muted`, not the issue accent.** "NO CHAPTERS" set in
+ * a saturated colour codes as a failure, and an empty repository is not one —
+ * the copy under it says so explicitly. An accent eyebrow is for a *place*
+ * ("Issue No. 80"), not for a verdict.
+ *
+ * **The mark is the issue's, not a generic boxed glyph.** The 38px
+ * icon-in-a-rounded-square was identical on the empty state and the 404, so
+ * the two were formally indistinguishable — and `vercel-labs/next-skills`, a
+ * repo with 136k installs, lost every trace of its own identity at exactly the
+ * moment it most needed reassurance. Where an avatar is known it is set as the
+ * book mark on its accent plate; where it is not, a 120px ghosted display
+ * glyph stands in for it.
+ */
 function StateFrame({
   eyebrow,
   title,
   icon,
+  avatar,
+  owner,
   children,
 }: {
   eyebrow: string;
   title: string;
   icon: typeof BookOpen01Icon;
+  /** The owner's avatar, when the repository resolved far enough to have one. */
+  avatar?: string | null;
+  owner?: string;
   children: ReactNode;
 }) {
   return (
     <div className="book-frame book-frame--solo">
       <div className="book-column reader">
-        <div className="book-measure flex min-h-[60dvh] flex-col justify-center py-16">
-          <span
-            className="border-rule text-ink-muted mb-6 grid size-11 place-items-center rounded-lg border"
-            aria-hidden="true"
-          >
-            <HugeiconsIcon icon={icon} className="size-5" />
+        <div className="book-measure relative flex min-h-[60dvh] flex-col justify-center py-16">
+          {/* A display glyph at 120px in 8% accent: furniture, not chrome. */}
+          <span className="book-state__glyph" aria-hidden="true">
+            <HugeiconsIcon icon={icon} className="size-full" strokeWidth={1} />
           </span>
-          <p className="book-eyebrow book-eyebrow--accent">{eyebrow}</p>
+
+          {avatar ? (
+            <span className="book-mark mb-6">
+              <Image src={avatar} alt="" width={128} height={128} unoptimized={false} />
+            </span>
+          ) : owner ? (
+            <span className="book-mark mb-6">
+              <span className="book-mark__fallback" aria-hidden="true">
+                {owner.slice(0, 2)}
+              </span>
+            </span>
+          ) : null}
+
+          <p className="book-eyebrow">{eyebrow}</p>
           <h1 className="book-opener__title mt-3">{title}</h1>
-          <hr className="book-rule book-rule--strong mt-6" />
+          <hr className="book-rule book-rule--issue mt-6" />
           <div className="mt-6 flex flex-col gap-4">{children}</div>
         </div>
       </div>
@@ -59,6 +94,7 @@ export interface EmptyBookProps {
   repo: string;
   description?: string | null;
   installs?: number;
+  avatar?: string | null;
 }
 
 export function EmptyBook({
@@ -66,12 +102,15 @@ export function EmptyBook({
   repo,
   description,
   installs,
+  avatar,
 }: EmptyBookProps) {
   return (
     <StateFrame
       eyebrow="No chapters"
       title="This repository publishes no skills"
       icon={BookOpen01Icon}
+      avatar={avatar}
+      owner={owner}
     >
       <p className="book-standfirst">
         We walked every directory of{" "}

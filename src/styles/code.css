@@ -105,11 +105,15 @@
   .code-block__bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 0.5rem;
     padding: 0.25rem 0.35rem 0.25rem 0.85rem;
     border-block-end: 1px solid var(--rule);
     min-block-size: 2.25rem;
+  }
+
+  .code-block__bar[data-named="true"] {
+    justify-content: space-between;
   }
 
   .code-block__lang {
@@ -227,6 +231,23 @@
     text-indent: 0;
   }
 
+  /*
+   * Preformatting lives on `.line`, not on `code`.
+   *
+   * Shiki emits a literal `\n` text node *between* every `<span class="line">`.
+   * Those spans are `display: block`, so under `white-space: pre` on the
+   * ancestor each of those newlines also renders its own line box — one empty
+   * box per line, doubling the leading of every fence in the product.
+   * Measured before this rule on `/anthropics/skills/skill-creator`:
+   * `line-height: 24.22px`, `.line` height 24px, line-to-line pitch 48–49px.
+   * ASCII tree diagrams (`├──` / `└──`) lost their verticals as a result.
+   *
+   * Collapsing whitespace on `code` drops the inter-line newlines (whitespace
+   * between block boxes generates no box), and `white-space: pre` back on
+   * `.line` preserves the indentation that actually matters. The `\n` text
+   * nodes stay in the DOM, so selecting and copying by hand still works, and
+   * the Copy button was never reading the DOM anyway.
+   */
   .code-block__pre code {
     display: block;
     inline-size: fit-content;
@@ -235,44 +256,94 @@
     background: none;
     padding: 0;
     border: none;
+    white-space: normal;
   }
 
   .code-block__pre .line {
     display: block;
     min-block-size: 1lh;
+    white-space: pre;
+    text-wrap: nowrap;
   }
 
   /* Opt-in wrapping, for the reader who asks for it in the controls panel. */
   [data-code-wrap="on"] .code-block__pre,
   [data-code-wrap="on"] .code-block__pre code {
-    white-space: pre-wrap;
     text-wrap: wrap;
     overflow-wrap: break-word;
     inline-size: auto;
   }
 
+  [data-code-wrap="on"] .code-block__pre .line {
+    white-space: pre-wrap;
+    text-wrap: wrap;
+    overflow-wrap: break-word;
+  }
+
   /* ═══════════════════════════════════════════════════════ inline code */
 
+  /*
+   * Inline code is a *tint*, not a chip.
+   *
+   * It used to carry `1px solid var(--rule)` and a 0.32em radius. One
+   * paragraph of the `claude-api` chapter carries nine code spans; nine
+   * bordered pills in a row read as a tag cloud rather than prose, and the
+   * boxes pushed the line boxes apart unevenly. A 6% ink wash marks the token
+   * as code without drawing a rectangle around it.
+   *
+   * The size is `0.875em` of the body — the same ratio block code uses —
+   * *and* it carries the reader's own `--reader-code-offset`, which is what
+   * the block already applied and the inline span did not. Before this,
+   * `evals/evals.json` measured 16.815px in a paragraph and 15.628px in a
+   * fence on the same page in the same family: the identical token, two sizes,
+   * decided by where it happened to sit. `0.0525` is `0.875 × 0.06`, so the
+   * step is the same fraction of the same ladder the block uses.
+   */
   .prose :not(pre) > code {
     font-family: var(--font-reader-code);
-    /* 0.875em is right for a block; inline code sits inside a line of prose
-       and needs a hair more to match the x-height of the surrounding text. */
-    font-size: 0.885em;
+    font-size: calc(0.875em + 0.0525em * var(--reader-code-offset));
     font-variant-ligatures: none;
     font-variant-numeric: lining-nums tabular-nums slashed-zero;
-    background: var(--paper-raised);
-    border: 1px solid var(--rule);
-    border-radius: 0.32em;
-    padding: 0.08em 0.32em;
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+    border: none;
+    border-radius: 0.25em;
+    padding: 0.05em 0.22em;
     /* An identifier split across a line is a different identifier. */
     hyphens: manual;
     overflow-wrap: break-word;
   }
 
-  /* A code span inside a link should read as part of the link. */
+  /* Inside a pull quote the chip would out-measure its own line box and its
+     background would collide with the descenders above. */
+  .prose .prose-quote[data-pull="true"] code {
+    font-size: 0.78em;
+    line-height: inherit;
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
+    padding-block: 0;
+  }
+
+  /*
+   * A code span inside a link should read as part of the link — and must not
+   * pay for it in contrast.
+   *
+   * `--issue-accent` is pinned to L=0.52 (light) / 0.70 (dark) precisely
+   * because that is the measured point where accent-on-paper clears 4.5:1;
+   * `theme.ts` and `verify:contrast` both treat it as a guarantee. Any wash
+   * *behind* accent-coloured text spends that margin, and a wash of the accent
+   * itself spends the most: measured on a production build, a 12% accent tint
+   * dropped `openai/skills` to **4.22:1** (axe, serious, WCAG 1.4.3) and put
+   * 10 nodes on `mattpocock/skills`, 8 on `DreambaseAI/skills`, 2 on
+   * `supabase/agent-skills` — 4 of 12 books swept. The token audit cannot see
+   * it because the pair only exists once the two rules composite.
+   *
+   * So a linked code span keeps the mono face and the link's own colour and
+   * underline, and paints nothing behind itself. Contrast is then exactly the
+   * accent-on-paper figure the theme already guarantees.
+   */
   .prose .prose-link > code {
     color: inherit;
-    border-color: color-mix(in oklch, var(--issue-accent) 35%, transparent);
+    background: transparent;
+    padding-inline: 0.1em;
   }
 
   .prose :is(h1, h2, h3, h4, h5, h6) code {
@@ -324,12 +395,24 @@
       color: CanvasText;
       background: Canvas;
     }
+
+    /* A background tint is dropped in HCM, so inline code needs an outline
+       back to stay distinguishable from the prose around it. */
+    .prose :not(pre) > code {
+      border: 1px solid CanvasText;
+      padding-inline: 0.2em;
+    }
   }
 
   @media (prefers-contrast: more) {
     .code-block__scroll {
       -webkit-mask-image: none;
       mask-image: none;
+    }
+
+    .prose :not(pre) > code {
+      background: var(--paper-raised);
+      border: 1px solid var(--rule);
     }
 
     .code-block__copy {

@@ -96,3 +96,28 @@ export function trendLabel(values: readonly number[]): string | null {
   if (delta === 0) return "Level over 8 weeks";
   return `${delta > 0 ? "Up" : "Down"} ${Math.abs(delta)}% over 8 weeks`;
 }
+
+/** Anything inside ±5% over eight weeks is noise, not a direction. */
+const FLAT = 5;
+
+export interface TrendGlyph {
+  glyph: "↑" | "↓" | "→";
+  label: string;
+}
+
+/**
+ * The trend as one character.
+ *
+ * Below the lead band of the index a sparkline is worse than nothing: 79 of
+ * them, each auto-scaled to its own extrema and each tinted with its own
+ * issue accent, made a 3% wobble and a 300% climb look identical and turned
+ * the column into confetti. One glyph in ink says the only thing that
+ * survives at that size, and it says it the same way on every row.
+ */
+export function trendGlyph(values: readonly number[]): TrendGlyph | null {
+  const delta = trend(values);
+  if (delta === null) return null;
+  if (delta > FLAT) return { glyph: "↑", label: `Up ${delta}% over 8 weeks` };
+  if (delta < -FLAT) return { glyph: "↓", label: `Down ${Math.abs(delta)}% over 8 weeks` };
+  return { glyph: "→", label: "Level over 8 weeks" };
+}

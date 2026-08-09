@@ -13,11 +13,9 @@
 import { createHash } from "node:crypto";
 import { chapterNav, findSkill, getBook } from "@/lib/book";
 import { fetchRawText, rawUrl } from "@/lib/github";
-import {
-  chapterLicence,
-  classifyUpstreamError,
-  TAKEDOWN_CONTACT,
-} from "@/lib/serialize";
+import { serveJson } from "@/lib/http";
+import { chapterLicence, TAKEDOWN_CONTACT } from "@/lib/serialize";
+import { resolveUpstreamFailure } from "@/lib/upstream";
 import {
   absoluteUrl,
   external,
@@ -43,7 +41,7 @@ function fail(status: number, code: string, message: string, hint?: string) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   ctx: RouteContext<"/api/v1/books/[owner]/[repo]/skills/[skill]">,
 ): Promise<Response> {
   const { owner, repo, skill: slug } = await ctx.params;
@@ -130,7 +128,7 @@ export async function GET(
       },
       licenseNotice: licence.redistributable
         ? null
-        : "No licence could be detected for this skill at either the repository or the skill level, so its body is not served here. Read it upstream at links.raw.",
+        : `No licence could be detected for this skill at either the repository or the skill level, so its body is not served here. Read it upstream at ${rawUrl(o, r, ref, skill.skillMdPath)}.`,
       content:
         source != null
           ? {
@@ -148,21 +146,21 @@ export async function GET(
         upstream: external.file(o, r, ref, skill.skillMdPath),
         takedown: TAKEDOWN_CONTACT,
       },
-      generatedAt: new Date().toISOString(),
+      // No `generatedAt`: it made the payload byte-unstable, so no `ETag`
+      // could ever match. Nothing about this chapter changes per request.
     };
 
-    return Response.json(payload, {
-      headers: {
-        ...JSON_HEADERS,
-        link: [
-          `<${chapterUrl}>; rel="canonical"`,
-          `<${chapterUrl}.md>; rel="alternate"; type="text/markdown"`,
-          `<${absoluteUrl(paths.bookJson(o, r))}>; rel="up"`,
-        ].join(", "),
-      },
+    return serveJson(request, payload, {
+      ...JSON_HEADERS,
+      link: [
+        `<${chapterUrl}>; rel="canonical"`,
+        `<${chapterUrl}.md>; rel="alternate"; type="text/markdown"`,
+        `<${rawUrl(o, r, ref, skill.skillMdPath)}>; rel="describedby"; type="text/markdown"`,
+        `<${absoluteUrl(paths.bookJson(o, r))}>; rel="up"`,
+      ].join(", "),
     });
   } catch (error) {
-    const failure = classifyUpstreamError(error);
+    const failure = await resolveUpstreamFailure(error, owner, repo);
     return fail(
       failure.status,
       failure.code,

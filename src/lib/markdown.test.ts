@@ -22,6 +22,7 @@ import {
   isKnownLanguage,
 } from "./markdown/highlighter";
 import { joinPath } from "./markdown/links";
+import { extractHeadings } from "./skills";
 
 const CTX: MarkdownContext = {
   owner: "acme",
@@ -207,6 +208,89 @@ describe("heading normalisation", () => {
   });
 });
 
+/* ----------------------------------------------------- outline / API parity */
+
+/**
+ * The JSON API publishes `outline` from `extractHeadings`, which never runs the
+ * markdown pipeline; the page renders its anchors from the pipeline. When the
+ * two disagree, every `#anchor` an agent builds from the API is a coin flip and
+ * the chapter opener's "N sections" figure is wrong. Measured before the fix,
+ * across 78 real chapters: 38% id mismatches, 32% count mismatches, 85% wrong
+ * first level.
+ *
+ * These cases are exactly the transforms that used to be applied on one side
+ * only.
+ */
+describe("outline parity with extractHeadings", () => {
+  const CASES: Array<{ name: string; source: string; title?: string }> = [
+    {
+      name: "duplicate leading H1 (skill-creator's shape)",
+      title: "Skill Creator",
+      source:
+        "# Skill Creator\n\nIntro.\n\n## Overview\n\ntext\n\n### Detail\n\n## Don't Panic -- really\n",
+    },
+    {
+      name: "document that opens at H1 with no matching title",
+      title: "Something Else",
+      source: "# Overview\n\n## Detail\n\n#### Skipped\n",
+    },
+    {
+      name: "skipped levels and repeats",
+      source: "## Two\n\n##### Five\n\n### Three\n\n## Two\n",
+    },
+    {
+      name: "inline code, links and emphasis in headings",
+      source:
+        "## Use `evals/evals.json`\n\n### See [the guide](https://example.com)\n\n### **Bold** heading\n",
+    },
+    {
+      name: "fenced code containing hashes",
+      source: "## Real\n\n```sh\n# not a heading\n```\n\n~~~\n# nor this\n~~~\n\n## Also real\n",
+    },
+    {
+      name: "smart punctuation in headings",
+      source: "## \"Quoted\" and it's fine...\n\n### 1--2 ranges\n",
+    },
+    {
+      name: "a real fixture chapter",
+      title: "Unrepaired Outline",
+      source: readFileSync(
+        "tests/fixtures/rough-book/files/skills/unrepaired-outline/SKILL.md",
+        "utf8",
+      ),
+    },
+    {
+      name: "another real fixture chapter",
+      title: "Writing Clearly",
+      source: readFileSync(
+        "tests/fixtures/clean-book/files/skills/writing-clearly/SKILL.md",
+        "utf8",
+      ),
+    },
+  ];
+
+  for (const testCase of CASES) {
+    it(`agrees with the renderer: ${testCase.name}`, async () => {
+      const source = stripFrontmatter(testCase.source);
+      const rendered = await renderMarkdown(source, {
+        ...CTX,
+        title: testCase.title,
+      });
+      expect(extractHeadings(source, testCase.title)).toEqual(rendered.headings);
+    });
+  }
+
+  it("matches the ids actually present in the rendered markup", async () => {
+    const source = "# Title\n\n## Don't Panic -- really\n\n### `code` heading\n";
+    const rendered = await renderMarkdown(source, { ...CTX, title: "Title" });
+    const html = toMarkup(rendered.tree);
+    for (const heading of extractHeadings(source, "Title")) {
+      expect(html).toContain(`id="${heading.id}"`);
+      expect(html).toMatch(new RegExp(`<h${heading.depth}[^>]*id="${heading.id}"`));
+    }
+  });
+});
+
 /* -------------------------------------------------------------- highlight */
 
 describe("syntax highlighting", () => {
@@ -325,6 +409,18 @@ describe("link resolution", () => {
     expect(joinPath("a/b", "../../../../x")).toBe("x");
     expect(joinPath("a/b", "./c/./d")).toBe("a/b/c/d");
     expect(joinPath("", "c")).toBe("c");
+  });
+
+  it("resolves a root-relative path from the repository root, as GitHub does", () => {
+    expect(joinPath("skills/x", "/logo.png")).toBe("logo.png");
+    expect(joinPath("skills/x", "/assets/a/b.png")).toBe("assets/a/b.png");
+  });
+
+  it("points a root-relative image at the repo root, not the skill directory", async () => {
+    const { html } = await render("![x](/logo.png)");
+    expect(html).toContain(
+      'src="https://raw.githubusercontent.com/acme/skills/main/logo.png"',
+    );
   });
 });
 

@@ -65,15 +65,22 @@ export function CodeBlock({ lang, source, shikiClassName, children }: CodeBlockP
   }
 
   const label = lang === "text" ? "Code" : lang;
+  // `text` is the pipeline's word for "this fence carried no language", not a
+  // language. Printing `CODE` above a fence tells the reader something they
+  // can already see; printing `BASH` tells them something they cannot. When
+  // there is nothing to say, the bar carries the Copy button alone.
+  const named = lang !== "text";
 
   return (
     // `data-slot` is the selector contract theme-modes.css targets for print
     // and forced-colors; `className` is what code.css styles. Both are needed.
     <figure className="code-block" data-slot="code-block" data-lang={lang}>
-      <div className="code-block__bar">
-        <span className="code-block__lang" aria-hidden="true">
-          {label}
-        </span>
+      <div className="code-block__bar" data-named={named ? "true" : undefined}>
+        {named ? (
+          <span className="code-block__lang" aria-hidden="true">
+            {label}
+          </span>
+        ) : null}
         <Button
           variant="ghost"
           size="xs"

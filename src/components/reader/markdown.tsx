@@ -8,6 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowUpRight01Icon, Link01Icon } from "@hugeicons/core-free-icons";
 import type { Element, ElementContent, Root } from "hast";
 
+import type { DropCapMode } from "@/components/book/dropcap";
 import { CodeBlock } from "@/components/reader/code-block";
 import { MarginNote, MarginNoteRef } from "@/components/reader/margin-note";
 import type { RenderedMarkdown } from "@/lib/markdown";
@@ -39,6 +40,15 @@ const OPTIMISED_HOSTS = new Set([
 
 /** A blockquote shorter than this, with a single paragraph, reads as a pull quote. */
 const PULL_QUOTE_MAX_CHARS = 180;
+
+/** Is any of these tags anywhere inside the subtree? */
+function containsElement(node: Element, tags: string[]): boolean {
+  let found = false;
+  visit(node, "element", (child: Element) => {
+    if (tags.includes(child.tagName)) found = true;
+  });
+  return found;
+}
 
 /* ------------------------------------------------------------- footnotes */
 
@@ -126,16 +136,17 @@ function footnoteRefIn(node: Element): Element | undefined {
 export interface MarkdownProps {
   rendered: RenderedMarkdown;
   /**
-   * Sink the first letter of the opening paragraph. Ignored for code-heavy
-   * documents, where the first block is usually a fence and a drop cap on the
-   * one stray sentence above it looks like a mistake.
+   * How the opening paragraph is decorated — see `book/dropcap.ts`. The
+   * decision is made from the shape of that paragraph alone; the document-wide
+   * code ratio used to veto it here, which refused four otherwise perfect
+   * openers for a property of a different part of the document.
    */
-  dropCap?: boolean;
+  dropCap?: DropCapMode;
   className?: string;
 }
 
-export function Markdown({ rendered, dropCap = false, className }: MarkdownProps) {
-  const { tree, codeRatio } = rendered;
+export function Markdown({ rendered, dropCap = "none", className }: MarkdownProps) {
+  const { tree } = rendered;
   const { notes, promote } = collectFootnotes(tree);
 
   // Indices are assigned during a walk rather than counted inside a component
@@ -274,7 +285,31 @@ export function Markdown({ rendered, dropCap = false, className }: MarkdownProps
             (child: ElementContent) => child.type === "element" && child.tagName === "p",
           ).length
         : 0;
-      const pull = paragraphs === 1 && text.length > 0 && text.length <= PULL_QUOTE_MAX_CHARS;
+      /*
+       * A pull quote is a *repetition* of body copy set large for the eye to
+       * land on. A GFM blockquote in a skill document is very often the
+       * opposite — an instruction, a warning, or a `> **Note:**` admonition
+       * that appears exactly once. Setting one of those at 1.563em italic
+       * promotes an aside above the prose it qualifies.
+       *
+       * So a quote also has to look like prose to be pulled: no code spans (a
+       * chip inside a 30px italic line collides with the descenders above it),
+       * no headings, and no list — all three are structure, and structure set
+       * as a pull quote reads as a rendering fault.
+       */
+      const hasNonProse = node
+        ? node.children.some(
+            (child: ElementContent) =>
+              child.type === "element" &&
+              child.tagName !== "p" &&
+              child.tagName !== "cite",
+          ) || containsElement(node, ["code", "pre", "table", "img"])
+        : false;
+      const pull =
+        paragraphs === 1 &&
+        !hasNonProse &&
+        text.length > 0 &&
+        text.length <= PULL_QUOTE_MAX_CHARS;
       return (
         <blockquote
           {...rest}
@@ -347,7 +382,7 @@ export function Markdown({ rendered, dropCap = false, className }: MarkdownProps
   return (
     <div
       className={cn("prose", className)}
-      data-dropcap={dropCap && codeRatio <= 0.25 ? "true" : undefined}
+      data-dropcap={dropCap === "none" ? undefined : dropCap}
     >
       {toJsxRuntime(tree, state.options)}
     </div>

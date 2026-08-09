@@ -92,14 +92,29 @@ export const SHORTCUTS: ShortcutDef[] = [
   { action: "controls", label: "Reading controls", group: "display", keys: [","] },
   { action: "themeCycle", label: "Cycle theme", group: "display", keys: ["d"] },
   { action: "immersive", label: "Hide chrome", group: "display", keys: ["z"] },
+  /*
+   * `+` / `=` and `_` / `-`, not `shift+=` and `shift+-`.
+   *
+   * `normalizeKey` deliberately does not record Shift for a printable
+   * character that already encodes its own shift state, so a US keyboard emits
+   * `key: "+"` for Shift+= and the binding `"shift+="` could never match
+   * anything — measured: pressing Shift+Equal, `+` and `=` all left the body
+   * size at 19px. Binding both the shifted and unshifted characters keeps the
+   * pair working across layouts where `+` is unshifted.
+   *
+   * `Cmd+=` is untouched either way, so browser zoom still belongs to the
+   * browser. `buildKeymap` round-trips every default binding through
+   * `normalizeKey` in the unit suite, so a binding that cannot fire is now a
+   * test failure rather than a silently dead key cap.
+   */
   {
     action: "sizeUp",
     label: "Larger text",
     group: "reading",
-    keys: ["shift+="],
+    keys: ["+", "="],
     note: "Cmd+= stays browser zoom",
   },
-  { action: "sizeDown", label: "Smaller text", group: "reading", keys: ["shift+-"] },
+  { action: "sizeDown", label: "Smaller text", group: "reading", keys: ["_", "-"] },
 ];
 
 export const SHORTCUT_GROUP_LABELS: Record<ShortcutGroup, string> = {
@@ -256,8 +271,13 @@ export function isEditableTarget(target: EventTarget | null): boolean {
  * field is what everybody expects — but bare characters never do.
  */
 export function shouldHandle(event: KeyboardEvent, settings: ShortcutSettings): boolean {
-  if (!settings.enabled) return false;
   if (event.defaultPrevented || event.repeat) return false;
+  // The off switch is escape (b) of 2.1.4, which is about *single-character*
+  // shortcuts: the hazard is a speech-input user saying a word made of keys.
+  // A modifier combo cannot be spoken by accident, and ⌘K is the only way into
+  // search from the keyboard, so the switch leaves it alone. Bare characters —
+  // including the first key of a chord — are silenced completely.
+  if (!settings.enabled) return isModKey(event);
   if (isModKey(event)) return true;
   return !isEditableTarget(event.target);
 }
@@ -321,25 +341,73 @@ export function conflictFor(
 
 /* ------------------------------------------------------------- dispatch */
 
-type Listener = (action: ShortcutAction) => void;
-const listeners = new Set<Listener>();
+type Listener = () => void;
 
 /**
- * One global bus rather than a context.
+ * One global bus rather than a context, and keyed by action rather than a flat
+ * list.
  *
  * The pieces that respond to a shortcut — the controls panel, the theme
  * toggle, the chapter nav — are scattered across three workstreams' component
  * trees and several portals. A context would force all of them under one
- * provider for no benefit; the keymap has exactly one producer and the
- * subscription list is a dozen entries long.
+ * provider for no benefit.
+ *
+ * **Keying by action is what makes the keymap honest.** A flat listener set
+ * cannot answer "does anything actually handle `]`?", so the dispatcher
+ * happily called `preventDefault()` for eleven actions nobody had implemented:
+ * pressing `/` on a chapter page suppressed the browser's own quick-find and
+ * then did nothing — a net removal of function — and the shortcuts dialog
+ * advertised a key cap for every one of them. With a per-action registry the
+ * dispatcher can leave an unclaimed key to the browser, and the dialog can say
+ * which shortcuts are live on this page.
  */
-export function onShortcut(listener: Listener): () => void {
-  listeners.add(listener);
+const listeners = new Map<ShortcutAction, Set<Listener>>();
+const registryWatchers = new Set<() => void>();
+
+function notifyRegistry(): void {
+  for (const watcher of registryWatchers) watcher();
+}
+
+export function onShortcut(action: ShortcutAction, listener: Listener): () => void {
+  let set = listeners.get(action);
+  if (!set) {
+    set = new Set();
+    listeners.set(action, set);
+  }
+  set.add(listener);
+  notifyRegistry();
+
   return () => {
-    listeners.delete(listener);
+    set.delete(listener);
+    if (set.size === 0) listeners.delete(action);
+    notifyRegistry();
   };
 }
 
-export function emitShortcut(action: ShortcutAction): void {
-  for (const listener of listeners) listener(action);
+/** True when something on this page is listening for `action`. */
+export function hasShortcutListener(action: ShortcutAction): boolean {
+  return (listeners.get(action)?.size ?? 0) > 0;
+}
+
+/** Subscribe to registry changes, for UI that reports which keys are live. */
+export function onShortcutRegistryChange(watcher: () => void): () => void {
+  registryWatchers.add(watcher);
+  return () => {
+    registryWatchers.delete(watcher);
+  };
+}
+
+/** Fire `action`. Returns false when nothing was listening. */
+export function emitShortcut(action: ShortcutAction): boolean {
+  const set = listeners.get(action);
+  if (!set || set.size === 0) return false;
+  // Copied: a handler may unmount another subscriber mid-iteration.
+  for (const listener of [...set]) listener();
+  return true;
+}
+
+/** Test-only: drop every subscription. */
+export function resetShortcutListeners(): void {
+  listeners.clear();
+  notifyRegistry();
 }

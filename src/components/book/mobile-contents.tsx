@@ -3,6 +3,7 @@
 import { ArrowUp01Icon, Menu01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type ReactNode } from "react";
+import { useHideOnScroll } from "@/hooks/use-hide-on-scroll";
 import {
   Sheet,
   SheetContent,
@@ -43,10 +44,18 @@ export function MobileContents({
   slot,
 }: MobileContentsProps) {
   const [open, setOpen] = useState(false);
+  // Scrolling down is reading; a control parked over the paragraph you are
+  // reading is the one thing a floating control must never be. Mirrors the
+  // site header exactly, and never hides while the sheet is open.
+  const hidden = useHideOnScroll(!open);
 
   return (
     <>
-      <div className="book-pill" data-print="hide">
+      <div
+        className="book-pill"
+        data-print="hide"
+        data-hidden={hidden ? "true" : undefined}
+      >
         <div className="book-pill__inner translucent-surface">
           <button
             type="button"

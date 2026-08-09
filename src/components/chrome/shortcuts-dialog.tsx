@@ -31,6 +31,7 @@ import {
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { useShortcutAvailable } from "@/hooks/use-shortcut";
 import {
   bindingsFor,
   conflictFor,
@@ -41,6 +42,7 @@ import {
   SHORTCUTS,
   type ShortcutAction,
   type ShortcutGroup,
+  type ShortcutSettings,
 } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 
@@ -176,13 +178,67 @@ export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
                   {SHORTCUT_GROUP_LABELS[group]}
                 </h3>
                 <Separator className="mb-1" />
-                {rows.map((def) => {
-                  const keys = bindingsFor(def.action, settings);
-                  const overridden = Boolean(settings.bindings[def.action]);
-                  const isRecording = recording === def.action;
-                  return (
+                {rows.map((def) => (
+                  <ShortcutRow
+                    key={def.action}
+                    def={def}
+                    settings={settings}
+                    platform={platform}
+                    recording={recording === def.action}
+                    onRecord={(next) => {
+                      setConflict(null);
+                      setRecording(next ? def.action : null);
+                    }}
+                    onClear={() => clearOverride(def.action)}
+                  />
+                ))}
+              </section>
+            );
+          })}
+        </div>
+
+        <p className="text-muted-foreground text-[0.6875rem] leading-snug">
+          <Kbd>J</Kbd> and <Kbd>K</Kbd> are left free on purpose: readers expect
+          them as next and previous <em>item</em>, and <Kbd>K</Kbd> is NVDA&rsquo;s
+          link key in browse mode.
+        </p>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface ShortcutRowProps {
+  def: (typeof SHORTCUTS)[number];
+  settings: ShortcutSettings;
+  platform: "mac" | "other";
+  recording: boolean;
+  onRecord: (next: boolean) => void;
+  onClear: () => void;
+}
+
+/**
+ * One row of the keymap.
+ *
+ * `available` is the honest bit. Eleven of the sixteen actions had no
+ * subscriber anywhere in the app, and this dialog printed a key cap for every
+ * one of them — a reader was told `]` was "Next chapter", pressed it, and
+ * nothing moved. Now a row whose action nothing on this page handles says so,
+ * and the dispatcher leaves that key to the browser.
+ */
+function ShortcutRow({
+  def,
+  settings,
+  platform,
+  recording: isRecording,
+  onRecord,
+  onClear,
+}: ShortcutRowProps) {
+  const available = useShortcutAvailable(def.action);
+  const keys = bindingsFor(def.action, settings);
+  const overridden = Boolean(settings.bindings[def.action]);
+
+  return (
                     <div
-                      key={def.action}
                       className={cn(
                         "flex items-center justify-between gap-3 rounded-xl px-2 py-1.5",
                         isRecording && "bg-muted",
@@ -192,11 +248,12 @@ export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
                         <span className="text-foreground truncate text-sm">
                           {def.label}
                         </span>
-                        {def.note ? (
-                          <span className="text-muted-foreground truncate text-[0.6875rem]">
-                            {def.note}
-                          </span>
-                        ) : null}
+                        {/* Never dimmed with `opacity`: compositing this note
+                            at 60% dropped `--muted-foreground` under 4.5:1
+                            (axe, serious). Unavailability is said in words. */}
+                        <span className="text-muted-foreground truncate text-[0.6875rem]">
+                          {available ? def.note : "Not available on this page"}
+                        </span>
                       </span>
 
                       <span className="flex shrink-0 items-center gap-1.5">
@@ -223,10 +280,7 @@ export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
                               ? `Cancel recording for ${def.label}`
                               : `Change the key for ${def.label}`
                           }
-                          onClick={() => {
-                            setConflict(null);
-                            setRecording(isRecording ? null : def.action);
-                          }}
+                          onClick={() => onRecord(!isRecording)}
                         >
                           <HugeiconsIcon icon={RecordIcon} aria-hidden />
                         </Button>
@@ -237,26 +291,12 @@ export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
                             variant="ghost"
                             size="icon-xs"
                             aria-label={`Reset ${def.label} to its default key`}
-                            onClick={() => clearOverride(def.action)}
+                            onClick={onClear}
                           >
                             <HugeiconsIcon icon={Delete02Icon} aria-hidden />
                           </Button>
                         ) : null}
                       </span>
                     </div>
-                  );
-                })}
-              </section>
-            );
-          })}
-        </div>
-
-        <p className="text-muted-foreground text-[0.6875rem] leading-snug">
-          <Kbd>J</Kbd> and <Kbd>K</Kbd> are left free on purpose: readers expect
-          them as next and previous <em>item</em>, and <Kbd>K</Kbd> is NVDA&rsquo;s
-          link key in browse mode.
-        </p>
-      </DialogContent>
-    </Dialog>
   );
 }

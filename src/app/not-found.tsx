@@ -13,12 +13,11 @@
  */
 
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import Link from "next/link";
 import { AttemptedPath } from "@/components/home/attempted-path";
 import { IssueAccentRules } from "@/components/home/issue-accent";
 import { Masthead } from "@/components/home/masthead";
-import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
+import { PaletteFallback } from "@/components/home/palette-slot";
 import { RepoSwapField } from "@/components/home/repo-swap-field";
 import { SiteFooter } from "@/components/home/site-footer";
 import { SEED_REPOS } from "@/lib/data/seed-repos";
@@ -42,13 +41,19 @@ export default function NotFound() {
     <>
       <IssueAccentRules />
 
-      <Masthead
-        palette={
-          <Suspense fallback={<PaletteFallback />}>
-            <PaletteSlot />
-          </Suspense>
-        }
-      />
+      {/*
+        `PaletteFallback`, not `PaletteSlot`, and this is a load-bearing choice.
+        `not-found.tsx` is the 404 boundary for *every* segment, so its subtree
+        is serialized into the RSC flight of every book and chapter page — and
+        because both the root and the book-level 404 boundary are present, it
+        went in twice. Measured on a production build: the ⌘K corpus is 230,738
+        bytes of JSON (89 books + 500 chapters), so a chapter document carried
+        461,476 bytes of it — 45 KB gzipped, 38–73% of the transferred document
+        — for a palette that never renders on that page (`'Search skills' in
+        visible_html → False`). The fallback is a plain link to /search, which
+        is what a reader on a 404 can actually use.
+      */}
+      <Masthead palette={<PaletteFallback />} />
 
       <main id="main" tabIndex={-1} className="bg-paper text-ink flex-1">
         <div className="mx-auto max-w-3xl px-5 py-16 sm:px-8 sm:py-24">

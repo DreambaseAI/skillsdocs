@@ -41,8 +41,16 @@ export const metadata: Metadata = {
 
 function SearchField({ query }: { query: string }) {
   return (
-    <form action={paths.search()} method="get" role="search" className="flex gap-2">
-      <div className="border-rule bg-paper-raised focus-within:border-issue-accent focus-within:ring-issue-accent/25 flex h-12 flex-1 items-center gap-2 rounded-2xl border px-4 transition-colors focus-within:ring-3">
+    // `flex-wrap` + a full-width field below `sm`: at a 320px viewport (1280 at
+    // 400% zoom, WCAG 1.4.10) the 80px submit button pushed the page 6px
+    // sideways. Wrapping costs one row of height and buys back the reflow.
+    <form
+      action={paths.search()}
+      method="get"
+      role="search"
+      className="flex flex-wrap gap-2"
+    >
+      <div className="border-rule bg-paper-raised focus-within:border-issue-accent focus-within:ring-issue-accent/25 flex h-12 min-w-0 flex-1 basis-full items-center gap-2 rounded-2xl border px-4 transition-colors focus-within:ring-3 sm:basis-auto">
         <HugeiconsIcon icon={Search01Icon} className="text-ink-muted size-4 shrink-0" aria-hidden />
         <label htmlFor="search-q" className="sr-only">
           Search chapters and books
@@ -60,7 +68,7 @@ function SearchField({ query }: { query: string }) {
           className="text-ink placeholder:text-ink-muted/60 h-full min-w-0 flex-1 bg-transparent text-base outline-none"
         />
       </div>
-      <Button type="submit" size="lg" className="h-12 shrink-0 px-5">
+      <Button type="submit" size="lg" className="h-12 w-full shrink-0 px-5 sm:w-auto">
         Search
       </Button>
     </form>
@@ -185,11 +193,19 @@ export default function SearchPage(props: PageProps<"/search">) {
       />
 
       <main id="main" tabIndex={-1} className="bg-paper text-ink flex-1">
-        <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8 sm:py-16">
-          <h1 className="font-display text-ink-strong mb-8 text-4xl tracking-[-0.025em]">Search</h1>
-          <Suspense fallback={<ResultsSkeleton />}>
-            <Results searchParams={props.searchParams} />
-          </Suspense>
+        {/* `max-w-6xl` is the site container — the same one the masthead, the
+            homepage sections and the footer use. The results themselves stay
+            at a readable measure inside it rather than setting their own
+            gutter, which used to put the column 128px inside the header's. */}
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
+          <div className="max-w-3xl">
+            <h1 className="font-display text-ink-strong mb-8 text-4xl tracking-[-0.025em]">
+              Search
+            </h1>
+            <Suspense fallback={<ResultsSkeleton />}>
+              <Results searchParams={props.searchParams} />
+            </Suspense>
+          </div>
         </div>
       </main>
 

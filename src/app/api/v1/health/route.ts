@@ -56,10 +56,16 @@ export async function GET(): Promise<Response> {
           : "Unauthenticated: 60 requests/hour. A book costs two calls, plus one per new owner.",
       },
       budget: {
-        // Two API calls per uncached book — repo metadata and one recursive
-        // tree. Owner metadata is a third call, amortised across that owner.
-        callsPerBook: 2,
-        booksRemaining: reachable ? Math.floor(github.remaining / 2) : null,
+        // Measured, not aspirational. `getBook` makes three core calls — repo
+        // metadata, one recursive tree, and owner metadata — and the design
+        // chain adds up to four more recursive-tree calls when it chases a
+        // `design.md` pointer. Owner metadata is amortised across an owner's
+        // books, so a cold book costs 3 in the common case and up to 7 in the
+        // worst. Publishing `2` overstated capacity by 1.5–2x for an agent
+        // pacing itself against this number.
+        callsPerBook: { typical: 3, worstCase: 7 },
+        booksRemaining: reachable ? Math.floor(github.remaining / 3) : null,
+        note: "booksRemaining assumes the typical cost. Owner metadata is shared across one owner's books; a repository whose design.md chases pointers costs more.",
       },
       links: {
         openapi: absoluteUrl("/api/v1/openapi.json"),

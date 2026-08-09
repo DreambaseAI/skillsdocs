@@ -7,7 +7,16 @@ import { defineConfig, devices } from "@playwright/test";
 const root = __dirname;
 
 const PORT = Number(process.env.E2E_PORT ?? 3311);
-const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`;
+/**
+ * `localhost`, not `127.0.0.1`.
+ *
+ * Under `next dev` the cross-origin dev guard answers 403 to every
+ * `_next/static/chunks/*.js` requested from an origin it does not recognise,
+ * so a suite pointed at `127.0.0.1` loads a page that never hydrates and three
+ * overlay specs "fail" for reasons that have nothing to do with the code. Same
+ * run against `localhost`: zero failures. Cost the reviewer forty minutes.
+ */
+const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 /** `E2E_DEV=1` swaps `next start` for `next dev` while iterating on a spec. */
 const DEV = process.env.E2E_DEV === "1";

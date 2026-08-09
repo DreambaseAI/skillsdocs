@@ -9,7 +9,9 @@
  * function never fails and never returns an unthemed issue.
  */
 
+import { cacheLife, cacheTag } from "next/cache";
 import { formatHex, parseColor } from "../color";
+import { ownerTag, repoTag } from "../github";
 import { looksLikeMarkdown, parseDesignCss, parseDesignMarkdown } from "./parse";
 import { curatedFor, REGISTRY_RAW } from "./registry";
 import { deriveIssueTheme } from "./theme";
@@ -25,6 +27,18 @@ const MAX_BYTES = 512 * 1024;
  */
 const MAX_CSS_BYTES = 256 * 1024;
 
+/**
+ * The intended freshness window for a design document, in seconds. Kept as the
+ * written-down intent behind the `design` cacheLife profile.
+ *
+ * The individual `fetch()` calls below deliberately carry no
+ * `next: { revalidate }`. They used to, while running inside `getBook`'s
+ * `"use cache"` scope, which is the exact "two independent TTLs over the same
+ * bytes" bug `lib/github.ts` writes down: after `revalidateTag("repo:o/r")`
+ * re-ran the book, the fetch-level entry was still fresh, so a changed
+ * `design.md` stayed invisible until *its* TTL expired. One owner of freshness
+ * per byte — now the `getIssueTheme` cache entry below.
+ */
 export const DESIGN_REVALIDATE = 60 * 60 * 24;
 
 interface FetchedDoc {
@@ -38,7 +52,6 @@ async function tryFetchMarkdown(url: string): Promise<FetchedDoc | null> {
       headers: { Accept: "text/markdown, text/plain;q=0.9, */*;q=0.1" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "follow",
-      next: { revalidate: DESIGN_REVALIDATE },
     });
     if (!res.ok) return null;
 
@@ -65,7 +78,6 @@ async function tryFetchCss(url: string): Promise<FetchedDoc | null> {
       headers: { Accept: "text/css, */*;q=0.1" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "follow",
-      next: { revalidate: DESIGN_REVALIDATE },
     });
     if (!res.ok) return null;
     if (Number(res.headers.get("content-length") ?? 0) > MAX_CSS_BYTES) return null;
@@ -154,8 +166,7 @@ async function listRepoBlobs(owner: string, repo: string): Promise<string[]> {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         signal: AbortSignal.timeout(TIMEOUT_MS),
-        next: { revalidate: DESIGN_REVALIDATE },
-      },
+        },
     );
     if (!res.ok) return [];
     const json = (await res.json()) as {
@@ -416,11 +427,34 @@ function applyCurated(manifest: DesignManifest, owner: string): DesignManifest {
   };
 }
 
-/** Convenience: resolve and derive in one call. */
+/**
+ * Convenience: resolve and derive in one call.
+ *
+ * Its own cache scope, tagged with the owner and with every repository whose
+ * local `design.md` it consulted, so the chain is invalidated by the same
+ * webhook that invalidates the book — and so two books by the same owner cost
+ * one design resolution rather than two (the chain can make up to four
+ * `git/trees` calls, which is most of the gap between the documented "two API
+ * calls per book" and the three-to-four measured).
+ */
 export async function getIssueTheme(sources: DesignSources): Promise<{
   manifest: DesignManifest;
   theme: IssueTheme;
 }> {
+  "use cache";
+  cacheLife("design");
+  cacheTag("design", ownerTag(sources.owner), ...repoTagsOf(sources.repoLocalUrls));
+
   const manifest = await resolveDesignManifest(sources);
   return { manifest, theme: deriveIssueTheme(sources.owner, manifest) };
+}
+
+/** `raw.githubusercontent.com/<owner>/<repo>/…` → the book's revalidation tag. */
+function repoTagsOf(urls: string[] | undefined): string[] {
+  const tags = new Set<string>();
+  for (const url of urls ?? []) {
+    const m = /^https?:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\//i.exec(url);
+    if (m) tags.add(repoTag(m[1], m[2]));
+  }
+  return [...tags];
 }

@@ -19,6 +19,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
+import { probeRepoStatus } from "@/lib/upstream";
 import { getBook, issueNumberFor } from "@/lib/book";
 import { formatHex, parseColor } from "@/lib/color";
 import { SITE_NAME } from "@/lib/site";
@@ -122,7 +123,16 @@ interface Cover {
   avatar: string | null;
 }
 
-async function coverFor(owner: string, repo: string): Promise<Cover> {
+/**
+ * `null` when the repository does not exist upstream.
+ *
+ * A branded 200 for a repository that is not there is worse than a 404: the
+ * card for `/nonexistentowner999/nope` read "ISSUE 51 · nope · Agent Skills,
+ * rendered as a book · npx skills add nonexistentowner999/nope" — a
+ * plausible-looking install command for nothing. A rate-limited or transiently
+ * failing lookup still gets a card, because that repository probably is real.
+ */
+async function coverFor(owner: string, repo: string): Promise<Cover | null> {
   try {
     const book = await getBook(owner, repo);
     const [avatar] = await Promise.all([
@@ -142,7 +152,11 @@ async function coverFor(owner: string, repo: string): Promise<Cover> {
       avatar,
     };
   } catch {
-    // Unindexed, rate-limited, or plain missing. Still a card.
+    // `getBook` is a `use cache` function, and in production its rejection
+    // reaches us stripped of `kind` — so ask GitHub directly rather than guess.
+    if ((await probeRepoStatus(owner, repo)).kind === "not-found") return null;
+
+    // Unindexed or rate-limited. Still a card.
     return {
       owner,
       repo,
@@ -170,6 +184,12 @@ export default async function Image({
   const [literata, geist, geistSemibold] = await FONTS;
   const { owner, repo } = await params;
   const cover = await coverFor(owner, repo);
+  if (!cover) {
+    return new Response("No such repository.", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
   const stats = [
     cover.skillCount !== null
       ? `${cover.skillCount} ${cover.skillCount === 1 ? "skill" : "skills"}`
@@ -289,7 +309,12 @@ export default async function Image({
           <div style={{ display: "flex", color: INK, fontWeight: 600 }}>
             {stats.length ? stats.join("  ·  ") : "Agent Skills"}
           </div>
-          <div style={{ display: "flex" }}>npx skills add {clamp(`${cover.owner}/${cover.repo}`, 34)}</div>
+          {/* Nothing to install when the repository publishes no skills. */}
+          {cover.skillCount === 0 ? (
+            <div style={{ display: "flex" }}>No Agent Skills yet</div>
+          ) : (
+            <div style={{ display: "flex" }}>npx skills add {clamp(`${cover.owner}/${cover.repo}`, 34)}</div>
+          )}
         </div>
       </div>
     ),
