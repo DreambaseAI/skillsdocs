@@ -55,7 +55,13 @@ export const DEFAULT_STATE: ReaderState = {
   extras: DEFAULT_EXTRAS,
 };
 
-const STORAGE_KEY = "githubskills:reader:1";
+const STORAGE_KEY = "skillsdocs:reader:1";
+/**
+ * The key this used to be, read once so the rename does not silently reset
+ * everyone's typeface, size and measure. Cheaper than a migration and it costs
+ * one `getItem` on a cache miss; delete it a release or two after launch.
+ */
+const LEGACY_STORAGE_KEY = "githubskills:reader:1";
 
 /* ----------------------------------------------------------------- cookie */
 
@@ -105,7 +111,9 @@ export function loadState(): ReaderState {
   let prefs = DEFAULT_PREFS;
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as {
         prefs?: string;

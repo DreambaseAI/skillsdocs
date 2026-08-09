@@ -1,4 +1,4 @@
-# GitHub Skills Book — Architecture Brief
+# Skills Docs — Architecture Brief
 
 **Status:** Authoritative. This document supersedes the six research reports in `docs/research/` wherever they conflict. The research reports remain the *evidence*; this document is the *decision*.
 **Date:** 2026-08-08 · **Author:** Principal architect / PM
@@ -27,7 +27,7 @@
 
 ## 1.1 What this is
 
-**GitHub Skills Book turns any GitHub repository containing `SKILL.md` files into a branded, book-grade reading experience — for humans and for agents.**
+**Skills Docs turns any GitHub repository containing `SKILL.md` files into a branded, book-grade reading experience — for humans and for agents.**
 
 One repo = one **issue** of a magazine / one **book**. One `SKILL.md` = one **chapter**. The repo README is the **front matter**. The owner's `design.md` (or the community registry, or a deterministic hash) supplies the issue's **accent, display font, radius, and voice**. Every page is simultaneously a beautiful HTML reading surface and a clean `text/markdown` document an agent can read by appending `.md`.
 
@@ -43,11 +43,11 @@ One repo = one **issue** of a magazine / one **book**. One `SKILL.md` = one **ch
 
 | Constant | Value | Where |
 |---|---|---|
-| Production origin | `https://githubskills.dev` | `SITE_URL` in `src/lib/site.ts`, from `NEXT_PUBLIC_SITE_URL` |
-| Site name | `GitHub Skills Book` | `SITE_NAME` |
+| Production origin | `https://skillsdocs.com` | `SITE_URL` in `src/lib/site.ts`, from `NEXT_PUBLIC_SITE_URL` |
+| Site name | `Skills Docs` | `SITE_NAME` |
 | Primary install command | `npx skills add <owner>/<repo>` | `installCommand()` in `src/lib/site.ts` |
 
-**DECISION — domain.** `githubskills.dev`. The a11y research assumed `githubskills.book`; `.book` is an Amazon-controlled brand gTLD not generally registrable. Every `@id`, `metadataBase`, `llms.txt` URL, and OG image reads `SITE_URL` — **never a string literal.** One constant, one change.
+**DECISION — domain.** `skillsdocs.com`. The a11y research assumed `githubskills.book`; `.book` is an Amazon-controlled brand gTLD not generally registrable. Every `@id`, `metadataBase`, `llms.txt` URL, and OG image reads `SITE_URL` — **never a string literal.** One constant, one change.
 
 **DECISION — install command.** `npx skills add <owner>/<repo>` is the only form **verified in the wild** (observed verbatim in `supabase/agent-skills`, `coinbase/agentic-wallet-skills`, `resend/design-skills` READMEs). The per-skill form `npx skills add <owner>/<repo>/<skill>` is unverified — do **not** ship it in OG images or copy buttons. Chapter pages show the repo-level command plus a "Copy skill path" secondary action.
 
@@ -438,7 +438,7 @@ export const SEED_REPOS: SeedRepo[] = [ /* the 89 verified entries from docs/res
 ### `src/lib/site.ts` (WS-0)
 ```ts
 export const SITE_URL: string;                    // NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
-export const SITE_NAME: "GitHub Skills Book";
+export const SITE_NAME: "Skills Docs";
 export function absoluteUrl(path: string): string;
 export function installCommand(owner: string, repo: string): string;   // `npx skills add ${owner}/${repo}`
 export function bookPath(owner: string, repo: string): string;
@@ -1241,7 +1241,7 @@ Featured grid from `SEED_REPOS` merged with the live leaderboard; `weeklyInstall
 | 15 | dither-kit chart colors | **Patch `palette.ts` to accept a `Seed`; feed RGB triples from `IssueTheme`, resolved server-side.** | `DitherColor` is a closed 7-name union because charts paint to canvas, which cannot read CSS variables. |
 | 16 | Font loading for 12+ selectable families | **Variable fonts only, exactly 3 preloaded, rest `preload:false` + CSS-variable swap. No `@fontsource` for anything Google Fonts carries.** | 10+ preload tags on every page is 200–400 KB of wasted blocking fetches; fontsource forfeits fallback-metric generation. |
 | 17 | Brand fonts at request time | **Match against a build-time Google Fonts snapshot; swap only to pre-declared families; otherwise substitute and note it in the colophon. Never inject a runtime font `<link>`.** | Avoids a third-party CSP origin and an attacker-controlled string in `<head>`. |
-| 18 | Domain | **`githubskills.dev`, read from `SITE_URL`.** | `.book` is not generally registrable; one constant means one change. |
+| 18 | Domain | **`skillsdocs.com`, read from `SITE_URL`.** | `.book` is not generally registrable; one constant means one change. |
 | 19 | Install command | **`npx skills add <owner>/<repo>` only.** | The per-skill form is unverified; only the repo form is observed in the wild. |
 | 20 | `SkillResource` vs `SkillFile` | **Keep `SkillResource`; add `SkillFile` as an alias; new code uses `SkillFile`.** | The shipped name wins; the alias avoids a pointless rename. |
 | 21 | Bionic Reading | **Deferred to P4, self-implemented, named "Fixation emphasis", default off, CI grep bans the word.** | Patent + trademark + commercial-use prohibition, and weak efficacy evidence. |

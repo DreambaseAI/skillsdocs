@@ -23,7 +23,7 @@ import { ROUTES, SEL } from "../support/contract";
 import { gotoReady } from "../support/a11y";
 import { missingRouteNote, routeMissing } from "../support/routes";
 
-const STORAGE_KEY = "githubskills:reader:1";
+const STORAGE_KEY = "skillsdocs:reader:1";
 
 /** Interaction-shaped tests run once, in the reference environment. */
 function interactionOnly(projectName: string) {

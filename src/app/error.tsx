@@ -39,7 +39,7 @@ export default function GlobalErrorBoundary({
   useEffect(() => {
     // Server-side failures are already logged upstream; this catches the
     // client-side ones, which otherwise vanish.
-    console.error("[githubskills]", error);
+    console.error("[skillsdocs]", error);
   }, [error]);
 
   const rateLimited = RATE_LIMITED.test(error.message);

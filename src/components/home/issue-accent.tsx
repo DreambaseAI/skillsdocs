@@ -43,7 +43,7 @@ export interface IssueAccent {
  */
 const cache = new Map<string, IssueAccent>();
 
-function curatedManifest(owner: string): DesignManifest | null {
+export function curatedManifest(owner: string): DesignManifest | null {
   const curated = curatedFor(owner);
   const seed = curated ? parseColor(curated.color) : null;
   if (!curated || !seed) return null;

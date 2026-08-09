@@ -338,7 +338,7 @@ async function runRoute(ctx: BrowserContext, route: { id: string; path: string }
 /* ------------------------------------------------ the three 2.1.4 escapes */
 
 const SEED = (shortcuts: string) =>
-  `(() => { localStorage.setItem("githubskills:reader:1", JSON.stringify({ shortcuts: ${JSON.stringify(shortcuts)} })); return true; })()`;
+  `(() => { localStorage.setItem("skillsdocs:reader:1", JSON.stringify({ shortcuts: ${JSON.stringify(shortcuts)} })); return true; })()`;
 
 async function runEscapes(ctx: BrowserContext) {
   process.stdout.write(`\n── WCAG 2.1.4 escapes (chapter route)\n`);

@@ -40,7 +40,7 @@ export async function GET(): Promise<Response> {
   return Response.json(
     {
       status,
-      service: "githubskills-api",
+      service: "skillsdocs-api",
       version: "1.0",
       time: new Date().toISOString(),
       upstream: {

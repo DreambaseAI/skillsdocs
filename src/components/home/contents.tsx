@@ -24,6 +24,7 @@
 import { FeatureCard, IndexLeadRow, IndexTailRow, LeadStory } from "@/components/home/book-card";
 import { chartSeedsFromTheme, InstallsBarChart } from "@/components/charts";
 import { compact } from "@/components/home/format";
+import { curatedManifest } from "@/components/home/issue-accent";
 import { deriveIssueTheme } from "@/lib/design/theme";
 import type { FeaturedBook } from "@/lib/featured";
 
@@ -34,13 +35,18 @@ export interface ContentsProps {
 /**
  * House colours for the one chart on this page.
  *
- * The book pages paint charts in their issue's own accent. The directory has
- * no single issue, so it uses the house identity — `deriveIssueTheme` with no
- * manifest, which terminates in the FNV-1a hue hash and therefore returns the
- * same palette on every render and every deploy. Same contrast guarantees as
- * every other chart in the product.
+ * The book pages paint charts in their issue's own accent. The directory has no
+ * single issue, so it uses the house identity — the curated `skillsdocs` seed,
+ * run through the same `deriveIssueTheme` and therefore under the same contrast
+ * guarantees as every other chart in the product.
+ *
+ * Curated, not hashed: with no manifest this falls through to an FNV hue off
+ * the name, so the house colour would change the next time the name did.
  */
-const HOUSE_CHART_SEEDS = chartSeedsFromTheme(deriveIssueTheme("githubskills", null));
+const HOUSE = "skillsdocs";
+const HOUSE_CHART_SEEDS = chartSeedsFromTheme(
+  deriveIssueTheme(HOUSE, curatedManifest(HOUSE)),
+);
 
 /** How many books the installs chart compares. Beyond this the bars are noise. */
 const CHART_TOP_N = 12;

@@ -77,3 +77,17 @@ describe("parseRepoReference", () => {
     expect(isValidRepo("skills.md")).toBe(true);
   });
 });
+
+describe("the swap accepts our own URLs", () => {
+  // A reader who copies a Skills Docs URL and pastes it back into the hero
+  // must get the book, not a search for the hostname.
+  it.each([
+    "skillsdocs.com/anthropics/skills",
+    "https://skillsdocs.com/anthropics/skills",
+    "https://www.skillsdocs.com/anthropics/skills",
+    "http://localhost:3150/anthropics/skills",
+    "https://skillsdocs.com/anthropics/skills/pdf",
+  ])("parses %s", (input) => {
+    expect(parseRepoReference(input)).toEqual({ owner: "anthropics", repo: "skills" });
+  });
+});

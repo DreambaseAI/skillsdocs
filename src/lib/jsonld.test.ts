@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { SITE_NAME } from "@/lib/site";
 import { assembleBook, type Book } from "./book";
 import type { IssueTheme } from "./design/types";
 import type { RepoMeta, TreeEntry } from "./github";
@@ -194,7 +195,7 @@ describe("chapterJsonLd", () => {
   it("has a four-level breadcrumb trail", () => {
     const crumbs = graph.find((n) => n["@type"] === "BreadcrumbList")!;
     expect((crumbs.itemListElement as Node[]).map((i) => i.name)).toEqual([
-      "GitHub Skills Book",
+      SITE_NAME,
       "acme",
       "skills",
       "beta",

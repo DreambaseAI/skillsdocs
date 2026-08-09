@@ -546,7 +546,7 @@
   /* Write out the destination of links that leave the page. Internal anchors
      and links whose text already is the URL are skipped, because printing
      "(https://…)" twice is noise. */
-  a[href^="http"]:not([href*="githubskills"])::after {
+  a[href^="http"]:not([href*="skillsdocs"])::after {
     content: " (" attr(href) ")";
     font-size: 0.85em;
     word-break: break-all;

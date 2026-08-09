@@ -6,10 +6,10 @@
  * router owns.
  */
 
-export const SITE_NAME = "GitHub Skills Book";
-export const SITE_TAGLINE = "Any skills repo, read as a book.";
+export const SITE_NAME = "Skills Docs";
+export const SITE_TAGLINE = "Read any skills repo like documentation deserves.";
 export const SITE_DESCRIPTION =
-  "Turn any GitHub repository of agent skills into a beautifully typeset, branded reading experience. Swap “github.com” for this site and read the docs the way they deserve.";
+  "Turn any GitHub repository of agent skills into beautifully typeset, branded documentation. Change “github” to “skillsdocs” in any repo URL and read it properly.";
 
 export const AUTHOR = { name: "Kyle Ledbetter", url: "https://github.com/kyleledbetter" };
 export const PUBLISHER = { name: "Dreambase", url: "https://dreambase.com" };
@@ -28,7 +28,7 @@ export const AGENT_SKILLS_SPEC = "https://agentskills.io/specification";
  * overridable by env so a deployment can point at its own.
  */
 export const SOURCE_URL =
-  process.env.NEXT_PUBLIC_SOURCE_URL ?? `${AUTHOR.url}/githubskills`;
+  process.env.NEXT_PUBLIC_SOURCE_URL ?? `${AUTHOR.url}/skillsdocs`;
 
 export const TAKEDOWN_URL =
   process.env.NEXT_PUBLIC_TAKEDOWN_URL ??
@@ -39,6 +39,15 @@ export const TAKEDOWN_URL =
 // is not. That gap is exactly how a preview shipped
 // `<link rel="canonical" href="http://localhost:3000"/>`. A preview
 // canonicalising to itself is imperfect; canonicalising to a laptop is not.
+/**
+ * The production origin.
+ *
+ * Now that the domain exists it is the default rather than a thing every
+ * deploy must remember to configure. Env still wins, so previews and forks
+ * override it; what changed is that forgetting no longer publishes a laptop.
+ */
+export const PRODUCTION_ORIGIN = "https://skillsdocs.com";
+
 const CONFIGURED_SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
@@ -60,7 +69,7 @@ const CONFIGURED_SITE_URL =
  * artefacts would make the gate unrunnable. Wire the throw up in CI, where the
  * deploy target is known.
  */
-const WARNED = Symbol.for("githubskills.site-url-warned");
+const WARNED = Symbol.for("skillsdocs.site-url-warned");
 type WarnedGlobal = typeof globalThis & { [WARNED]?: boolean };
 
 if (
@@ -77,18 +86,24 @@ if (
 ) {
   (globalThis as WarnedGlobal)[WARNED] = true;
   console.warn(
-    "[site] NEXT_PUBLIC_SITE_URL is not set. This build will publish " +
-      "http://localhost:3000 as its canonical origin, in sitemap.xml, in " +
-      "llms.txt and in every absolute URL. Set NEXT_PUBLIC_SITE_URL (or " +
-      "VERCEL_PROJECT_PRODUCTION_URL) before building for deployment.",
+    `[site] NEXT_PUBLIC_SITE_URL is not set; falling back to ${PRODUCTION_ORIGIN} ` +
+      "as the canonical origin, in sitemap.xml, in llms.txt and in every " +
+      "absolute URL. Correct for production, wrong for a preview — set " +
+      "NEXT_PUBLIC_SITE_URL (or VERCEL_PROJECT_PRODUCTION_URL) there.",
   );
 }
 
-/** Canonical origin, no trailing slash. */
-export const SITE_URL = (CONFIGURED_SITE_URL ?? "http://localhost:3000").replace(
-  /\/+$/,
-  "",
-);
+/**
+ * Canonical origin, no trailing slash.
+ *
+ * Development stays on localhost so relative testing works; anything built for
+ * production without an explicit origin gets the real domain, which is the
+ * only value that could ever be correct there.
+ */
+export const SITE_URL = (
+  CONFIGURED_SITE_URL ??
+  (process.env.NODE_ENV === "production" ? PRODUCTION_ORIGIN : "http://localhost:3000")
+).replace(/\/+$/, "");
 
 export function absoluteUrl(path: string): string {
   return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
@@ -204,6 +219,10 @@ export function parseRepoReference(
     .replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//i, "")
     .replace(/^(?:https?:\/\/)?raw\.githubusercontent\.com\//i, "")
     .replace(/^(?:https?:\/\/)?(?:www\.)?skills\.sh\//i, "")
+    // Our own URLs, so a reader who copies one out of the address bar and
+    // pastes it back in gets the book rather than a search for the hostname.
+    .replace(/^(?:https?:\/\/)?(?:www\.)?skillsdocs\.com\//i, "")
+    .replace(/^(?:https?:\/\/)?localhost:\d+\//i, "")
     .replace(/^git@github\.com:/i, "")
     .replace(/^\/+/, "");
 

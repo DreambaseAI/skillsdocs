@@ -137,7 +137,7 @@ export function lineDecorations(options: LineDecorationOptions): ShikiTransforme
   const { showLineNumbers, lineAnchors, anchorPrefix } = options;
 
   return {
-    name: "githubskills:line-decorations",
+    name: "skillsdocs:line-decorations",
     line(node, line) {
       if (lineAnchors) node.properties.id = `${anchorPrefix}${line}`;
       node.properties["data-line"] = String(line);

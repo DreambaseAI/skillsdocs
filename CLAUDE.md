@@ -1,4 +1,4 @@
-# GitHub Skills Book
+# Skills Docs
 
 Turns any GitHub repo of agent skills into a typeset, branded reading experience.
 `/anthropics/skills` renders `github.com/anthropics/skills` as a book.

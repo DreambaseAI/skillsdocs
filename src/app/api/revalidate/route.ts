@@ -1,7 +1,7 @@
 /**
  * On-demand cache invalidation.
  *
- *   curl -X POST https://githubskills.dev/api/revalidate \
+ *   curl -X POST https://skillsdocs.com/api/revalidate \
  *     -H "Authorization: Bearer $REVALIDATE_SECRET" \
  *     -H "Content-Type: application/json" \
  *     -d '{"repo":"anthropics/skills"}'

@@ -72,7 +72,7 @@ const BOOK_MANIFEST =
 
 const SITE_WELL_KNOWN: Record<string, string> = {
   "/.well-known/agent-skills/index.json": "/api/well-known/agent-skills",
-  "/.well-known/agent-skills/githubskills-book/skill.md":
+  "/.well-known/agent-skills/skills-docs/skill.md":
     "/api/well-known/agent-skills/skill",
   "/.well-known/api-catalog": "/api/well-known/api-catalog",
 };

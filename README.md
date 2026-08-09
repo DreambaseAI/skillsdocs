@@ -1,9 +1,9 @@
-# GitHub Skills Book
+# Skills Docs
 
 **Change `github.com` to this site, and read the repo as a book.**
 
 ```
-github.com/anthropics/skills   →   githubskills.dev/anthropics/skills
+github.com/anthropics/skills   →   skillsdocs.com/anthropics/skills
 ```
 
 Agent skills ship as folders of `SKILL.md` files. They are written to be read —

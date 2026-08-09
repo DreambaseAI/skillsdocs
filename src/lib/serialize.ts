@@ -1028,7 +1028,7 @@ export function bookToAgentSkills(
  * Held here as a string constant rather than a file on disk so that the bytes
  * hashed for the manifest digest are provably the bytes served by the route.
  */
-export const SITE_SKILL_NAME = "githubskills-book";
+export const SITE_SKILL_NAME = "skills-docs";
 
 export const SITE_SKILL_MD = `---
 name: ${SITE_SKILL_NAME}

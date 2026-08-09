@@ -1,11 +1,11 @@
 /**
- * `GET /.well-known/agent-skills/githubskills-book/skill.md`
+ * `GET /.well-known/agent-skills/skills-docs/skill.md`
  *
  * The body of the one skill this site publishes. Served from the same
  * `SITE_SKILL_MD` constant the manifest hashes, so the advertised digest always
  * matches the bytes — verify with:
  *
- *   curl -s localhost:3000/.well-known/agent-skills/githubskills-book/skill.md |
+ *   curl -s localhost:3000/.well-known/agent-skills/skills-docs/skill.md |
  *     shasum -a 256
  */
 

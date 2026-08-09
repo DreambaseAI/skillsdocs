@@ -25,6 +25,17 @@ export interface CuratedSeed {
 }
 
 export const CURATED: Record<string, CuratedSeed> = {
+  /*
+   * This site's own identity.
+   *
+   * Curated rather than hashed on purpose. Every other owner without a
+   * design.md gets an FNV hue off their name, which is fine for them and wrong
+   * for us: renaming from "githubskills" to "skillsdocs" swung the house
+   * colour from amber (hue 53) to red (hue 4), and a product should not
+   * discover its own brand by changing its variable names. Amber keeps the
+   * warmth of the stone paper and the Literata setting.
+   */
+  skillsdocs: { color: "#B45309", ink: "#1C1917", site: "https://skillsdocs.com" },
   anthropics: {
     color: "#cc785c",
     ink: "#191919",

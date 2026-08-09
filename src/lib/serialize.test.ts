@@ -8,6 +8,7 @@
 
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { SITE_NAME } from "@/lib/site";
 import { assembleBook, type Book } from "./book";
 import type { IssueTheme } from "./design/types";
 import type { RepoMeta, TreeEntry } from "./github";
@@ -353,7 +354,7 @@ describe("siteLlmsTxt", () => {
 
   it("follows the llmstxt.org element order", () => {
     const lines = txt.split("\n");
-    expect(lines[0]).toBe("# GitHub Skills Book");
+    expect(lines[0]).toBe(`# ${SITE_NAME}`);
     expect(lines[2].startsWith("> ")).toBe(true);
 
     const headings = lines.filter((l) => l.startsWith("## "));
@@ -379,7 +380,7 @@ describe("SITE_SKILL_MD", () => {
     const frontmatter = SITE_SKILL_MD.slice(4, end);
     const name = /^name: (.+)$/m.exec(frontmatter)?.[1];
     const description = /^description: (.+)$/m.exec(frontmatter)?.[1];
-    expect(name).toBe("githubskills-book");
+    expect(name).toBe("skills-docs");
     // Spec: name is [a-z0-9-], <= 64 chars; description <= 1024.
     expect(name).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     expect(name!.length).toBeLessThanOrEqual(64);
