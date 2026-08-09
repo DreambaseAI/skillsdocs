@@ -4,4 +4,351 @@
  * dither-kit chart chrome, legends, HCM fallbacks.
  *
  * Imported by globals.css. Do not edit globals.css to add rules here.
+ *
+ * Two things in here carry real weight and should not be trimmed as cosmetics:
+ *
+ *   • The `forced-colors` swap. `theme-modes.css` already opts `[data-chart]`
+ *     out with `forced-color-adjust: none` and re-encodes SVG in `CanvasText`
+ *     — but SVG fill/stroke are *not* forced, so a multi-series chart left to
+ *     its own devices collapses into either invisible or identical shapes, and
+ *     the canvas cannot be recoloured at any price. The rules below hide the
+ *     live drawing and reveal the hatched monochrome rendition from
+ *     `charts/hcm-fallback.tsx` in its place.
+ *
+ *   • `.chart-frame`'s fixed height. Every dither chart measures its container
+ *     before it paints a single pixel. An auto-height frame measures zero,
+ *     paints nothing, and then jumps when content arrives — CLS by
+ *     construction. The height is always an inline style from the component.
  */
+
+/* ════════════════════════════════════════════════════════════ Figure */
+
+.chart-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.chart-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  order: -1;
+}
+
+.chart-title {
+  color: var(--ink-strong);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+}
+
+.chart-desc {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* The headline number a sparkline sits under. Tabular so a column of them in
+   a directory grid lines up on the decimal. */
+.chart-figure-number {
+  align-items: baseline;
+  color: var(--ink-strong);
+  display: flex;
+  font-family: var(--font-display, inherit);
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+  gap: 0.375rem;
+  line-height: 1.1;
+  margin-top: 0.25rem;
+}
+
+.chart-figure-unit {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ════════════════════════════════════════════════════════════ Frame */
+
+.chart-frame {
+  contain: layout paint;
+  position: relative;
+  width: 100%;
+}
+
+.chart-live,
+.chart-hcm {
+  inset: 0;
+  position: absolute;
+}
+
+/* Hidden until forced colours are active; see the block at the foot of this
+   file. `display` rather than `visibility` so its SVG patterns cost nothing. */
+.chart-hcm {
+  display: none;
+}
+
+.chart-hcm-svg {
+  height: 100%;
+  width: 100%;
+}
+
+/* The donut's centre label. Pointer-transparent so it never eats a hover on
+   the ring beneath it, and aria-hidden in the markup — the same total is in
+   the caption and the table. */
+.chart-donut-center {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  justify-content: center;
+  pointer-events: none;
+  position: absolute;
+}
+
+.chart-donut-total {
+  color: var(--ink-strong);
+  font-family: var(--font-display, inherit);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.chart-donut-unit {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ════════════════════════════════════════════════════════════ Key */
+
+.chart-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.875rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chart-key-item {
+  align-items: center;
+  color: var(--ink-muted);
+  display: flex;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  gap: 0.375rem;
+  line-height: 1.4;
+}
+
+/* Painted from `var(--issue-chart-N)` inline — the DOM, unlike the canvas,
+   can resolve a custom property, so the key follows a theme swap for free. */
+.chart-key-swatch {
+  border-radius: 1px;
+  flex: none;
+  height: 0.5rem;
+  width: 0.5rem;
+}
+
+.chart-key-value {
+  color: var(--ink-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ════════════════════════════════════════════════════════════ Actions */
+
+.chart-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* ════════════════════════════════════════════════════════════ Data table
+ *
+ * This table is the chart's primary representation, not a courtesy. It is in
+ * the accessibility tree at all times (`sr-only` when collapsed) and the
+ * toggle only decides whether it is also on screen.
+ */
+
+.chart-table-wrap {
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--radius) * 0.6);
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.chart-table {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  width: 100%;
+}
+
+.chart-table caption {
+  caption-side: top;
+  color: var(--ink-muted);
+  font-size: 0.6875rem;
+  padding: 0.5rem 0.625rem;
+  text-align: start;
+  text-wrap: pretty;
+}
+
+.chart-table :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.375rem 0.625rem;
+  text-align: start;
+}
+
+.chart-table thead th {
+  background: var(--paper-raised);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  position: sticky;
+  text-transform: uppercase;
+  top: 0;
+}
+
+.chart-table tbody th {
+  color: var(--ink-strong);
+  font-weight: 500;
+}
+
+.chart-table td {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+/* ═════════════════════════════════════════════ Forced colors (Windows HCM)
+ *
+ * `theme-modes.css` owns the `[data-chart]` reset (forced-color-adjust: none,
+ * Canvas ground, CanvasText strokes and text). This adds the one thing that
+ * reset cannot do on its own: swap the drawing.
+ *
+ * The canvas is unreachable — its pixels are baked, `forced-color-adjust` has
+ * no effect on them, and there is no filter that turns five hues into five
+ * distinguishable system-palette values. So the live chart goes away and the
+ * hatched rendition takes its exact place in the same fixed-height frame.
+ */
+
+@media (forced-colors: active) {
+  .chart-live {
+    display: none;
+  }
+
+  .chart-hcm {
+    display: block;
+  }
+
+  /* A flat swatch is the one legend element that *is* pure colour, so it dies
+     under forced colours. Rebuild each one as the hatch its series uses in the
+     fallback drawing — same six patterns, same order, drawn in CanvasText. */
+  .chart-key-swatch {
+    background: Canvas !important;
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+    height: 0.625rem;
+    width: 0.625rem;
+  }
+
+  .chart-key-swatch[data-series="0"] {
+    background: repeating-linear-gradient(
+      45deg,
+      Canvas 0 1px,
+      CanvasText 1px 2px
+    ) !important;
+  }
+
+  .chart-key-swatch[data-series="1"] {
+    background: repeating-linear-gradient(
+      90deg,
+      Canvas 0 1px,
+      CanvasText 1px 2px
+    ) !important;
+  }
+
+  .chart-key-swatch[data-series="2"] {
+    background: repeating-linear-gradient(
+      0deg,
+      Canvas 0 1px,
+      CanvasText 1px 2px
+    ) !important;
+  }
+
+  .chart-key-swatch[data-series="3"] {
+    background: repeating-linear-gradient(
+      135deg,
+      Canvas 0 1px,
+      CanvasText 1px 2px
+    ) !important;
+  }
+
+  .chart-key-swatch[data-series="4"] {
+    background:
+      repeating-linear-gradient(45deg, Canvas 0 1px, CanvasText 1px 2px),
+      repeating-linear-gradient(
+        135deg,
+        Canvas 0 1px,
+        CanvasText 1px 2px
+      ) !important;
+  }
+
+  .chart-key-swatch[data-series="5"] {
+    background: CanvasText !important;
+  }
+
+  .chart-table :is(th, td) {
+    border-bottom-color: CanvasText;
+  }
+
+  .chart-table-wrap {
+    border-color: CanvasText;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════ Print
+ *
+ * `theme-modes.css` greyscales `[data-chart]` and forbids it breaking across
+ * pages. A printed page has no "show data" button to press, so the table is
+ * unhidden — a chart in a printout with no numbers beside it is a decoration.
+ */
+
+@media print {
+  .chart-actions {
+    display: none;
+  }
+
+  .chart-figure .sr-only {
+    clip: auto;
+    clip-path: none;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    position: static;
+    white-space: normal;
+    width: auto;
+  }
+
+  /* `--rule` is redefined for paper in the print block of theme-modes.css, so
+     this stays a token rather than the hairline grey literal it resolves to. */
+  .chart-table-wrap,
+  .chart-figure .sr-only {
+    border: 1px solid var(--rule);
+    max-height: none;
+    overflow: visible;
+  }
+}

@@ -86,6 +86,30 @@
     box-shadow: none;
   }
 
+  /*
+   * No fade-in either.
+   *
+   * The rules above make the *resting* surface opaque, but the entry
+   * animation still walks it up from `opacity: 0` — measured at 0.575 a
+   * frame after the reading-controls popover opened. In forced colours a
+   * half-transparent panel is not a soft entrance, it is CanvasText over
+   * whatever the panel is covering. There is nothing to animate here.
+   */
+  .translucent-surface,
+  [data-slot="popover-content"],
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="drawer-popup"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="select-content"],
+  [data-slot="hover-card-content"],
+  [data-slot="tooltip-content"] {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1;
+  }
+
   /* base-luma paints the blur on a ::before pseudo-element, which survives the
      rule above and would otherwise sit as a transparent sheet over the popup. */
   .translucent-surface::before,

@@ -1,0 +1,1001 @@
+/**
+ * book.css — owner: WS-4
+ *
+ * The editorial furniture: cover, masthead, contents, chapter openers, rails,
+ * folios, colophon. Imported by `[owner]/[repo]/layout.tsx`, so it only ships
+ * on book routes.
+ *
+ * Everything here sits in `@layer components` and is prefixed `book-`, which
+ * nothing else in the app declares. The `.reader` typographic base is
+ * `reader.css`'s (WS-5); this file no longer carries a fallback copy of it.
+ *
+ * Every length is either a token or a multiple of the reader's own font size.
+ * The reader can change the base size at any moment and the furniture has to
+ * move with the text, or the page comes apart at 32px.
+ */
+
+@layer components {
+  /* ═══════════════════════════════════════════════════ the issue surface */
+
+  /*
+   * The whole book route is a reading surface, not a chrome page with a
+   * reading pane inside it. `--paper` here is what makes an issue feel like
+   * stock rather than a browser window.
+   */
+  .book-issue {
+    background: var(--paper);
+    color: var(--ink);
+    /* 100dvh, never 100vh: the iOS URL bar makes vh taller than the visible
+       viewport, which puts the last line of every page under the chrome. */
+    min-block-size: 100dvh;
+    display: flex;
+    flex-direction: column;
+    /* Isolates the paper texture and any accent glow from the app chrome. */
+    isolation: isolate;
+  }
+
+  /* ═══════════════════════════════════════════════════════ the page frame */
+
+  /*
+   * Candidate C: three tracks, only the middle one is a reading column.
+   * The rails absorb the leftover width so a 1920px window never stretches
+   * the measure, and they carry the furniture a printed book puts in its
+   * margins.
+   *
+   * And the grid cannot squeeze the text out.
+   *
+   * The rails are `rem`, and so are the media queries that gate them — but a
+   * media query's `rem` is always the *initial* 16px and ignores
+   * `html { font-size }`. Under Firefox's "zoom text only" at 200% the rails
+   * inflate to 560px + 520px while the 80rem query still reads a 1280px
+   * viewport as qualifying. Measured before this fix: `.book-column`
+   * resolved to **0px** and every `overflow: hidden` panel inside it —
+   * `.book-install`, `.book-chapternav` — clipped to nothing.
+   *
+   * `minmax(0, …)` lets a rail give ground, and `--book-col-min` gives the
+   * centre a floor in `ch`, the one unit that means the same thing to a
+   * reading column at any font size. At every ordinary size the tracks
+   * resolve exactly as they did before.
+   */
+  .book-frame {
+    --book-gutter: max(1.25rem, 5vw);
+    --book-col-min: min(34ch, 100%);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 2.5rem;
+    inline-size: 100%;
+    margin-inline: auto;
+    max-inline-size: 96rem;
+    padding-inline: var(--book-gutter);
+    flex: 1;
+  }
+
+  /* 1024px: the right rail earns its keep first — it is the one that changes
+     as you scroll, and it is the cheaper of the two in width. */
+  @media (min-width: 64rem) {
+    .book-frame {
+      --book-gutter: 2.5rem;
+      grid-template-columns: minmax(var(--book-col-min), 1fr) minmax(0, var(--rail-w-right));
+    }
+  }
+
+  /* 1280px: the contents rail joins. Below this it is a Sheet. */
+  @media (min-width: 80rem) {
+    .book-frame {
+      --book-gutter: 3rem;
+      grid-template-columns:
+        minmax(0, var(--rail-w))
+        minmax(var(--book-col-min), 1fr)
+        minmax(0, var(--rail-w-right));
+      column-gap: 3.5rem;
+    }
+  }
+
+  /* A state page has no rails, so it must not reserve their tracks — a 260px
+     hole on the right reads as a layout that failed to load. */
+  .book-frame--solo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The reading column. `--reader-bleed` is the outer bound because code and
+     tables are allowed 118% of the measure; prose itself stays at the measure
+     via prose.css. */
+  .book-column {
+    min-inline-size: 0;
+    inline-size: 100%;
+    max-inline-size: var(--reader-bleed);
+    margin-inline: auto;
+    padding-block-end: 6rem;
+  }
+
+  /* Furniture aligns to the text measure, not to the bleed, or the eyebrow
+     starts left of the paragraph it introduces. */
+  .book-measure {
+    max-inline-size: var(--reader-measure);
+    margin-inline: auto;
+  }
+
+  /*
+   * WCAG 1.4.10 Reflow for the editorial furniture.
+   *
+   * The equivalent rule for rendered markdown now lives in `prose.css`, where
+   * it belongs. This one stays because the chapter opener's display title and
+   * standfirst are *not* inside `.prose` — they come from a skill's front
+   * matter, which is just as capable of holding a 60-character identifier.
+   */
+  .book-column :is(h1, h2, h3, h4, h5, h6),
+  .book-column :is(p, li, dd, dt, figcaption, blockquote, th, td) {
+    overflow-wrap: break-word;
+  }
+
+  /*
+   * The running head shares the sticky stack with the site header.
+   *
+   * Below `lg` the header translates away on scroll-down, so a running head
+   * pinned under it would hang in mid-air with scrolled text visible above.
+   * Pinning it to 0 instead puts it *behind* the header (z-30 against z-50)
+   * while the header is up, and reveals it in the header's place as the header
+   * slides out — which is what a printed running head is for.
+   */
+  .book-runninghead {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 30;
+  }
+
+  @media (min-width: 64rem) {
+    .book-runninghead {
+      inset-block-start: var(--header-h);
+    }
+  }
+
+  /* A chapter carries a running head under the chrome, so an anchor jump has
+     two sticky bars to clear, not one. `:target` in globals.css only knows
+     about the header. */
+  .book-column[data-running-head] :is(h1, h2, h3, h4, h5, h6)[id],
+  .book-column[data-running-head] :target {
+    scroll-margin-block-start: calc(var(--header-h) + 4.25rem);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ rails */
+
+  .book-rail {
+    display: none;
+  }
+
+  @media (min-width: 64rem) {
+    .book-rail {
+      display: block;
+      position: sticky;
+      inset-block-start: var(--header-h);
+      max-block-size: calc(100dvh - var(--header-h) - 2rem);
+      overflow-y: auto;
+      /* Stops a rail that hits its end from scrolling the article behind it. */
+      overscroll-behavior: contain;
+      padding-block: 2.25rem 2rem;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rule) transparent;
+    }
+  }
+
+  .book-rail--left {
+    display: none;
+  }
+
+  @media (min-width: 80rem) {
+    .book-rail--left {
+      display: block;
+      grid-column: 1;
+    }
+  }
+
+  /* ═════════════════════════════════════════════════════ editorial voice */
+
+  /*
+   * Small caps. Real `smcp` where the family has it; a hand-built substitute
+   * where it does not — never the browser's synthesis, which just scales
+   * capitals and reads anaemic next to the text it labels.
+   */
+  .book-eyebrow {
+    font-family: var(--reader-font-family);
+    font-size: 0.78em;
+    line-height: 1.4;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    font-variant-caps: all-small-caps;
+    font-variant-numeric: lining-nums tabular-nums;
+    color: var(--ink-muted);
+  }
+
+  [data-font-caps=""] .book-eyebrow {
+    font-variant-caps: normal;
+    text-transform: uppercase;
+    font-size: 0.68em;
+    font-weight: 550;
+    letter-spacing: 0.14em;
+  }
+
+  .book-eyebrow--accent {
+    color: var(--issue-accent);
+  }
+
+  /* A hairline that reads as a rule rather than a border. */
+  .book-rule {
+    border: 0;
+    block-size: 1px;
+    background: var(--rule);
+    margin: 0;
+  }
+
+  .book-rule--strong {
+    block-size: 2px;
+    background: var(--ink-strong);
+  }
+
+  .book-standfirst {
+    font-family: var(--reader-font-family);
+    font-size: 1.25em;
+    line-height: 1.45;
+    letter-spacing: -0.006em;
+    font-weight: 350;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+
+  /* At 44 characters per line a 1.25em standfirst runs to ten lines before the
+     body starts. 1.15em is the measured mobile value and buys back two. */
+  @media (max-width: 30rem) {
+    .book-standfirst {
+      font-size: 1.15em;
+    }
+  }
+
+  .book-caption {
+    font-size: 0.8em;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+    color: var(--ink-muted);
+    text-wrap: pretty;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ cover */
+
+  .book-cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+    /* Not a full 100dvh: a cover that exactly fills the viewport gives the
+       reader no signal that anything is below it. Leaving the top of the
+       contents visible is the oldest trick in magazine layout. */
+    min-block-size: min(78dvh, 46rem);
+    padding-block: clamp(2.5rem, 7vh, 5.5rem) clamp(2rem, 5vh, 4rem);
+  }
+
+  .book-cover__title {
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 9vw, 6rem);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    font-weight: 400;
+    color: var(--ink-strong);
+    text-wrap: balance;
+    /* Optical alignment: a display cap sits inside its own side bearing, so
+       the visual left edge lands a hair right of the rule above it. */
+    margin-inline-start: -0.035em;
+  }
+
+  @supports (text-box: trim-both cap alphabetic) {
+    .book-cover__title {
+      text-box: trim-both cap alphabetic;
+    }
+  }
+
+  .book-cover__owner {
+    font-family: var(--font-display);
+    display: block;
+    font-size: clamp(1.1rem, 2.6vw, 1.6rem);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    font-weight: 400;
+    color: var(--ink-muted);
+  }
+
+  /*
+   * The avatar as a letterpress mark rather than a chat bubble: squared to the
+   * grid, ruled, desaturated, and multiplied into the paper so the stock shows
+   * through the ink. Most dev-org avatars are monochrome marks already; this
+   * treatment is what stops the remaining ones looking like a pasted PNG.
+   */
+  .book-mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: clamp(3.5rem, 8vw, 5rem);
+    block-size: clamp(3.5rem, 8vw, 5rem);
+    flex: none;
+    border: 1px solid var(--rule);
+    border-radius: calc(var(--radius) * 0.5);
+    background: var(--paper-raised);
+    overflow: hidden;
+  }
+
+  .book-mark::after {
+    /* An inner hairline: the debossed edge of a printing plate. */
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border: 1px solid color-mix(in oklab, var(--rule) 55%, transparent);
+    border-radius: calc(var(--radius) * 0.35);
+    pointer-events: none;
+  }
+
+  .book-mark img {
+    inline-size: 68%;
+    block-size: 68%;
+    object-fit: contain;
+    filter: grayscale(1) contrast(1.05);
+    mix-blend-mode: multiply;
+    opacity: 0.92;
+  }
+
+  .dark .book-mark img {
+    /* `multiply` on a dark ground erases the mark; screen is its dual. */
+    mix-blend-mode: screen;
+    filter: grayscale(1) contrast(0.95) brightness(1.15);
+  }
+
+  @media (forced-colors: active) {
+    .book-mark img {
+      mix-blend-mode: normal;
+      filter: none;
+    }
+  }
+
+  .book-mark__fallback {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--ink-muted);
+    font-variant-caps: all-small-caps;
+  }
+
+  /* ════════════════════════════════════════════════════════════ masthead */
+
+  /*
+   * Horizontal rules only. The tempting version of this — a 1px grid `gap`
+   * over a `--rule` background — paints the rule colour into every *empty*
+   * track, so a masthead with five cells in a four-up grid grows a grey block
+   * where the sixth would be. Per-cell bottom borders cannot do that.
+   */
+  .book-masthead {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    column-gap: 1.75rem;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .book-masthead__cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-block: 0.85rem 0.9rem;
+    border-block-end: 1px solid var(--rule);
+    min-inline-size: 0;
+  }
+
+  .book-masthead__label {
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  /*
+   * `overflow-wrap: anywhere` would break `github.com/anthropics/skills` into
+   * "github.com/anthro | pics/skills", which is worse than an overflow. The
+   * value carries explicit `<wbr>` break opportunities at its slashes instead,
+   * so it breaks where a typesetter would break it.
+   */
+  .book-masthead__value {
+    font-family: var(--reader-font-family);
+    font-size: 0.95rem;
+    line-height: 1.35;
+    color: var(--ink-strong);
+    font-variant-numeric: lining-nums tabular-nums;
+    overflow-wrap: break-word;
+    hyphens: none;
+  }
+
+  /* ════════════════════════════════════════════════════════════ contents */
+
+  .book-contents {
+    display: block;
+  }
+
+  .book-part + .book-part {
+    margin-block-start: 2.75rem;
+  }
+
+  .book-part__head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding-block-end: 0.6rem;
+    border-block-end: 2px solid var(--ink-strong);
+  }
+
+  .book-part__count {
+    margin-inline-start: auto;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .book-entry {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    column-gap: 1rem;
+    align-items: baseline;
+    padding-block: 0.95rem;
+    border-block-end: 1px solid var(--rule);
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 140ms var(--ease-out-quint);
+  }
+
+  @media (min-width: 48rem) {
+    .book-entry {
+      grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+      column-gap: 1.5rem;
+    }
+  }
+
+  .book-entry:hover {
+    background: var(--paper-raised);
+  }
+
+  .book-entry:focus-visible {
+    outline: var(--focus-ring-width) solid var(--issue-accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
+
+  .book-entry__folio {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    line-height: 1.2;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
+  .book-entry:hover .book-entry__folio {
+    color: var(--issue-accent);
+  }
+
+  .book-entry__title {
+    font-family: var(--font-display);
+    font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    font-weight: 500;
+    color: var(--ink-strong);
+    text-wrap: balance;
+  }
+
+  .book-entry__dek {
+    margin-block-start: 0.3rem;
+    font-family: var(--reader-font-family);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--ink-muted);
+    text-wrap: pretty;
+    /* Two lines is a dek; three is the article. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .book-entry__meta {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    white-space: nowrap;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  @media (max-width: 47.99rem) {
+    .book-entry__meta {
+      grid-column: 2;
+      margin-block-start: 0.45rem;
+    }
+  }
+
+  /* ═════════════════════════════════════════════════════ chapter opener */
+
+  .book-opener {
+    padding-block: clamp(2rem, 7vh, 4.5rem) 0;
+  }
+
+  .book-opener__title {
+    font-family: var(--font-display);
+    font-size: clamp(2.1rem, 5.4vw, 2.9rem);
+    line-height: 1.05;
+    letter-spacing: -0.022em;
+    font-weight: 500;
+    color: var(--ink-strong);
+    text-wrap: balance;
+    margin-inline-start: -0.02em;
+  }
+
+  @supports (text-box: trim-both cap alphabetic) {
+    .book-opener__title {
+      text-box: trim-both cap alphabetic;
+    }
+  }
+
+  /* The chapter number, set as a folio in the margin above 1280px and inline
+     below it. A number that reflows into the text column at every width is
+     just a badge; in the margin it is a folio. */
+  .book-opener__folio {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  /* ═══════════════════════════════════════════════════ editor's notes */
+
+  /*
+   * Spec violations are set as marginalia, not as an error banner. A red alert
+   * on someone else's repository is a scold; a note in the margin is an
+   * editor's mark, and it is the same information.
+   */
+  .book-note {
+    display: block;
+    margin-block: 1rem;
+    padding-inline-start: 0.9rem;
+    border-inline-start: 2px solid var(--issue-accent);
+    font-size: 0.8em;
+    line-height: 1.55;
+    letter-spacing: 0.005em;
+    color: var(--ink-muted);
+  }
+
+  .book-note__label {
+    display: block;
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    color: var(--issue-accent);
+  }
+
+  [data-font-caps=""] .book-note__label {
+    font-variant-caps: normal;
+    text-transform: uppercase;
+    font-size: 0.86em;
+  }
+
+  .book-note ul {
+    margin-block: 0.35em 0;
+    padding-inline-start: 1.1em;
+    list-style: disc;
+  }
+
+  .book-note li {
+    margin-block-end: 0.2em;
+  }
+
+  /* Above ~1440px the reading column has an empty right gutter; that is where
+     a printed book would set the note. Matches prose.css's margin notes. */
+  @container prose (min-width: 46rem) {
+    .book-note--margin {
+      float: inline-end;
+      clear: inline-end;
+      inline-size: 12.5rem;
+      margin-inline-end: -14.5rem;
+      margin-block: 0.2em 0.8em;
+      padding-inline-start: 0;
+      border-inline-start: none;
+      border-block-start: 2px solid var(--issue-accent);
+      padding-block-start: 0.4em;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════ rail contents */
+
+  .book-rail__title {
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-muted);
+    padding-block-end: 0.6rem;
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .book-rail__link {
+    display: block;
+    padding: 0.3rem 0 0.3rem 0.75rem;
+    border-inline-start: 2px solid transparent;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--ink-muted);
+    text-decoration: none;
+    text-wrap: pretty;
+    transition: color 120ms var(--ease-out-quint);
+  }
+
+  .book-rail__link:hover {
+    color: var(--ink-strong);
+  }
+
+  .book-rail__link[aria-current="true"],
+  .book-rail__link[aria-current="page"] {
+    color: var(--ink-strong);
+    border-inline-start-color: var(--issue-accent);
+    font-weight: 550;
+  }
+
+  .book-rail__link[data-depth="3"] {
+    padding-inline-start: 1.5rem;
+    font-size: 0.8rem;
+  }
+
+  .book-rail__link[data-depth="4"] {
+    padding-inline-start: 2.25rem;
+    font-size: 0.8rem;
+  }
+
+  .book-rail__link:focus-visible {
+    outline: var(--focus-ring-width) solid var(--issue-accent);
+    outline-offset: 1px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* ══════════════════════════════════════════════════════════ statistics */
+
+  .book-stats {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .book-stat {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+  }
+
+  .book-stat__value {
+    color: var(--ink-strong);
+    font-variant-numeric: lining-nums tabular-nums;
+    font-weight: 550;
+  }
+
+  /* A masthead sparkline, not a chart: no axes, no tooltip, no legend. The
+     real charts are WS-7's. */
+  .book-spark {
+    display: block;
+    inline-size: 100%;
+    block-size: 1.75rem;
+    overflow: visible;
+  }
+
+  .book-spark path {
+    fill: none;
+    stroke: var(--issue-accent);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .book-spark .book-spark__area {
+    fill: color-mix(in oklab, var(--issue-accent) 14%, transparent);
+    stroke: none;
+  }
+
+  @media (forced-colors: active) {
+    .book-spark path {
+      stroke: CanvasText;
+    }
+    .book-spark .book-spark__area {
+      fill: none;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════ install panel */
+
+  .book-install {
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    background: var(--paper-raised);
+    overflow: hidden;
+  }
+
+  .book-install__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.55rem 0.55rem 0.9rem;
+    min-inline-size: 0;
+  }
+
+  .book-install__row + .book-install__row {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  /*
+   * Wraps rather than scrolls.
+   *
+   * A horizontally scrolling `<code>` is a scroll container with no keyboard
+   * access (axe `scrollable-region-focusable`) and it clips outright at 200%
+   * text zoom, where a 44-character command has nowhere to go. Wrapping costs
+   * nothing here — there is a copy button beside every row, so nobody has to
+   * select the wrapped text by hand.
+   */
+  .book-install__code {
+    font-family: var(--reader-code-family);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--ink-strong);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .book-install__sigil {
+    color: var(--ink-muted);
+    user-select: none;
+  }
+
+  /* ══════════════════════════════════════════════════════════ colophon */
+
+  /* `.book-colophon` is the `<dl>` itself, not a wrapper around one. */
+  .book-colophon {
+    font-size: 0.9rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem 1.5rem;
+  }
+
+  @media (min-width: 34rem) {
+    .book-colophon {
+      grid-template-columns: 11rem minmax(0, 1fr);
+    }
+  }
+
+  .book-colophon dt {
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-muted);
+    padding-block-start: 0.45rem;
+  }
+
+  .book-colophon dd {
+    color: var(--ink);
+    padding-block: 0.3rem 0.7rem;
+    border-block-end: 1px solid var(--rule);
+    overflow-wrap: anywhere;
+  }
+
+  @media (min-width: 34rem) {
+    .book-colophon dt {
+      border-block-end: 1px solid var(--rule);
+      padding-block-end: 0.7rem;
+    }
+  }
+
+  .book-colophon code {
+    font-family: var(--reader-code-family);
+    font-size: 0.86em;
+    color: var(--ink-strong);
+  }
+
+  /* ═════════════════════════════════════════════════════════ chapter nav */
+
+  .book-chapternav {
+    display: grid;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  @media (min-width: 40rem) {
+    .book-chapternav {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .book-chapternav__link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1rem 1.15rem;
+    background: var(--paper);
+    text-decoration: none;
+    color: inherit;
+    min-block-size: 4.5rem;
+    justify-content: center;
+    transition: background-color 140ms var(--ease-out-quint);
+  }
+
+  .book-chapternav__link:hover {
+    background: var(--paper-raised);
+  }
+
+
+  .book-chapternav__link--next {
+    text-align: end;
+    align-items: flex-end;
+  }
+
+  .book-chapternav__title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    line-height: 1.25;
+    color: var(--ink-strong);
+    text-wrap: balance;
+  }
+
+  /* ══════════════════════════════════════════════════════ mobile controls */
+
+  /*
+   * A single pill in the thumb zone. Not a top-right button: on a 6.7" phone
+   * the top-right corner is the least reachable point on the screen, and this
+   * is the control a reader uses most.
+   *
+   * No horizontal swipe is bound anywhere in this file or its components —
+   * it collides with the iOS back gesture.
+   */
+  .book-pill {
+    position: fixed;
+    inset-block-end: calc(1.25rem + var(--safe-b));
+    inset-inline: 0;
+    z-index: 40;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  @media (min-width: 64rem) {
+    .book-pill {
+      display: none;
+    }
+  }
+
+  .book-pill__inner {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.3rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--paper) 86%, transparent);
+    box-shadow: 0 6px 24px -8px oklch(0 0 0 / 0.35);
+  }
+
+  @supports (backdrop-filter: blur(1px)) {
+    .book-pill__inner {
+      backdrop-filter: blur(20px) saturate(1.4);
+    }
+  }
+
+  /* Tap targets: 2.5.5 AAA is 44×44, and this is a one-handed control. */
+  .book-pill__button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-block-size: 2.75rem;
+    min-inline-size: 2.75rem;
+    padding-inline: 0.9rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 550;
+    color: var(--ink-strong);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .book-pill__button:hover {
+    background: var(--paper-raised);
+  }
+
+  /* ══════════════════════════════════════════════════════════ skeleton */
+
+  /*
+   * The App Shell. Every uncached repo on Earth paints this first, so it is
+   * built out of the same rules as the real page — same rhythm, same rules,
+   * same folio positions — and differs only in that the ink has not landed.
+   * It must never read as a spinner.
+   */
+  .book-ghost {
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+    border-radius: 0.25rem;
+    display: block;
+  }
+
+  .book-ghost--pulse {
+    animation: book-ghost-fade 2.4s ease-in-out infinite;
+  }
+
+  @keyframes book-ghost-fade {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root:not([data-motion="allow"]) .book-ghost--pulse {
+      animation: none;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .book-ghost {
+      background: GrayText;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ print */
+
+  @media print {
+    .book-rail,
+    .book-pill {
+      display: none !important;
+    }
+
+    .book-frame {
+      display: block;
+      max-inline-size: none;
+      padding-inline: 0;
+    }
+
+    .book-cover {
+      min-block-size: auto;
+      break-after: page;
+    }
+  }
+}
+
+/*
+ * ─────────────────────────────────────────────────────────── UNLAYERED
+ *
+ * One rule, deliberately outside `@layer components`.
+ *
+ * `.book-chapternav` is `overflow: hidden` — that is what turns its 1px grid
+ * gap into hairline rules and rounds the block's corners — and each link fills
+ * its cell edge to edge. An outward `outline-offset` is therefore clipped away
+ * on all four sides and the focused link looks unfocused. Measured under
+ * forced colours: "no visible focus ring (WCAG 2.4.7) on a.book-chapternav__link".
+ *
+ * A negative offset draws the ring inside the cell, where nothing can clip it,
+ * and `outline` is the one focus affordance forced-colours mode preserves.
+ *
+ * It has to be unlayered because `theme-modes.css` sets `:focus-visible {
+ * outline-offset: 2px }` in its own unlayered `@media (forced-colors: active)`
+ * block, and an unlayered declaration beats *any* layered one regardless of
+ * specificity. Layered here, this rule wins in normal mode and silently loses
+ * in exactly the mode it exists for.
+ */
+.book-chapternav__link:focus-visible {
+  outline-offset: calc(-1 * var(--focus-ring-width, 2px));
+}

@@ -69,7 +69,11 @@
   --secondary: oklch(0.97 0.001 106.424);
   --secondary-foreground: oklch(0.216 0.006 56.043);
   --muted: oklch(0.97 0.001 106.424);
-  --muted-foreground: oklch(0.553 0.013 58.071);
+  /* shadcn ships stone-500 here, which measures 4.47:1 on the popover ground
+     — axe `color-contrast`, serious, on every small label in the reading
+     panel. 0.52 is the nearest step that clears 4.5 with margin (≈5.0:1) and
+     is still visibly recessive. */
+  --muted-foreground: oklch(0.52 0.013 58.071);
   --accent: oklch(0.97 0.001 106.424);
   --accent-foreground: oklch(0.216 0.006 56.043);
   --destructive: oklch(0.577 0.245 27.325);

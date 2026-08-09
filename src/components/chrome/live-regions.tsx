@@ -46,10 +46,25 @@ export function LiveRegions() {
 
   return (
     <>
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      {/* The ids are the contract the accessibility suite asserts against
+          (ARCHITECTURE §7.1) — copy buttons and Sonner mount their own
+          `role="status"` nodes, so a selector needs something unambiguous. */}
+      <div
+        id="page-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
         {polite}
       </div>
-      <div role="alert" aria-live="assertive" aria-atomic="true" className="sr-only">
+      <div
+        id="alerts"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+        className="sr-only"
+      >
         {assertive}
       </div>
     </>

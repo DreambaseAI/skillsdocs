@@ -1,0 +1,14 @@
+{
+  "login": "a11y-fixture",
+  "name": "Accessibility Fixture",
+  "bio": null,
+  "description": "A fictional organisation that exists only so the accessibility suite has a book to render.",
+  "blog": null,
+  "avatar_url": "https://avatars.githubusercontent.com/u/900000001?v=4",
+  "html_url": "https://github.com/a11y-fixture",
+  "type": "Organization",
+  "location": null,
+  "twitter_username": null,
+  "public_repos": 1,
+  "followers": 0
+}

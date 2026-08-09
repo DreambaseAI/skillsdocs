@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LiveRegions } from "@/components/chrome/live-regions";
 import { SkipLinks } from "@/components/chrome/skip-links";
+import { ReaderPrefsProvider } from "@/components/providers/reader-prefs-provider";
 import { ReaderPrefsScript } from "@/components/providers/reader-prefs-script";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { FONT_VARIABLE_CLASSES } from "@/lib/fonts";
@@ -69,12 +70,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="bg-background text-foreground flex min-h-full flex-col font-sans">
         <ThemeProvider>
-          <TooltipProvider>
-            <SkipLinks />
-            {children}
-            <LiveRegions />
-            <Toaster position="bottom-right" closeButton />
-          </TooltipProvider>
+          {/* Inside ThemeProvider: applying a preset that carries a colour
+              scheme calls `setTheme`, so the prefs provider needs the theme
+              context above it. */}
+          <ReaderPrefsProvider>
+            <TooltipProvider>
+              <SkipLinks />
+              {children}
+              <LiveRegions />
+              <Toaster position="bottom-right" closeButton />
+            </TooltipProvider>
+          </ReaderPrefsProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,0 +1,127 @@
+name: Quality gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The a11y suite renders fixture repositories through a preloaded fetch
+  # interceptor, so no job here needs GitHub API credentials.
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  static:
+    name: types, lint, unit, contrast
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm tsc --noEmit
+
+      - name: Lint (strict jsx-a11y)
+        run: pnpm lint
+
+      - name: Unit tests and source guards
+        run: pnpm vitest run
+
+      - name: Contrast audit
+        run: pnpm verify:contrast
+
+  e2e:
+    name: accessibility (6 projects)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build
+        run: pnpm build
+
+      - name: Accessibility suite
+        run: pnpm exec playwright test
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: node_modules/.cache/playwright/report
+          retention-days: 14
+
+      # Violations found inside rendered third-party markdown are product data,
+      # not a build failure: they are what the per-issue accessibility report in
+      # the colophon is built from. Keep them, do not gate on them.
+      - name: Upload third-party content findings
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-content-report
+          path: node_modules/.cache/a11y-content-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  lighthouse:
+    name: lighthouse accessibility 1.0
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Start the server against the fixture repositories
+        run: |
+          NODE_OPTIONS="--require $PWD/tests/fixtures/github-mock.cjs" \
+            pnpm exec next start --port 3311 &
+          pnpm exec wait-on http://127.0.0.1:3311 --timeout 120000
+
+      - name: Lighthouse CI
+        run: pnpm exec lhci autorun
+
+      - name: Upload Lighthouse output
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: node_modules/.cache/lighthouse
+          if-no-files-found: ignore
+          retention-days: 14

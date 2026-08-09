@@ -18,6 +18,22 @@ export const COPYRIGHT_YEAR = 2026;
 export const SKILLS_SH = "https://www.skills.sh";
 export const AGENT_SKILLS_SPEC = "https://agentskills.io/specification";
 
+/**
+ * This site's own repository, and the one place a repo owner is told to go.
+ *
+ * ARCHITECTURE §9 risk 4 makes the takedown path a hard requirement: we
+ * republish third-party markdown, so there has to be an obvious, monitored
+ * address. An issue tracker beats a mailbox — it is public, it is timestamped,
+ * and it does not depend on a mail server nobody has provisioned. Both are
+ * overridable by env so a deployment can point at its own.
+ */
+export const SOURCE_URL =
+  process.env.NEXT_PUBLIC_SOURCE_URL ?? `${AUTHOR.url}/githubskills`;
+
+export const TAKEDOWN_URL =
+  process.env.NEXT_PUBLIC_TAKEDOWN_URL ??
+  `${SOURCE_URL}/issues/new?labels=takedown&title=Takedown+request`;
+
 /** Canonical origin, no trailing slash. */
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ??
@@ -56,8 +72,21 @@ export const paths = {
 export const external = {
   repo: (owner: string, repo: string) => `https://github.com/${owner}/${repo}`,
   owner: (owner: string) => `https://github.com/${owner}`,
+  /**
+   * The owner's avatar, by login.
+   *
+   * `avatars.githubusercontent.com/<login>` looks right and is wrong: that
+   * host keys on the numeric account id, so a login lands on the generic
+   * 420×420 Octocat identicon (measured: 5,065 B of placeholder for
+   * `anthropics`, against 2,740 B of the real mark). `github.com/<login>.png`
+   * is the login-keyed redirect and honours `?size=`.
+   *
+   * When the API has already given us `owner.avatarUrl` — which is the
+   * id-keyed URL and correct — prefer that; this builder is for the case
+   * where all we have is a name.
+   */
   avatar: (owner: string, size = 128) =>
-    `https://avatars.githubusercontent.com/${owner}?s=${size}`,
+    `https://github.com/${enc(owner)}.png?size=${size}`,
   file: (owner: string, repo: string, ref: string, path: string) =>
     `https://github.com/${owner}/${repo}/blob/${ref}/${path.split("/").map(enc).join("/")}`,
   raw: (owner: string, repo: string, ref: string, path: string) =>

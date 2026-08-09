@@ -23,6 +23,12 @@ import { cn } from "@/lib/utils";
  * what gives a keyboard user arrow-key control of it. It carries a role and an
  * accessible name so it is not an unlabelled stop in the tab order.
  *
+ * The role is `group`, not `region`. `region` is a landmark, and a chapter
+ * with nine code blocks then exposes nine landmarks all named "Code block,
+ * scrollable" — axe `landmark-unique`, measured at four instances on
+ * `/anthropics/skills/skill-creator`. `group` is nameable, focusable, and not
+ * a landmark, which is what this is.
+ *
  * **Copy uses the source the pipeline attached**, not the DOM text, so what
  * lands on the clipboard is byte-identical to the file even though what is on
  * screen has been split into a few thousand token spans.
@@ -87,7 +93,7 @@ export function CodeBlock({ lang, source, shikiClassName, children }: CodeBlockP
       <div
         className="code-block__scroll"
         tabIndex={0}
-        role="region"
+        role="group"
         aria-label={`${label} block, scrollable`}
       >
         <pre className={cn("code-block__pre", shikiClassName)}>{children}</pre>

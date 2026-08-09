@@ -527,6 +527,21 @@
     color: var(--ink-muted);
   }
 
+  /*
+   * WCAG 1.4.10 Reflow.
+   *
+   * Third-party prose contains tokens no typographer chose: hyphen-free
+   * identifiers, bare URLs, `claude-with-access-to-the-skill`. At a 320px
+   * viewport a single such token is wider than the column and pushes the whole
+   * document sideways — measured at 77px of horizontal page scroll on
+   * `anthropics/skills/algorithmic-art` before this rule. `break-word` only
+   * acts when a word genuinely cannot fit, so ordinary prose is untouched.
+   */
+  .prose :is(h1, h2, h3, h4, h5, h6),
+  .prose :is(p, li, dd, dt, figcaption, blockquote, th, td) {
+    overflow-wrap: break-word;
+  }
+
   /* ───────────────────────────────────────────────────────── drop cap */
 
   /*
@@ -547,13 +562,26 @@
   @supports not (initial-letter: 3) {
     .prose[data-dropcap="true"] > p:first-of-type::first-letter {
       float: inline-start;
-      /* Three lines of leading divided by the family's cap height, which is
-         what `initial-letter` computes internally. The token is per-family;
-         0.70 covers Literata, Geist and Fraunces. */
-      font-size: calc(3 * 1.6em / var(--font-cap-height, 0.7) / 2.14);
+      /*
+       * Make the *cap height* equal three line boxes, which is what
+       * `initial-letter` computes internally:
+       *
+       *     fontSize × capHeight = 3 × lineHeight
+       *     fontSize = 3 × lineHeight ÷ capHeight
+       *
+       * The earlier constant here (`3 * 1.6em / capHeight / 2.14`) sank the
+       * capital 1.4 lines, not 3 — measured in Chrome with `initial-letter`
+       * forced off, which is what every Firefox reader sees. At the defaults
+       * the corrected form is 3 × 30.374px ÷ 0.7 = 130px, giving a 91px cap
+       * against a 91px three-line stack.
+       *
+       * `--font-cap-height` is per-family and set by reader.css; 0.70 is the
+       * Literata/Geist/Fraunces fallback.
+       */
+      font-size: calc(3 * var(--reader-lh-auto) / var(--font-cap-height, 0.7));
       line-height: var(--font-cap-height, 0.7);
       padding-inline-end: 0.06em;
-      padding-block-start: 0.04em;
+      padding-block-start: 0;
     }
   }
 

@@ -1,7 +1,498 @@
 /**
  * reader.css — owner: WS-5
  *
- * Reading column, measure, size ladder, paper surface, chapter furniture.
+ * The reading column: which face, how big, how wide, how loose. Not what the
+ * markdown inside it looks like — that is `prose.css`, and this file must not
+ * reach into it. The contract between the two is four custom properties:
+ * `--reader-measure`, `--reader-bleed`, `--reader-para-gap`,
+ * `--reader-para-indent`, plus the per-family `--font-*` tokens below.
  *
  * Imported by globals.css. Do not edit globals.css to add rules here.
+ *
+ * Two rules govern everything in this file:
+ *
+ * 1. **The measure is characters, never `ch`.** `1ch` is the advance of `0`,
+ *    which is between 1.00× and 1.48× the average character depending on the
+ *    family. `max-width: 66ch` would give a reader 66 characters in Geist Mono
+ *    and 98 in Atkinson. The measure is `CPL × --font-avg-char × font-size`.
+ * 2. **Size is normalised by x-height.** x-heights here span 0.400em to
+ *    0.546em. Without `--font-size-mult` the family switcher reads as a bug:
+ *    the reader picks Garamond, the text visibly shrinks, and they conclude
+ *    the size control reset itself.
+ *
+ * Every number in the per-family block was measured from the woff2 files this
+ * app actually ships. `src/lib/reader/metrics.ts` documents the method and
+ * holds the same values; `metrics.test.ts` fails if the two ever drift.
  */
+
+/*
+ * Defaults for every input the control panel can override.
+ *
+ * These are *stylesheet* defaults, which is what makes the responsive size
+ * default below possible: the pre-paint script and the provider write inline
+ * custom properties on <html> only for values that differ from the factory
+ * settings, and an inline declaration beats any rule here. A reader who has
+ * never touched the size control therefore inherits the media query; one who
+ * has, does not.
+ */
+:root {
+  --reader-size-step: 19px;
+  --reader-measure-cpl: 68;
+  --reader-tracking: -0.003em;
+  --reader-word-spacing: 0em;
+  --reader-para-gap: 0.9em;
+  --reader-para-indent: 0em;
+  --reader-align: left;
+  --reader-lh-manual: 1.6;
+
+  /* Reference family (Literata) until [data-reader-font] says otherwise. */
+  --reader-font-family: var(--font-literata), Georgia, "Times New Roman", serif;
+  --reader-code-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+  --font-avg-char: 0.4694;
+  --font-size-mult: 1;
+  --font-x-height: 0.508;
+  --font-cap-height: 0.703;
+  --font-caps: "";
+}
+
+/* ───────────────────────────────────────────────── per-family metrics
+ *
+ * `--font-caps` is empty for every family, and that is a measurement, not an
+ * omission. The OFL sources for Literata, Source Serif 4 and EB Garamond do
+ * carry `smcp` and `onum` — but the woff2 that fonts.gstatic.com serves, and
+ * therefore the woff2 `next/font` downloads and we ship, has those features
+ * and their glyphs stripped by Google's delivery subsetter. Asking for small
+ * caps we cannot render makes the browser synthesise them out of scaled
+ * capitals, which is worse than lining figures and a plain uppercase eyebrow.
+ * See `metrics.ts` for how this was verified, and `CAPS_UPSTREAM` for what
+ * would become true if the faces were ever self-hosted.
+ */
+
+[data-reader-font="literata"] {
+  --reader-font-family: var(--font-literata), Georgia, "Times New Roman", serif;
+  --font-avg-char: 0.4694;
+  --font-size-mult: 1;
+  --font-x-height: 0.508;
+  --font-cap-height: 0.703;
+  --font-caps: "";
+}
+
+[data-reader-font="source-serif"] {
+  --reader-font-family: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  --font-avg-char: 0.4713;
+  --font-size-mult: 1.055;
+  --font-x-height: 0.475;
+  --font-cap-height: 0.67;
+  --font-caps: "";
+}
+
+[data-reader-font="newsreader"] {
+  --reader-font-family: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --font-avg-char: 0.3984;
+  --font-size-mult: 1.15;
+  --font-x-height: 0.426;
+  --font-cap-height: 0.67;
+  --font-caps: "";
+}
+
+[data-reader-font="eb-garamond"] {
+  --reader-font-family: var(--font-eb-garamond), Georgia, "Times New Roman", serif;
+  --font-avg-char: 0.3732;
+  --font-size-mult: 1.15;
+  --font-x-height: 0.4;
+  --font-cap-height: 0.65;
+  --font-caps: "";
+}
+
+[data-reader-font="crimson-pro"] {
+  --reader-font-family: var(--font-crimson-pro), Georgia, "Times New Roman", serif;
+  --font-avg-char: 0.3926;
+  --font-size-mult: 1.15;
+  --font-x-height: 0.4199;
+  --font-cap-height: 0.5732;
+  --font-caps: "";
+}
+
+[data-reader-font="lora"] {
+  --reader-font-family: var(--font-lora), Georgia, "Times New Roman", serif;
+  --font-avg-char: 0.4612;
+  --font-size-mult: 1;
+  --font-x-height: 0.5;
+  --font-cap-height: 0.7;
+  --font-caps: "";
+}
+
+[data-reader-font="fraunces"] {
+  --reader-font-family: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-avg-char: 0.4571;
+  --font-size-mult: 1.035;
+  --font-x-height: 0.482;
+  --font-cap-height: 0.7;
+  --font-caps: "";
+}
+
+[data-reader-font="instrument-serif"] {
+  --reader-font-family: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+  --font-avg-char: 0.3338;
+  --font-size-mult: 0.98;
+  --font-x-height: 0.51;
+  --font-cap-height: 0.72;
+  --font-caps: "";
+}
+
+[data-reader-font="geist"] {
+  --reader-font-family: var(--font-geist), system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-avg-char: 0.4603;
+  --font-size-mult: 0.945;
+  --font-x-height: 0.53;
+  --font-cap-height: 0.71;
+  --font-caps: "";
+}
+
+[data-reader-font="inter"] {
+  --reader-font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-avg-char: 0.4705;
+  --font-size-mult: 0.915;
+  --font-x-height: 0.5459;
+  --font-cap-height: 0.7275;
+  --font-caps: "";
+}
+
+[data-reader-font="public-sans"] {
+  --reader-font-family: var(--font-public-sans), system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-avg-char: 0.46;
+  --font-size-mult: 0.965;
+  --font-x-height: 0.517;
+  --font-cap-height: 0.723;
+  --font-caps: "";
+}
+
+[data-reader-font="geist-mono"] {
+  --reader-font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+  --font-avg-char: 0.6;
+  --font-size-mult: 0.945;
+  --font-x-height: 0.53;
+  --font-cap-height: 0.71;
+  --font-caps: "";
+}
+
+[data-reader-font="jetbrains-mono"] {
+  --reader-font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+  --font-avg-char: 0.6;
+  --font-size-mult: 0.91;
+  --font-x-height: 0.55;
+  --font-cap-height: 0.73;
+  --font-caps: "";
+}
+
+[data-reader-font="atkinson"] {
+  --reader-font-family: var(--font-atkinson), system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-avg-char: 0.4374;
+  --font-size-mult: 1.01;
+  --font-x-height: 0.496;
+  --font-cap-height: 0.668;
+  --font-caps: "";
+}
+
+[data-reader-font="atkinson-mono"] {
+  --reader-font-family: var(--font-atkinson-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+  --font-avg-char: 0.632;
+  --font-size-mult: 1.01;
+  --font-x-height: 0.496;
+  --font-cap-height: 0.668;
+  --font-caps: "";
+}
+
+/* Code face. Separate axis: the body family never dictates the code family. */
+[data-reader-code-font="geist-mono"] {
+  --reader-code-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+}
+
+[data-reader-code-font="jetbrains-mono"] {
+  --reader-code-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+}
+
+[data-reader-code-font="atkinson-mono"] {
+  --reader-code-family: var(--font-atkinson-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+}
+
+/*
+ * The mobile default, and the reason this whole section is unlayered.
+ *
+ * `tokens.css` declares the same custom properties on `:root` outside any
+ * cascade layer, and an unlayered declaration beats every layered one no
+ * matter how specific — so a `@layer base` block here would lose silently and
+ * every family would render at Literata's metrics. These blocks are therefore
+ * unlayered too, and win on source order because `globals.css` imports
+ * `tokens.css` first.
+ *
+ * 17px, not 19px. At 390px with a 5vw gutter the column is ~350px, which is 44
+ * characters at 19px Literata — under Butterick's floor and unfixable at that
+ * width. Dropping a step buys back four characters. An inline
+ * `--reader-size-step` from the pre-paint script overrides this, which is why
+ * the provider only writes that property when the reader has actually moved
+ * off the default.
+ */
+@media (max-width: 479px) {
+  :root {
+    --reader-size-step: 17px;
+  }
+}
+
+@layer components {
+  /* ────────────────────────────────────────────────── the reading column */
+
+  .reader {
+    /*
+     * The column owns a container so `prose.css` and the rails can respond to
+     * the column's width rather than the viewport's. Which rails are open
+     * changes the column width without changing the viewport at all, so a
+     * media query would be wrong roughly half the time.
+     */
+    container: reader / inline-size;
+
+    /*
+     * Derived values, resolved here and only here.
+     *
+     * `--reader-measure` multiplies by `--reader-font-size` rather than by
+     * `1em` on purpose. A custom property is substituted as raw tokens and
+     * resolved where it is *used*, so an `em` inside it would be measured
+     * against the font size of whatever element consumed it — meaning an h2
+     * that sets `max-inline-size: var(--reader-measure)` would get a column
+     * 1.563× too wide. Resolving to px here removes the trap entirely.
+     */
+    --reader-font-size: calc(var(--reader-size-step) * var(--font-size-mult));
+    --reader-lh-auto: calc(0.49rem + 1.186 * var(--reader-font-size));
+    --reader-line-height: var(--reader-lh-auto);
+    --reader-measure: calc(
+      var(--reader-measure-cpl) * var(--font-avg-char) * var(--reader-font-size)
+    );
+    /* Code, tables and figures are grids of tokens, not lines of prose. */
+    --reader-bleed: calc(var(--reader-measure) * 1.18);
+
+    font-family: var(--reader-font-family);
+    font-size: var(--reader-font-size);
+    line-height: var(--reader-line-height);
+    letter-spacing: var(--reader-tracking);
+    word-spacing: var(--reader-word-spacing);
+    text-align: var(--reader-align);
+    color: var(--ink);
+
+    font-optical-sizing: auto;
+    font-kerning: normal;
+    font-variant-ligatures: common-ligatures contextual;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* "Auto" is a state, not a value: the manual ratio only exists when chosen. */
+  [data-reader-lh="manual"] .reader {
+    --reader-line-height: var(--reader-lh-manual);
+  }
+
+  /*
+   * Justified text with ragged word spacing is worse than either alternative,
+   * so the two ship together and are not independently settable. `hyphens`
+   * silently no-ops without a `lang`, which the root layout sets.
+   */
+  [data-reader-align="justify"] .reader {
+    text-align: justify;
+    text-justify: inter-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    hyphenate-limit-chars: 8 4 4;
+  }
+
+  /* Never break a command, an identifier or a URL across a line. */
+  .reader :is(code, kbd, samp, pre, a[href^="http"]) {
+    hyphens: manual;
+    -webkit-hyphens: manual;
+  }
+
+  /* ───────────────────────────────────────────────────── measure helpers */
+
+  /*
+   * Direct children only. Anything wrapped in `.prose` is `prose.css`'s
+   * business, and constraining the wrapper here would cap its bleed at the
+   * text measure.
+   */
+  .reader > :is(pre, table, figure) {
+    max-inline-size: var(--reader-bleed);
+    margin-inline: auto;
+  }
+
+  /* For furniture the shell composes directly into the column. */
+  .reader-measure {
+    max-inline-size: var(--reader-measure);
+    margin-inline: auto;
+  }
+
+  .reader-bleed {
+    max-inline-size: var(--reader-bleed);
+    margin-inline: auto;
+  }
+
+  /* ───────────────────────────────────────────────────────────── mobile */
+
+  /* Hyphenation stops a 44-character rag from turning into a comb. The size
+     half of the mobile default is unlayered, above. */
+  @media (max-width: 479px) {
+    .reader {
+      hyphens: auto;
+      -webkit-hyphens: auto;
+      hyphenate-limit-chars: 7 3 3;
+    }
+  }
+
+  /* ─────────────────────────────────────────────────── reading progress */
+
+  .reading-progress {
+    position: fixed;
+    inset-block-start: 0;
+    inset-inline: 0;
+    block-size: 2px;
+    z-index: 60;
+    pointer-events: none;
+    background-color: color-mix(in oklch, var(--rule) 40%, transparent);
+  }
+
+  .reading-progress__bar {
+    block-size: 100%;
+    inline-size: 100%;
+    transform-origin: left center;
+    scale: var(--reading-progress, 0) 1;
+    background-color: var(--issue-accent);
+  }
+
+  /*
+   * The bar is a scroll-linked animation by any other name, so it is subject
+   * to 2.3.3. Under a reduced-motion preference it still tracks the scroll —
+   * that is information, not decoration — but it stops easing between frames,
+   * which is the part that reads as movement.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    .reading-progress__bar {
+      transition: scale 90ms linear;
+    }
+  }
+
+  [data-motion="reduce"] .reading-progress__bar {
+    transition: none;
+  }
+
+  [data-motion="allow"] .reading-progress__bar {
+    transition: scale 90ms linear;
+  }
+
+  /* ────────────────────────────────────────────────────────  focus mode */
+
+  [data-focus-mode="on"] .reader :is(p, li, blockquote, pre, figure, h1, h2, h3, h4) {
+    opacity: var(--focus-dim, 0.32);
+  }
+
+  [data-focus-mode="on"] .reader [data-focus-active] {
+    opacity: 1;
+  }
+
+  [data-focus-mode="on"] .reader [data-focus-active] :is(p, li, blockquote, pre, figure) {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-focus-mode="on"] .reader :is(p, li, blockquote, pre, figure, h1, h2, h3, h4) {
+      transition: opacity 160ms linear;
+    }
+  }
+
+  /* Both attributes live on <html>, so these are compound selectors, not
+     descendant ones. Written as `[a] [b]` they would never match. */
+  [data-motion="reduce"][data-focus-mode="on"] .reader * {
+    transition: none;
+  }
+
+  /* Dimming *is* a contrast reduction, so at high contrast the mode has to
+     stop being itself rather than fight the setting that was asked for. */
+  [data-contrast="high"][data-focus-mode="on"]
+    .reader
+    :is(p, li, blockquote, pre, figure, h1, h2, h3, h4) {
+    opacity: 1;
+  }
+
+  /* ───────────────────────────────────────────────── the controls surface */
+
+  /*
+   * Translucent so the reader keeps seeing the paragraph the sliders are
+   * changing. The panel is non-modal on desktop for the same reason — a modal
+   * settings dialog over a typography control is a design that forgot what it
+   * was for.
+   */
+  .reader-panel {
+    background-color: color-mix(in oklch, var(--popover) 84%, transparent);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .reader-panel {
+      background-color: var(--popover);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .reader-panel {
+      background-color: var(--popover);
+    }
+  }
+
+  /* Translucency and forced colours are incompatible by definition. */
+  @media (forced-colors: active) {
+    .reader-panel {
+      background-color: Canvas;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  [data-contrast="high"] .reader-panel {
+    background-color: var(--popover);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /*
+   * Thumb zone. A settings control in the top-right corner of a phone is a
+   * control most people will not use, and the reading controls are the one
+   * feature this product cannot afford to hide.
+   */
+  .reader-controls-pill {
+    position: fixed;
+    inset-block-end: calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
+    inset-inline-start: 50%;
+    translate: -50% 0;
+    z-index: 45;
+  }
+
+  /* The live sample strip inside the panel: real prose, at the real settings. */
+  .reader-sample {
+    font-family: var(--reader-font-family);
+    font-size: calc(var(--reader-size-step) * var(--font-size-mult) * 0.62);
+    line-height: 1.5;
+    letter-spacing: var(--reader-tracking);
+    word-spacing: var(--reader-word-spacing);
+    text-align: var(--reader-align);
+  }
+}

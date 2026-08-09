@@ -1,0 +1,33 @@
+{
+  "id": 900000001,
+  "name": "clean-book",
+  "full_name": "a11y-fixture/clean-book",
+  "owner": {
+    "login": "a11y-fixture",
+    "avatar_url": "https://avatars.githubusercontent.com/u/900000001?v=4",
+    "html_url": "https://github.com/a11y-fixture",
+    "type": "Organization"
+  },
+  "html_url": "https://github.com/a11y-fixture/clean-book",
+  "description": "A hand-authored, zero-violation skills repository used as the accessibility fixture.",
+  "homepage": null,
+  "default_branch": "main",
+  "stargazers_count": 1234,
+  "forks_count": 56,
+  "watchers_count": 1234,
+  "subscribers_count": 78,
+  "open_issues_count": 3,
+  "topics": ["agent-skills", "accessibility", "fixture"],
+  "license": {
+    "key": "mit",
+    "name": "MIT License",
+    "spdx_id": "MIT"
+  },
+  "pushed_at": "2026-07-04T12:00:00Z",
+  "created_at": "2025-11-02T09:30:00Z",
+  "updated_at": "2026-07-04T12:00:00Z",
+  "archived": false,
+  "fork": false,
+  "language": "Markdown",
+  "size": 64
+}
