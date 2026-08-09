@@ -1,16 +1,15 @@
-import { ArrowDown01Icon, CheckmarkBadge01Icon, StarIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, CheckmarkBadge01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import { Deck } from "@/components/book/deck";
 import {
-  compactCount,
   editorialDate,
   licenceLabel,
   plural,
   readingTime,
 } from "@/components/book/format";
 import { InstallCommand } from "@/components/book/install-command";
-import { Sparkline } from "@/components/book/sparkline";
+import { chartSeedsFromTheme, InstallSparkline } from "@/components/charts";
 import type { Book } from "@/lib/book";
 import { external, installCommand, marketplaceCommand } from "@/lib/site";
 
@@ -243,22 +242,19 @@ export function BookMasthead({ book }: BookCoverProps) {
       </dl>
 
       {signal && signal.weeklyInstalls.length > 1 ? (
-        <div className="flex items-end gap-4">
-          <div className="min-w-0 flex-1">
-            <Sparkline
-              values={signal.weeklyInstalls}
-              label={`Weekly installs of ${repo.fullName}`}
-            />
-          </div>
-          <p className="book-caption shrink-0">
-            Eight weeks · {compactCount(repo.stars)}{" "}
-            <HugeiconsIcon
-              icon={StarIcon}
-              className="text-ink-muted inline size-3 translate-y-[-1px]"
-              aria-label="stars"
-            />
-          </p>
-        </div>
+        /*
+         * "The wire" — the issue's one real data graphic, painted in the
+         * issue's own colours. Unlike the word-sized sparklines in the
+         * homepage index, this is a single instance on a page the reader has
+         * chosen to be on, so it can afford a canvas, a caption, and the
+         * accessible data table that `AccessibleChart` puts under every chart.
+         */
+        <InstallSparkline
+          weeklyInstalls={signal.weeklyInstalls}
+          seeds={chartSeedsFromTheme(theme)}
+          subject={repo.fullName}
+          installs={signal.installs}
+        />
       ) : null}
 
       {theme.origin !== "name-hash" ? (

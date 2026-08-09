@@ -22,12 +22,28 @@
  */
 
 import { FeatureCard, IndexLeadRow, IndexTailRow, LeadStory } from "@/components/home/book-card";
+import { chartSeedsFromTheme, InstallsBarChart } from "@/components/charts";
 import { compact } from "@/components/home/format";
+import { deriveIssueTheme } from "@/lib/design/theme";
 import type { FeaturedBook } from "@/lib/featured";
 
 export interface ContentsProps {
   books: FeaturedBook[];
 }
+
+/**
+ * House colours for the one chart on this page.
+ *
+ * The book pages paint charts in their issue's own accent. The directory has
+ * no single issue, so it uses the house identity — `deriveIssueTheme` with no
+ * manifest, which terminates in the FNV-1a hue hash and therefore returns the
+ * same palette on every render and every deploy. Same contrast guarantees as
+ * every other chart in the product.
+ */
+const HOUSE_CHART_SEEDS = chartSeedsFromTheme(deriveIssueTheme("githubskills", null));
+
+/** How many books the installs chart compares. Beyond this the bars are noise. */
+const CHART_TOP_N = 12;
 
 function pickLead(books: FeaturedBook[]): FeaturedBook {
   // Books arrive sorted by installs, so the first pick that carries an
@@ -98,6 +114,10 @@ export function Contents({ books }: ContentsProps) {
   const installs = books.reduce((sum, book) => sum + book.installs, 0);
   const live = books.some((book) => book.live);
 
+  const topInstalled = [...books]
+    .sort((a, b) => b.installs - a.installs)
+    .slice(0, CHART_TOP_N);
+
   const split = leadCount(books);
   const front = books.slice(0, split);
   const tail = books.slice(split);
@@ -141,6 +161,24 @@ export function Contents({ books }: ContentsProps) {
             <FeatureCard key={`${book.owner}/${book.repo}`} book={book} issue={i + 1} />
           ))}
         </div>
+
+        {/*
+         * The one full chart on the homepage. The index rows below use a
+         * word-sized inline SVG instead: eighty-nine canvases, each with a
+         * mount-time measurement pass, is a performance problem rather than a
+         * data graphic, and at that size a sparkline is typographic furniture.
+         * Here the comparison between books is the actual point, so it earns
+         * axes, a caption, and the data table underneath.
+         */}
+        <InstallsBarChart
+          items={topInstalled.map((book) => ({
+            label: `${book.owner}/${book.repo}`,
+            installs: book.installs,
+          }))}
+          seeds={HOUSE_CHART_SEEDS}
+          subject="the most-installed books on the shelf"
+          className="mt-2"
+        />
       </section>
 
       {/* ------------------------------------------------------------ index */}

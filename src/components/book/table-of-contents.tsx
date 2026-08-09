@@ -9,6 +9,7 @@ import {
 import type { Book } from "@/lib/book";
 import { dekOf } from "@/lib/deck";
 import { paths } from "@/lib/site";
+import { chartSeedsFromTheme, ChaptersDonut } from "@/components/charts";
 
 /**
  * The contents.
@@ -62,6 +63,23 @@ export function TableOfContents({
       // Additive only: the nav element and its label already carry the meaning.
       role="doc-toc"
     >
+      {/*
+       * Only worth drawing when the book genuinely divides. One part is a
+       * full circle, which tells the reader nothing they cannot read in the
+       * chapter count directly above it.
+       */}
+      {book.parts.length > 1 ? (
+        <ChaptersDonut
+          parts={book.parts.map((part) => ({
+            title: part.title,
+            chapters: part.skills.length,
+          }))}
+          seeds={chartSeedsFromTheme(book.theme)}
+          subject={book.repo.fullName}
+          className="book-contents__shape"
+        />
+      ) : null}
+
       {numbered.map((part, partIndex) => (
         <section key={part.group || "all"} className="book-part">
           <div className="book-part__head">
