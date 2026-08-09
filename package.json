@@ -18,7 +18,8 @@
     "test:e2e:install": "playwright install --with-deps chromium",
     "verify:source": "vitest run tests/guards",
     "verify:lighthouse": "lhci autorun",
-    "verify": "pnpm tsc --noEmit && pnpm lint && pnpm vitest run && pnpm verify:contrast && pnpm test:e2e"
+    "verify": "pnpm tsc --noEmit && pnpm lint && pnpm vitest run && pnpm verify:contrast && pnpm test:e2e",
+    "shots": "tsx scripts/shots.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -45,6 +46,7 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "shadcn": "^4.16.2",
+    "sharp": "^0.35.3",
     "shiki": "^4.4.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
