@@ -71,6 +71,16 @@ export function seedFromColors(colors: BrandColor[]): Oklch | null {
   const chromatic = colors.filter((c) => c.oklch.c >= CHROMA_FLOOR && c.alpha > 0.5);
   if (chromatic.length === 0) return null;
 
+  // A hand-verified curated seed is an editorial decision and outranks
+  // anything parsed. Without this, Dreambase — whose brand is unambiguously
+  // green (#14EC77) — was themed magenta, because some higher-chroma token
+  // deeper in its design.md won on raw chroma alone. Curated entries carry
+  // confidence > 1 precisely so they cannot lose that comparison.
+  const curated = chromatic.filter((c) => c.confidence > 1);
+  if (curated.length > 0) {
+    return [...curated].sort((a, b) => b.confidence - a.confidence)[0].oklch;
+  }
+
   const weight = (c: BrandColor) => {
     let w = c.oklch.c;
     if (c.role === "accent" || c.role === "primary") w += 0.02;

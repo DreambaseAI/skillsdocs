@@ -211,18 +211,61 @@ function deriveGroup(dir: string): string {
   return "";
 }
 
+/**
+ * Words whose canonical casing is not "capitalise the first letter".
+ *
+ * Skill directory names are lowercase by spec, so the information that `api`
+ * is an initialism and `echarts` is a product name is simply not in the
+ * string — "Claude Api" and "Dreambase Echarts" are what naive title casing
+ * produces, and they look like a bug to anyone who knows the subject. Keyed by
+ * the lowercased token.
+ */
+const CANONICAL_CASING: Record<string, string> = Object.fromEntries(
+  [
+    // Initialisms
+    "API", "CLI", "UI", "UX", "SDK", "MCP", "IDE", "CI", "CD", "QA", "PR",
+    "AI", "ML", "LLM", "RAG", "TTS", "ASR", "OCR", "NLP",
+    "PDF", "DOCX", "PPTX", "XLSX", "CSV", "TSV", "JSON", "JSONC", "YAML",
+    "XML", "HTML", "CSS", "SVG", "PNG", "JPEG", "GIF", "WEBP", "MDX",
+    "HTTP", "HTTPS", "REST", "RPC", "SQL", "ORM", "DNS", "SSL", "TLS", "SSH",
+    "URL", "URI", "CDN", "DOM", "CORS", "CSP", "JWT", "SSO", "MFA", "RBAC",
+    "AWS", "GCP", "S3", "EC2", "RDS", "IAM", "VPC", "EKS", "AKS", "GKE",
+    "K8S", "VM", "OS", "CPU", "GPU", "RAM", "IO", "TCP", "UDP", "SSG", "SSR",
+    "CSR", "PWA", "SEO", "RSS", "OG", "A11Y", "I18N", "L10N", "WCAG", "ARIA",
+    "SSI", "APM", "SLO", "SLA", "TDD", "BDD", "DDD", "CRUD", "ETL", "AB",
+  ].map((a) => [a.toLowerCase(), a]),
+);
+
+/** Product and brand names with deliberate internal capitals. */
+const BRAND_CASING: Record<string, string> = Object.fromEntries(
+  [
+    "ECharts", "GraphQL", "TypeScript", "JavaScript", "PostgreSQL", "MySQL",
+    "SQLite", "MongoDB", "DynamoDB", "GitHub", "GitLab", "OAuth", "OpenAPI",
+    "OpenAI", "WebGL", "WebGPU", "WebRTC", "WebAssembly", "WebSocket",
+    "PostHog", "DevOps", "GitOps", "MLOps", "FinOps", "NestJS", "Next.js",
+    "Node.js", "Nuxt", "VSCode", "PowerShell", "AppSync", "AppInsights", "BigQuery",
+    "CloudFront", "CloudWatch", "DataDog", "PagerDuty", "TanStack",
+    "npm", "pnpm", "iOS", "macOS", "tvOS", "watchOS", "visionOS", "iPadOS",
+    "gRPC", "dbt", "tRPC", "eBPF", "xAI",
+  ].map((b) => [b.toLowerCase(), b]),
+);
+
 export function titleCase(input: string): string {
   return input
     .replace(/[-_.]+/g, " ")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .trim()
     .split(/\s+/)
-    .map((w) =>
-      // Preserve deliberate acronyms and mixed-case brand names.
-      w.length <= 1 || w === w.toUpperCase()
-        ? w
-        : w[0].toUpperCase() + w.slice(1),
-    )
+    .map((word) => {
+      const lower = word.toLowerCase();
+      const canonical = BRAND_CASING[lower] ?? CANONICAL_CASING[lower];
+      if (canonical) return canonical;
+
+      // An author who typed mixed case or full caps meant it.
+      if (word !== lower) return word;
+
+      return word.length <= 1 ? word.toUpperCase() : word[0].toUpperCase() + word.slice(1);
+    })
     .join(" ");
 }
 

@@ -411,8 +411,19 @@ Text here.`,
 describe("titleCase", () => {
   it("humanises slugs while keeping acronyms", () => {
     expect(titleCase("expo-experiments")).toBe("Expo Experiments");
-    expect(titleCase("dd_apm")).toBe("Dd Apm");
     expect(titleCase(".curated")).toBe("Curated");
     expect(titleCase("PDF")).toBe("PDF");
+
+    // Skill directories are lowercase by spec, so the fact that "api" is an
+    // initialism is not recoverable from the string — it has to be known.
+    // Without this, every chapter title reads "Claude Api".
+    expect(titleCase("claude-api")).toBe("Claude API");
+    expect(titleCase("mcp-builder")).toBe("MCP Builder");
+    expect(titleCase("slack-gif-creator")).toBe("Slack GIF Creator");
+    expect(titleCase("dd_apm")).toBe("Dd APM");
+    expect(titleCase("pdf")).toBe("PDF");
+    expect(titleCase("dreambase-echarts")).toBe("Dreambase ECharts");
+    expect(titleCase("macos-setup")).toBe("macOS Setup");
+    expect(titleCase("aws-cli")).toBe("AWS CLI");
   });
 });
