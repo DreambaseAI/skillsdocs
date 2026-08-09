@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { Appendix } from "@/components/book/appendix";
 import { ChapterNav } from "@/components/book/chapter-nav";
 import { ChapterOpener } from "@/components/book/chapter-opener";
 import { ChapterRail } from "@/components/book/chapter-rail";
@@ -187,6 +188,17 @@ async function ChapterBody({
             dropCap={dropCapMode(rendered.tree)}
             className="mt-8"
           />
+
+          {/*
+            The appendix follows the prose, before the apparatus and before the
+            install block, because 4.1 follows 4 — it is the next thing to read,
+            not a footnote about the chapter. Streamed on its own boundary: it
+            fetches a raw file per markdown resource to write its extracts, and
+            nothing above it should wait on that.
+          */}
+          <Suspense fallback={null}>
+            <Appendix book={book} skill={skill} index={position} />
+          </Suspense>
 
           <div className="book-measure mt-14">
             <p className="book-eyebrow mb-2">Install this repository</p>

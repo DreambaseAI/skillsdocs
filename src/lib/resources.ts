@@ -16,6 +16,7 @@
  * with line numbers), or `binary` (described and linked, never inlined).
  */
 
+import { paths } from "./site";
 import { titleCase, type SkillResource } from "./skills";
 
 export type ResourceRender = "prose" | "code" | "binary";
@@ -159,6 +160,31 @@ export interface ResourceClass {
   language: string;
   /** Human label for the file type, e.g. "Markdown", "Python". */
   label: string;
+  /**
+   * True when this is *text we declined to render whole*, not bytes.
+   *
+   * `render: "binary"` covers two very different files — a TrueType font, and
+   * a 2 MB generated `option-index.json`. The font must never be fetched as
+   * text; the JSON should show its first lines and then send the reader
+   * upstream. Without this flag the loader cannot tell them apart, and would
+   * either feed a font to a decoder or throw away the only readable part of
+   * the largest files in the corpus.
+   */
+  oversized: boolean;
+}
+
+/**
+ * Best-effort Shiki id for a file we are not going to render in full.
+ *
+ * Language resolution normally happens on the way to `render: "code"`, which
+ * an oversized file never reaches — so a 2 MB JSON would have previewed as
+ * plain text. The preview is short; the highlighting is what makes it legible.
+ */
+function previewLanguageFor(ext: string, name: string): string {
+  if (PROSE_EXTENSIONS.has(ext)) return "markdown";
+  if (PLAIN_EXTENSIONS.has(ext)) return "text";
+  if (!ext) return KNOWN_FILENAMES[name] ?? "text";
+  return CODE_LANGUAGES[ext] ?? "text";
 }
 
 export function classifyResource(path: string, size = 0): ResourceClass {
@@ -166,38 +192,48 @@ export function classifyResource(path: string, size = 0): ResourceClass {
   const name = basename(path).toLowerCase();
 
   if (BINARY_EXTENSIONS.has(ext)) {
-    return { render: "binary", language: "text", label: labelFor(ext) };
+    return { render: "binary", language: "text", label: labelFor(ext), oversized: false };
   }
 
   if (PROSE_EXTENSIONS.has(ext)) {
     // An enormous markdown file is still markdown, but it is not a subchapter.
     return size > MAX_RENDER_BYTES
-      ? { render: "binary", language: "markdown", label: "Markdown" }
-      : { render: "prose", language: "markdown", label: "Markdown" };
+      ? { render: "binary", language: "markdown", label: "Markdown", oversized: true }
+      : { render: "prose", language: "markdown", label: "Markdown", oversized: false };
   }
 
   if (size > MAX_RENDER_BYTES) {
-    return { render: "binary", language: "text", label: labelFor(ext) };
+    return {
+      render: "binary",
+      language: previewLanguageFor(ext, name),
+      label: labelFor(ext || name),
+      oversized: true,
+    };
   }
 
   if (PLAIN_EXTENSIONS.has(ext)) {
-    return { render: "code", language: "text", label: labelFor(ext) };
+    return { render: "code", language: "text", label: labelFor(ext), oversized: false };
   }
 
   const byName = KNOWN_FILENAMES[name];
   if (!ext && byName) {
-    return { render: "code", language: byName, label: labelFor(name) };
+    return { render: "code", language: byName, label: labelFor(name), oversized: false };
   }
 
   const language = CODE_LANGUAGES[ext];
-  if (language) return { render: "code", language, label: labelFor(ext) };
+  if (language) return { render: "code", language, label: labelFor(ext), oversized: false };
 
   // Dotfiles and unknown extensions: show them, do not colour them.
   if (!ext || ext.length <= 5) {
-    return { render: "code", language: "text", label: labelFor(ext || name) };
+    return {
+      render: "code",
+      language: "text",
+      label: labelFor(ext || name),
+      oversized: false,
+    };
   }
 
-  return { render: "binary", language: "text", label: labelFor(ext) };
+  return { render: "binary", language: "text", label: labelFor(ext), oversized: false };
 }
 
 const LABELS: Record<string, string> = {
@@ -238,10 +274,7 @@ export interface ResourceGroup {
   files: ClassifiedResource[];
 }
 
-export interface ClassifiedResource extends SkillResource {
-  render: ResourceRender;
-  language: string;
-  label: string;
+export interface ClassifiedResource extends SkillResource, ResourceClass {
   /** URL-safe path segments for the subchapter route. */
   segments: string[];
 }
@@ -325,4 +358,205 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* ------------------------------------------------------- addressing */
+
+/**
+ * The subchapter URL for one bundled file.
+ *
+ * Built on `paths.chapter` rather than beside it, so the third segment stays
+ * whatever the router says a skill slug is. See ARCHITECTURE §namespace: the
+ * third segment belongs entirely to skill slugs, and a fourth-and-deeper
+ * catch-all is the only addition that cannot collide with one.
+ */
+export function resourcePath(
+  owner: string,
+  repo: string,
+  slug: string,
+  relPath: string,
+): string {
+  const tail = relPath.split("/").map(encodeURIComponent).join("/");
+  return `${paths.chapter(owner, repo, slug)}/${tail}`;
+}
+
+/**
+ * The maximum depth and length a bundled file's path may have.
+ *
+ * Not a security control on their own — the whitelist below is — but a cheap
+ * way to refuse an absurd request before it costs a book fetch.
+ */
+const MAX_SEGMENTS = 12;
+const MAX_REL_PATH = 512;
+
+/**
+ * A git path never contains a control character. NUL in particular only
+ * ever arrives as a truncation probe, so it is refused rather than trimmed.
+ */
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
+
+/**
+ * Turn the catch-all's segments into a repo-relative path, or refuse.
+ *
+ * **This is the first half of a security boundary.** The second half —
+ * `findResource` — is the one that actually matters, because it only ever
+ * matches against paths the repository's own git tree declared. But defence
+ * here is not redundant: it means a traversal attempt is rejected *before* it
+ * is used to build a cache key or a fetch URL, and it makes the rule testable
+ * without a network.
+ *
+ * Next has already percent-decoded these segments, so `%2e%2e` arrives as
+ * `..` and `%2f` arrives as a segment containing `/`. Both are refused.
+ */
+export function safeRelPath(segments: readonly string[]): string | null {
+  if (segments.length === 0 || segments.length > MAX_SEGMENTS) return null;
+
+  for (const segment of segments) {
+    if (segment === "" || segment === "." || segment === "..") return null;
+    if (segment.includes("/") || segment.includes("\\")) return null;
+    if (hasControlChar(segment)) return null;
+  }
+
+  const relPath = segments.join("/");
+  return relPath.length > MAX_REL_PATH ? null : relPath;
+}
+
+/**
+ * Every resource of a skill, in the order the appendix lists them.
+ *
+ * Flattened straight out of `groupResources` on purpose: prev/next has to walk
+ * the same sequence the reader can see, or paging through an appendix jumps
+ * around the list they are looking at.
+ */
+export function resourceOrder(resources: SkillResource[]): ClassifiedResource[] {
+  return groupResources(resources).flatMap((group) => group.files);
+}
+
+/**
+ * Look one resource up by its repo-relative path.
+ *
+ * **This is the security boundary.** The lookup is an exact match against the
+ * skill's declared resources, which come from the repository's git tree — so
+ * there is no path arithmetic to get wrong and no way to name a file the skill
+ * does not ship. Never replace this with a join against the skill directory.
+ */
+export function findResource(
+  resources: SkillResource[],
+  relPath: string,
+): ClassifiedResource | null {
+  const match = resources.find((r) => r.relPath === relPath);
+  return match ? (classifyAll([match])[0] ?? null) : null;
+}
+
+export interface ResourceNav {
+  /**
+   * 1-based position among the files that are *set in the book*, or 0 for one
+   * that is not — a font, or text too long to reproduce.
+   */
+  position: number;
+  /** How many files of this skill are set in the book. */
+  total: number;
+  prev: ClassifiedResource | null;
+  next: ClassifiedResource | null;
+}
+
+/**
+ * Neighbours within the same skill, so an appendix pages like a book.
+ *
+ * **The sequence is the readable files only, and that is the whole point.**
+ * `canvas-design` bundles 54 TrueType fonts among its 82 files; paging through
+ * the raw order would walk a reader into fifty-four consecutive pages that say
+ * "not reproduced here" and out the other side. The appendix does not link
+ * them and the contents rail does not number them, so the nav must not walk
+ * them either — three surfaces, one sequence.
+ *
+ * A file that is not in that sequence is still *addressable*: an old link or a
+ * typed URL lands on its description page. Rather than dead-ending there, it
+ * is bracketed in the full order and handed the nearest readable file on each
+ * side, so there is always a way back into the book.
+ */
+export function resourceNav(
+  resources: SkillResource[],
+  relPath: string,
+): ResourceNav {
+  const ordered = resourceOrder(resources);
+  const readable = ordered.filter((r) => r.render !== "binary");
+  const total = readable.length;
+
+  const index = readable.findIndex((r) => r.relPath === relPath);
+  if (index !== -1) {
+    return {
+      position: index + 1,
+      total,
+      prev: index > 0 ? readable[index - 1] : null,
+      next: index < readable.length - 1 ? readable[index + 1] : null,
+    };
+  }
+
+  const full = ordered.findIndex((r) => r.relPath === relPath);
+  if (full === -1) return { position: 0, total, prev: null, next: null };
+
+  let prev: ClassifiedResource | null = null;
+  for (let i = full - 1; i >= 0; i--) {
+    if (ordered[i].render !== "binary") {
+      prev = ordered[i];
+      break;
+    }
+  }
+  let next: ClassifiedResource | null = null;
+  for (let i = full + 1; i < ordered.length; i++) {
+    if (ordered[i].render !== "binary") {
+      next = ordered[i];
+      break;
+    }
+  }
+  return { position: 0, total, prev, next };
+}
+
+/** The directory a resource lives in, as a full repo path. `""` at the root. */
+export function resourceDir(path: string): string {
+  const i = path.lastIndexOf("/");
+  return i === -1 ? "" : path.slice(0, i);
+}
+
+/* --------------------------------------------------- rendering helpers */
+
+/*
+ * This lives here rather than in `resource-loader.ts` for one reason: it is
+ * the part of the loader that can be wrong in a way a reader would see, and
+ * `resource-loader.ts` imports `server-only`, so a test cannot load it. A pure
+ * function in a pure module is a function with a test.
+ *
+ * A `fenceFor` helper stood beside it while source files were rendered by
+ * wrapping them in a markdown fence. `CodeBlock` highlights the bytes
+ * directly, so CommonMark's fence-closing rules no longer apply to somebody
+ * else's Python and the helper had nothing left to protect.
+ */
+
+export interface PreviewHead {
+  source: string;
+  lines: number;
+}
+
+/**
+ * The head of a file we decline to set whole.
+ *
+ * `truncated` says the read stopped at a byte budget rather than at the end of
+ * the file, which means the last line almost certainly ends mid-token. A half
+ * line reads as a rendering fault rather than as a boundary, so it goes — but
+ * only when the preview actually reaches the end of what was fetched. When the
+ * file had more than `PREVIEW_LINES` lines inside the budget, the cut is ours
+ * and every line in it is whole.
+ */
+export function previewHead(text: string, truncated: boolean): PreviewHead {
+  const all = text.split("\n");
+  const lines = all.slice(0, PREVIEW_LINES);
+  if (truncated && lines.length === all.length) lines.pop();
+  return { source: lines.join("\n"), lines: lines.length };
 }

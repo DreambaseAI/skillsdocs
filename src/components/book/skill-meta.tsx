@@ -1,32 +1,20 @@
-import { fileSize, plural } from "@/components/book/format";
 import type { Book } from "@/lib/book";
 import { deckOf } from "@/lib/deck";
-import type { Skill, SkillResource } from "@/lib/skills";
+import type { Skill } from "@/lib/skills";
 import { external } from "@/lib/site";
 
 /**
  * The chapter's apparatus: the metadata a printed book puts on the verso of
- * the title page, and the bundled files a skill ships alongside its prose.
+ * the title page.
  *
- * Resources are grouped by what they *are* — scripts, references, assets —
- * because that is the distinction that decides whether a reader wants to open
- * one. Sorting 40 files alphabetically tells them nothing; telling them "four
- * scripts, one reference, thirty assets" tells them everything.
+ * **The bundled files are no longer here.** This section used to end with a
+ * list of every resource linked out to github.com, which is what every other
+ * skills browser does and is the single largest thing this book can do that
+ * they cannot: 96% of those 2,518 files are renderable text. They are now the
+ * appendix — numbered subchapters of this chapter, set on this site — and a
+ * second, duller copy of the same list underneath it would only argue against
+ * the first.
  */
-
-const KIND_LABEL: Record<SkillResource["kind"], string> = {
-  script: "Scripts",
-  reference: "References",
-  asset: "Assets",
-  other: "Other files",
-};
-
-const KIND_ORDER: SkillResource["kind"][] = [
-  "script",
-  "reference",
-  "asset",
-  "other",
-];
 
 export interface SkillApparatusProps {
   book: Book;
@@ -36,11 +24,6 @@ export interface SkillApparatusProps {
 export function SkillApparatus({ book, skill }: SkillApparatusProps) {
   const { repo } = book;
   const ref = repo.defaultBranch;
-
-  const byKind = KIND_ORDER.map((kind) => ({
-    kind,
-    files: skill.resources.filter((r) => r.kind === kind),
-  })).filter((g) => g.files.length > 0);
 
   const hasFacts =
     skill.allowedTools.length > 0 ||
@@ -58,7 +41,7 @@ export function SkillApparatus({ book, skill }: SkillApparatusProps) {
   const trigger = (skill.description ?? "").trim();
   const showTrigger = trigger !== "" && deckOf(trigger).length < trigger.length;
 
-  if (!hasFacts && byKind.length === 0 && !showTrigger) return null;
+  if (!hasFacts && !showTrigger) return null;
 
   return (
     <section
@@ -156,53 +139,6 @@ export function SkillApparatus({ book, skill }: SkillApparatusProps) {
           </dd>
         </dl>
       ) : null}
-
-      {byKind.map(({ kind, files }) => (
-        <div key={kind} className="mt-6">
-          <h3 className="book-eyebrow">
-            {KIND_LABEL[kind]} · {files.length}{" "}
-            {plural(files.length, "file")}
-          </h3>
-          <ul className="border-rule mt-2 border-t">
-            {files.slice(0, 24).map((file) => (
-              <li
-                key={file.path}
-                className="border-rule flex items-baseline justify-between gap-4 border-b py-1.5 text-sm"
-              >
-                <a
-                  className="hover:text-issue-accent min-w-0 truncate font-mono text-[0.8125rem] underline-offset-3 hover:underline"
-                  href={external.file(repo.owner, repo.repo, ref, file.path)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {file.relPath}
-                </a>
-                <span className="book-caption shrink-0 tabular-nums">
-                  {fileSize(file.size)}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {files.length > 24 ? (
-            <p className="book-caption mt-2">
-              and {files.length - 24} more —{" "}
-              <a
-                className="hover:text-issue-accent underline underline-offset-3"
-                href={external.file(
-                  repo.owner,
-                  repo.repo,
-                  ref,
-                  skill.dir || skill.skillMdPath,
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                browse the directory on GitHub
-              </a>
-            </p>
-          ) : null}
-        </div>
-      ))}
     </section>
   );
 }

@@ -837,6 +837,386 @@
     }
   }
 
+  /* ════════════════════════════════════════════════════════════ appendix */
+
+  /*
+   * The appendix — a chapter's bundled files, set as its subchapters.
+   *
+   * It has to read as a different part of the same publication: an index at
+   * the back of a book, not a second chapter and not a file listing. Three
+   * devices do the work. The block opens on the issue accent rather than on
+   * the ink rule the contents uses, so the eye knows the register has changed.
+   * Everything inside is set one step down from the reading size, the way
+   * back matter is. And the folios are real folios — `4.1`, in the display
+   * face — because the number is the entire argument: it says this file is in
+   * the book, and a hostname says it is not.
+   *
+   * It also has to survive three densities without redesign. `pdf` ships 3
+   * references, `supabase-postgres-best-practices` 35, `canvas-design` 82 of
+   * which 54 are TrueType fonts. Past ten entries a list drops its extracts
+   * and pairs into two columns; binaries never become rows at all.
+   */
+  .book-appendix {
+    margin-block-start: clamp(3.5rem, 9vh, 5.5rem);
+    padding-block-start: 1.1rem;
+    border-block-start: 2px solid var(--issue-accent);
+    font-size: 0.95em;
+    /*
+     * The index below pairs into columns on how much room *it* has, not on how
+     * wide the window is. Those are different numbers here: at 1024px both
+     * rails are up and the appendix has ~500px, while at 768px the rails are
+     * gone and it has ~700px. A viewport query got that exactly backwards —
+     * two cramped columns on the desktop layout, one on the tablet.
+     */
+    container-type: inline-size;
+    container-name: appendix;
+  }
+
+  @media (forced-colors: active) {
+    .book-appendix {
+      border-block-start-color: CanvasText;
+    }
+  }
+
+  .book-appendix__head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .book-appendix__label {
+    font-family: var(--font-display);
+    font-size: clamp(1.3rem, 3.2vw, 1.7rem);
+    line-height: 1.1;
+    letter-spacing: -0.012em;
+    font-weight: 500;
+    color: var(--ink-strong);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .book-appendix__tally {
+    margin-inline-start: auto;
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+    white-space: nowrap;
+  }
+
+  .book-appendix__intro {
+    max-inline-size: var(--reader-measure);
+    margin-block-start: 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--ink-muted);
+    text-wrap: pretty;
+  }
+
+  .book-appendix__group {
+    margin-block-start: 2.25rem;
+  }
+
+  .book-appendix__grouptitle {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin: 0;
+    padding-block-end: 0.4rem;
+    border-block-end: 1px solid var(--ink-strong);
+    font-family: var(--reader-font-family);
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-strong);
+  }
+
+  .book-appendix__count {
+    margin-inline-start: auto;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    font-weight: 400;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+    white-space: nowrap;
+  }
+
+  .book-appendix__note {
+    margin-block-start: 0.45rem;
+    max-inline-size: var(--reader-measure);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--ink-muted);
+    text-wrap: pretty;
+  }
+
+  .book-appendix__list {
+    list-style: none;
+    margin: 0.55rem 0 0;
+    padding: 0;
+  }
+
+  /*
+   * Past ten entries the list stops being read and starts being scanned, so it
+   * becomes an index: two columns, no extracts, tighter leading. 34 Supabase
+   * references go from a page of scrolling to 17 scannable lines.
+   */
+  /*
+   * 34rem is the measured floor. Below it "Conn Prepared Statements" wraps in
+   * both columns and the index costs more lines than the single-column list it
+   * replaced, which is the opposite of the point.
+   */
+  @container appendix (min-width: 34rem) {
+    .book-appendix__list[data-density="compact"] {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 2.25rem;
+    }
+  }
+
+  .book-appendix__entry {
+    display: grid;
+    grid-template-columns: 2.9rem minmax(0, 1fr) auto;
+    column-gap: 0.9rem;
+    align-items: baseline;
+    /* The hover band reaches past the text on both sides so a pointer landing
+       near the folio is still inside the row. */
+    margin-inline: -0.6rem;
+    padding: 0.7rem 0.6rem;
+    border-block-end: 1px solid var(--rule);
+    color: inherit;
+    text-decoration: none;
+    transition: background-color 140ms var(--ease-out-quint);
+  }
+
+  .book-appendix__entry:hover {
+    background: var(--paper-raised);
+  }
+
+  .book-appendix__entry:focus-visible {
+    outline: var(--focus-ring-width) solid var(--issue-accent);
+    outline-offset: -1px;
+    border-radius: var(--radius-sm);
+  }
+
+  .book-appendix__list[data-density="compact"] .book-appendix__entry {
+    grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+    column-gap: 0.7rem;
+    padding-block: 0.42rem;
+  }
+
+  .book-appendix__folio {
+    font-family: var(--font-display);
+    font-size: 0.98rem;
+    line-height: 1.2;
+    color: var(--issue-accent);
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  /* The chapter half of every folio is the same three characters down the
+     whole column; in full accent twelve rows read as a coloured stripe rather
+     than as numbers, so only the leaf carries the ink. */
+  .book-appendix__folio-chapter {
+    color: var(--ink-muted);
+  }
+
+  .book-appendix__entry:hover .book-appendix__folio,
+  .book-appendix__entry:hover .book-appendix__folio-chapter {
+    color: var(--ink-strong);
+  }
+
+  @media (forced-colors: active) {
+    .book-appendix__folio {
+      color: CanvasText;
+    }
+  }
+
+  .book-appendix__body {
+    min-inline-size: 0;
+  }
+
+  .book-appendix__title {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    line-height: 1.25;
+    letter-spacing: -0.008em;
+    font-weight: 500;
+    color: var(--ink-strong);
+    text-wrap: pretty;
+  }
+
+  .book-appendix__list[data-density="compact"] .book-appendix__title {
+    font-size: 0.94rem;
+  }
+
+  .book-appendix__extract {
+    display: block;
+    margin-block-start: 0.2rem;
+    font-family: var(--reader-font-family);
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--ink-muted);
+    text-wrap: pretty;
+  }
+
+  .book-appendix__path {
+    display: block;
+    margin-block-start: 0.22rem;
+    font-family: var(--reader-code-family);
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--ink-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .book-appendix__meta {
+    font-size: 0.74rem;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+    white-space: nowrap;
+    justify-self: end;
+  }
+
+  /* A file we decline to reproduce is not a dead link with a folio missing —
+     it is a described object. Muted title, dash for a number, and a sentence
+     that says which of the two reasons applies. */
+  .book-appendix__entry[data-omitted] .book-appendix__title {
+    color: var(--ink);
+    font-weight: 400;
+  }
+
+  .book-appendix__omitted {
+    display: grid;
+    grid-template-columns: 2.9rem minmax(0, 1fr);
+    column-gap: 0.9rem;
+    align-items: baseline;
+    padding-block: 0.7rem;
+    border-block-end: 1px solid var(--rule);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--ink-muted);
+    text-wrap: pretty;
+  }
+
+  .book-appendix__out {
+    color: var(--issue-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .book-appendix__out:hover {
+    color: var(--ink-strong);
+  }
+
+  /* A directory of 44 XML schemas is one fact about the skill, not 44 things
+     to read. It gets a line that says what it is, and opens on demand. */
+  .book-appendix__cluster {
+    margin-block-start: 0.9rem;
+  }
+
+  .book-appendix__dir {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding-block: 0.4rem;
+    border-block-end: 1px solid var(--rule);
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .book-appendix__dir[data-static] {
+    cursor: default;
+  }
+
+  .book-appendix__dir::-webkit-details-marker {
+    display: none;
+  }
+
+  details.book-appendix__cluster > .book-appendix__dir::before {
+    content: "▸";
+    display: inline-block;
+    font-size: 0.7em;
+    color: var(--issue-accent);
+    transition: rotate 140ms var(--ease-out-quint);
+  }
+
+  details.book-appendix__cluster[open] > .book-appendix__dir::before {
+    rotate: 90deg;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root:not([data-motion="allow"])
+      details.book-appendix__cluster
+      > .book-appendix__dir::before {
+      transition: none;
+    }
+  }
+
+  .book-appendix__dir:focus-visible {
+    outline: var(--focus-ring-width) solid var(--issue-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  .book-appendix__dirpath {
+    font-family: var(--reader-code-family);
+    font-size: 0.78rem;
+    color: var(--ink-strong);
+    overflow-wrap: anywhere;
+  }
+
+  .book-appendix__dircount {
+    margin-inline-start: auto;
+    font-variant-numeric: lining-nums tabular-nums;
+    white-space: nowrap;
+  }
+
+  /*
+   * At 390px the meta column and a display-face title cannot share a line
+   * without one of them collapsing to two characters, so the meta drops under
+   * the title where it still reads as a rider on the entry.
+   */
+  @media (max-width: 30rem) {
+    .book-appendix__entry {
+      grid-template-columns: 2.4rem minmax(0, 1fr);
+      column-gap: 0.7rem;
+    }
+
+    .book-appendix__meta {
+      grid-column: 2;
+      justify-self: start;
+      margin-block-start: 0.25rem;
+    }
+
+    /*
+     * Except in an index. A compact row's meta is a bare size — "1 KB" — and
+     * its title is one short line, so the two do share a phone's width; only
+     * the expanded row, which is already carrying an extract or a path under
+     * its title, needs the break. Wrapping the index too made each of
+     * `supabase-postgres-best-practices`'s 34 references 130px tall, which is
+     * 4,400px of scrolling to read a list of names.
+     */
+    .book-appendix__list[data-density="compact"] .book-appendix__entry {
+      grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+    }
+
+    .book-appendix__list[data-density="compact"] .book-appendix__meta {
+      grid-column: 3;
+      justify-self: end;
+      margin-block-start: 0;
+    }
+
+    .book-appendix__omitted {
+      grid-template-columns: 2.4rem minmax(0, 1fr);
+      column-gap: 0.7rem;
+    }
+  }
+
   /* ═══════════════════════════════════════════════════════ rail contents */
 
   .book-rail__title {
@@ -886,6 +1266,271 @@
     outline: var(--focus-ring-width) solid var(--issue-accent);
     outline-offset: 1px;
     border-radius: var(--radius-sm);
+  }
+
+  /* ═══════════════════════════════════════════════ rail: subchapters */
+
+  /*
+   * The open chapter's bundled files, indented under it.
+   *
+   * Only the open chapter expands. Every chapter expanded would put 82 rows
+   * under `canvas-design` alone and 35 under one Supabase chapter, and a
+   * contents that is longer than the book is not a contents. The hairline down
+   * the inline-start is the same device a printed index uses for a run-on
+   * subentry: it says "these belong to the line above" without spending a
+   * heading on it.
+   */
+  .book-rail__branch {
+    margin-block: 0.1rem 0.6rem;
+    margin-inline-start: 0.75rem;
+    padding-inline-start: 0.6rem;
+    border-inline-start: 1px solid var(--rule);
+  }
+
+  .book-rail__branchlabel {
+    margin-block: 0.5rem 0.1rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  .book-rail__sub {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 0.5rem;
+    align-items: baseline;
+    /* The negative start margin lays the row's own 2px marker exactly over the
+       branch hairline, so the current row lights that line up rather than
+       drawing a second one beside it. */
+    margin-inline-start: -0.6rem;
+    padding: 0.2rem 0 0.2rem 0.5rem;
+    border-inline-start: 2px solid transparent;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--ink-muted);
+    text-decoration: none;
+    text-wrap: pretty;
+    transition: color 120ms var(--ease-out-quint);
+  }
+
+  .book-rail__sub:hover {
+    color: var(--ink-strong);
+  }
+
+  .book-rail__sub[aria-current="page"] {
+    color: var(--ink-strong);
+    border-inline-start-color: var(--issue-accent);
+    font-weight: 550;
+  }
+
+  .book-rail__subfolio {
+    font-variant-numeric: lining-nums tabular-nums;
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
+    color: var(--ink-muted);
+  }
+
+  .book-rail__sub[aria-current="page"] .book-rail__subfolio {
+    color: var(--issue-accent);
+  }
+
+  /*
+   * A directory row stands in for files the appendix collapses, so it must not
+   * read as one of them: the name is set in mono to say "this is a path, not a
+   * title", and the count trails it in the caption size.
+   */
+  .book-rail__subdir {
+    font-family: var(--reader-code-family);
+    font-size: 0.72rem;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+
+  .book-rail__subcount {
+    margin-inline-start: 0.4rem;
+    font-size: 0.68rem;
+    font-variant-numeric: lining-nums tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* The directory that tells two same-named rows apart, set below the title
+     so the title still reads as the thing being scanned. */
+  .book-rail__subqual {
+    font-family: var(--reader-code-family);
+    font-size: 0.68rem;
+    opacity: 0.72;
+  }
+
+  .book-rail__sub[data-cluster]:hover .book-rail__subcount {
+    color: inherit;
+  }
+
+  .book-rail__more {
+    display: block;
+    margin-inline-start: -0.6rem;
+    padding: 0.25rem 0 0.25rem 0.5rem;
+    border-inline-start: 2px solid transparent;
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
+    color: var(--ink-muted);
+    text-decoration: none;
+  }
+
+  .book-rail__more:hover {
+    color: var(--issue-accent);
+  }
+
+  /* ═══════════════════════════════════════ rail: the subchapter page */
+
+  /*
+   * Where up is.
+   *
+   * A subchapter is the only page in the book that sits inside another page,
+   * and a reader who arrived from a search result has nothing else to tell
+   * them so. It is a plate rather than a link because it is the one piece of
+   * furniture on that page that has to be found before it is read.
+   */
+  .book-rail__uplink {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 0.7rem;
+    align-items: center;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    background: var(--paper-raised);
+    text-decoration: none;
+    transition: border-color 140ms var(--ease-out-quint);
+  }
+
+  .book-rail__uplink:hover {
+    border-color: var(--issue-accent);
+  }
+
+  .book-rail__upfolio {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    line-height: 1;
+    color: var(--issue-accent);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .book-rail__uplabel {
+    display: block;
+    font-size: 0.6rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  .book-rail__uptitle {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    line-height: 1.2;
+    color: var(--ink-strong);
+    overflow-wrap: break-word;
+  }
+
+  /* A code file's definitions, addressed by line. No scroll spy: see
+     `FileOutline` — a marker chasing 700 lines of Python is noise. */
+  .book-rail__jump {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+    column-gap: 0.5rem;
+    align-items: baseline;
+    padding: 0.2rem 0 0.2rem 0.75rem;
+    border-inline-start: 2px solid transparent;
+    color: var(--ink-muted);
+    text-decoration: none;
+    transition: color 120ms var(--ease-out-quint);
+  }
+
+  .book-rail__jump:hover {
+    color: var(--ink-strong);
+    border-inline-start-color: var(--rule);
+  }
+
+  .book-rail__jumpline {
+    font-family: var(--reader-code-family);
+    font-size: 0.68rem;
+    text-align: end;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .book-rail__jumptext {
+    font-family: var(--reader-code-family);
+    font-size: 0.74rem;
+    line-height: 1.45;
+    /* A definition truncates rather than wraps: the head of a signature is
+       what identifies it, and two-line entries turn a jump list into prose. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .book-rail__sibling {
+    display: block;
+    padding: 0.3rem 0 0.3rem 0.75rem;
+    border-inline-start: 2px solid transparent;
+    text-decoration: none;
+    color: var(--ink-muted);
+    transition: color 120ms var(--ease-out-quint);
+  }
+
+  .book-rail__sibling:hover {
+    color: var(--ink-strong);
+    border-inline-start-color: var(--issue-accent);
+  }
+
+  .book-rail__siblingrel {
+    display: block;
+    font-size: 0.6rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  .book-rail__siblingtitle {
+    display: block;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    text-wrap: pretty;
+  }
+
+  .book-rail__statlink {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+  }
+
+  .book-rail__statlink:hover {
+    color: var(--issue-accent);
+  }
+
+  :is(
+    .book-rail__sub,
+    .book-rail__more,
+    .book-rail__uplink,
+    .book-rail__jump,
+    .book-rail__sibling,
+    .book-rail__statlink
+  ):focus-visible {
+    outline: var(--focus-ring-width) solid var(--issue-accent);
+    outline-offset: 1px;
+    border-radius: var(--radius-sm);
+  }
+
+  @media (forced-colors: active) {
+    .book-rail__upfolio,
+    .book-rail__sub[aria-current="page"] .book-rail__subfolio {
+      color: LinkText;
+    }
   }
 
   /* ══════════════════════════════════════════════════════════ statistics */

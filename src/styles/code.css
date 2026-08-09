@@ -280,6 +280,274 @@
     overflow-wrap: break-word;
   }
 
+  /* ══════════════════════════════════════════ whole files, not quotations
+   *
+   * A fence inside prose is a quotation: a few lines, no filename, no ordinal.
+   * A bundled file is a document, and it gets the chrome a document needs — a
+   * header naming it, a gutter of ordinals, an `#L42` target per line, an
+   * opt-in wrap, and a clip for the ones long enough to swallow the page.
+   * Everything below is scoped to `.code-file`, so a fence in a chapter keeps
+   * the lean treatment above unchanged.
+   */
+
+  .code-file__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    padding: 0.3rem 0.4rem 0.3rem 0.85rem;
+    border-block-end: 1px solid var(--rule);
+    min-block-size: 2.25rem;
+  }
+
+  .code-file__path {
+    margin: 0;
+    min-inline-size: 6rem;
+    font-family: var(--font-reader-code);
+    font-size: 0.78rem;
+    /* The path is one string; breaking it mid-segment reads as two files. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* The directory is context, the filename is the subject. Directories are
+       long and repetitive — `references/` on every file of a 35-file skill —
+       so the eye needs the leaf to be the thing it lands on. */
+    direction: ltr;
+  }
+
+  .code-file__dir {
+    color: var(--ink-muted);
+  }
+
+  .code-file__name {
+    color: var(--ink-strong);
+    font-weight: 600;
+  }
+
+  .code-file__facts {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-reader-code);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .code-file__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin-inline-start: auto;
+  }
+
+  /* The head and foot already sit inside the figure's rounded border, and the
+     pre paints no ground of its own, so the scroll box needs no radii of its
+     own — square corners inside a rounded frame are invisible when nothing is
+     painted in them. */
+  .code-file .code-block__scroll {
+    border-radius: 0;
+  }
+
+  .code-file__more {
+    display: flex;
+    justify-content: center;
+    padding: 0.45rem;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .code-file__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 1rem;
+    padding: 0.5rem 0.85rem;
+    border-block-start: 1px solid var(--rule);
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+  }
+
+  .code-file__source {
+    color: var(--ink-strong);
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.18em;
+    margin-inline-start: auto;
+  }
+
+  .code-file__mark {
+    display: inline-block;
+    inline-size: 0.66em;
+    block-size: 0.66em;
+    margin-inline-start: 0.14em;
+    vertical-align: baseline;
+  }
+
+  /* ─────────────────────────────────────────────────────── the ordinals */
+
+  /*
+   * The gutter is sized in `ch` off the file's own digit count.
+   *
+   * `ch` is the wrong unit for prose measure — the ratio of a zero's advance
+   * to the average character swings 0.84–1.47 across our text faces, which is
+   * why measure is expressed in characters-per-line everywhere else. Here the
+   * face is monospaced by construction and the digits are tabular, so `1ch`
+   * *is* the advance width of a digit, exactly. That is what makes the gutter
+   * align at every step of the reader's type-size slider without a second
+   * measurement to keep in sync: the number is set in the same face at the
+   * same leading as the code beside it.
+   */
+  .code-block__pre[data-line-numbers] {
+    --code-gutter: calc(1rem + var(--code-line-digits, 2) * 1ch + 1ch);
+    /* The ordinal supplies its own leading pad so its sticky background can
+       reach the edge of the scrollport. */
+    padding-inline-start: 0;
+  }
+
+  /*
+   * `span.` in the selector is deliberate, and load-bearing.
+   *
+   * Shiki's dual-theme rules at the top of this file are `.shiki span` (0,2,0)
+   * and `:root.dark .shiki span` (0,3,0), and the ordinal *is* a span inside
+   * `.shiki`. At 0,3,0 this rule would only win the tie on source order, which
+   * is a promise the next person to reorder the file cannot know they are
+   * breaking. The element selector takes it to 0,3,1 and makes it unambiguous.
+   */
+  .code-block__pre .line > span.code-line__no {
+    display: inline-block;
+    /* Content-box keeps the `ch` arithmetic honest under Tailwind's global
+       `border-box`: the content is exactly N digits wide, the pads are extra,
+       and `--code-gutter` above is the sum of the three. */
+    box-sizing: content-box;
+    inline-size: calc(var(--code-line-digits, 2) * 1ch);
+    padding-inline: 1rem 1ch;
+    text-align: end;
+    color: var(--ink-muted);
+    /* Pinned to the scrollport, so the ordinal survives a file scrolled
+       sideways — and it needs a ground of its own to occlude the code that
+       passes beneath it. */
+    position: sticky;
+    inset-inline-start: 0;
+    background: var(--code-ground);
+    /* A selection dragged down the file must not put ordinals on the
+       clipboard, and a script must not be read out as "forty-two, import". */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* A wrapped file has no horizontal scroll for the ordinal to survive, and a
+     sticky ordinal beside a three-line wrap would sit next to the wrong line.
+     Hang the continuation lines off the gutter instead. */
+  [data-code-wrap="on"] .code-block__pre[data-line-numbers] .line {
+    padding-inline-start: var(--code-gutter);
+    text-indent: calc(-1 * var(--code-gutter));
+  }
+
+  [data-code-wrap="on"] .code-block__pre .line > span.code-line__no {
+    position: static;
+  }
+
+  /* ─────────────────────────────────────────────── the targeted line */
+
+  /*
+   * `#L42` marks its line with a ring and an accent ordinal — and paints
+   * nothing behind the code.
+   *
+   * A wash is the obvious way to do this and it is the wrong one here. The
+   * code ground is already lifted 0.04 L specifically to get the lowest Shiki
+   * scope to 4.55:1; any tint behind the tokens spends that margin, and the
+   * one token designed for the job (`--selection-bg`, L 0.9 on light) would
+   * put the `comment` scope near 3.6:1. The ring costs no contrast at all, and
+   * the accent ordinal is sticky, so the mark is still visible on a file
+   * scrolled sideways where a left-edge marker would be off-screen.
+   */
+  /* Clear of the site header when a deep link scrolls the line into view.
+     Only whole files carry anchors, so only they need the margin. */
+  .code-block__pre[data-line-numbers] .line {
+    scroll-margin-block: calc(var(--header-h, 3.5rem) + 2rem) 4rem;
+  }
+
+  .code-block__pre .line:target {
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--issue-accent) 60%, transparent);
+    border-radius: 2px;
+  }
+
+  .code-block__pre .line:target > span.code-line__no {
+    color: var(--issue-accent);
+    font-weight: 700;
+  }
+
+  /* ─────────────────────────────────────────────────────────── the clip */
+
+  /*
+   * Long files are clipped, with the rest one button away.
+   *
+   * Two states clip, and they are deliberately different values rather than a
+   * boolean. `true` is "not expanded yet", and it yields to a deep link:
+   * `:has(.line:target)` opens the file so `#L420` lands on line 420 even with
+   * JavaScript off. `pinned` is "the reader collapsed it again by hand", and
+   * it does not yield, because a button reading "show all" above a file that
+   * is visibly already all there is worse than a link that scrolls short.
+   *
+   * `:has()` is wrapped in `:where()` so the whole rule survives a browser
+   * that does not support it — an unforgiving `:not(:has(…))` would drop the
+   * declaration block entirely and un-clip every long file. Without `:has()`
+   * the file simply stays clipped until the button is pressed.
+   */
+  .code-file__body {
+    position: relative;
+  }
+
+  .code-file__body[data-clipped="true"]:not(:where(:has(.line:target))) .code-block__pre,
+  .code-file__body[data-clipped="pinned"] .code-block__pre {
+    /* Fallback for browsers without the `lh` unit (pre-Chrome 109 / Safari
+       16.4 / Firefox 120): roughly the same height at the default type size. */
+    max-block-size: 62rem;
+    /* `1lh` on the `pre` is exactly one code line — its own font-size times
+       its own line-height — so the clip cannot drift from the leading, at any
+       reader type size. `+ 1.7rem` is the block padding the box-sizing
+       includes. */
+    max-block-size: calc(var(--code-clip-lines, 120) * 1lh + 1.7rem);
+  }
+
+  /*
+   * The height is capped on the `pre`; the *clipping* is done one box out, on
+   * the scroll container. Those have to be two different elements.
+   *
+   * Putting `overflow-y: hidden` on the `pre` is the obvious way to write this
+   * and it silently breaks two things. `overflow` is not per-axis independent:
+   * a `visible` value computes to `auto` the moment the other axis is anything
+   * but `visible`, so `overflow-y: hidden` turns the `pre` into a *horizontal*
+   * scroller as well. The file then scrolls sideways in two nested boxes, and
+   * the inner one has no `tabindex` and no name — axe `scrollable-region-
+   * focusable`, WCAG 2.1.1, measured on `init-artifact.sh` (322 lines, long
+   * `printf` lines) where the clipped region overflows horizontally.
+   *
+   * `.code-block__scroll` is already the scroller, already focusable and
+   * already named, so hiding the vertical overflow there costs nothing and
+   * keeps the file to exactly one scroll container. The `pre` keeps the
+   * `max-block-size` because `1lh` has to resolve against the code's own font,
+   * not the wrapper's.
+   */
+  .code-file__body[data-clipped="true"]:not(:where(:has(.line:target))) .code-block__scroll,
+  .code-file__body[data-clipped="pinned"] .code-block__scroll {
+    overflow-y: hidden;
+  }
+
+  /* The fade says "this is cut, not finished". */
+  .code-file__body[data-clipped="true"]:not(:where(:has(.line:target)))::after,
+  .code-file__body[data-clipped="pinned"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    block-size: 4rem;
+    background: linear-gradient(to bottom, transparent, var(--code-ground));
+    pointer-events: none;
+  }
+
   /* ═══════════════════════════════════════════════════════ inline code */
 
   /*
@@ -402,6 +670,32 @@
       border: 1px solid CanvasText;
       padding-inline: 0.2em;
     }
+
+    /* The gutter's ground is what stops code sliding under the ordinals on a
+       horizontally scrolled file; a transparent one would make the two
+       overlap illegibly. */
+    .code-block__pre .line > span.code-line__no {
+      background: Canvas;
+      color: CanvasText;
+    }
+
+    /* `color-mix` of an accent is nothing in HCM. `Highlight` is the system's
+       own "this is the thing you asked for". */
+    .code-block__pre .line:target {
+      box-shadow: none;
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+
+    /* A gradient is dropped, so the fade would be a flat block of Canvas over
+       the last four lines of a clipped file. */
+    .code-file__body[data-clipped]::after {
+      display: none;
+    }
+
+    .code-file {
+      border: 1px solid CanvasText;
+    }
   }
 
   @media (prefers-contrast: more) {
@@ -417,6 +711,60 @@
 
     .code-block__copy {
       color: var(--ink-strong);
+    }
+
+    /* A 1px ring at 60% is a hint. At this setting the reader has asked for
+       statements, not hints. */
+    .code-block__pre .line:target {
+      box-shadow: inset 0 0 0 2px var(--issue-accent);
+    }
+
+    .code-block__pre .line > span.code-line__no {
+      color: var(--ink-strong);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════ print
+   *
+   * Paper has no scrollbars, no buttons and no "show all". A clipped file
+   * printed clipped is a file the reader cannot get at, so print opens
+   * everything and wraps what would otherwise run off the sheet.
+   */
+  @media print {
+    .code-file__actions,
+    .code-file__more,
+    .code-file__body[data-clipped]::after {
+      display: none;
+    }
+
+    .code-file__body[data-clipped] .code-block__pre {
+      max-block-size: none;
+      overflow: visible;
+    }
+
+    .code-file .code-block__scroll {
+      overflow: visible;
+      -webkit-mask-image: none;
+      mask-image: none;
+      animation: none;
+    }
+
+    .code-file .code-block__pre,
+    .code-file .code-block__pre code,
+    .code-file .code-block__pre .line {
+      white-space: pre-wrap;
+      text-wrap: wrap;
+      overflow-wrap: break-word;
+      inline-size: auto;
+    }
+
+    .code-file .code-block__pre[data-line-numbers] .line {
+      padding-inline-start: var(--code-gutter);
+      text-indent: calc(-1 * var(--code-gutter));
+    }
+
+    .code-block__pre .line > span.code-line__no {
+      position: static;
     }
   }
 }

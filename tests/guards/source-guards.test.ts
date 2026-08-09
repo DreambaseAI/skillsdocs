@@ -74,3 +74,71 @@ describe("root layout prerender safety", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * A component that is built, tested and never imported is worse than one that
+ * was never built: it passes every gate, it inflates the test count, and it
+ * reads like a shipped feature to the next person who greps for it.
+ *
+ * All three parts of the subchapter route arrived that way. `CodeBlock` and
+ * its 350 lines of `code.css` were complete, axe-clean and unreferenced —
+ * source files were reaching the page through a markdown fence instead, with
+ * no gutter, no `#L42`, no wrap and no clip. The shared `SubchapterRail` was
+ * likewise complete while the route rendered a thinner second copy of its own.
+ * Nothing failed. The site was simply missing the feature.
+ *
+ * These assertions are about *wiring*, which is why they read source text
+ * rather than behaviour: the rendering itself is covered by the component's
+ * own tests, and those all passed the whole time.
+ */
+describe("the subchapter route is wired to the components built for it", () => {
+  const read = async (rel: string) => {
+    const { readFileSync } = await import("node:fs");
+    return readFileSync(path.join(SRC, rel), "utf8");
+  };
+
+  const ROUTE = "app/[owner]/[repo]/[skill]/[...file]";
+
+  it("renders bundled source through CodeBlock", async () => {
+    const wrapper = await read(`${ROUTE}/code.tsx`);
+    const page = await read(`${ROUTE}/page.tsx`);
+
+    expect(wrapper).toContain('from "@/components/ai-elements/code-block"');
+    expect(page).toContain("CachedCodeBlock");
+  });
+
+  it("keeps the Shiki call inside a cache scope", async () => {
+    // Cache Components fails the prerender on the `Date.now()` Shiki reads.
+    // The wrapper exists for that and nothing else; without the directive the
+    // route throws on every code file.
+    expect(await read(`${ROUTE}/code.tsx`)).toContain('"use cache"');
+  });
+
+  it("hands the loader's own text to the highlighter", async () => {
+    // The bytes have to reach the page. A pre-rendered body would silently
+    // cost the gutter, the anchors, the copy button and the rail's outline.
+    const loader = await read("lib/resource-loader.ts");
+    expect(loader).toMatch(/view:\s*"code";\s*source:\s*string/);
+  });
+
+  it("uses the one SubchapterRail, not a local copy", async () => {
+    const page = await read(`${ROUTE}/page.tsx`);
+    const parts = await read(`${ROUTE}/parts.tsx`);
+
+    expect(page).toContain('SubchapterRail } from "@/components/book/chapter-rail"');
+    expect(parts).not.toMatch(/export function SubchapterRail/);
+  });
+
+  it("gives a code subchapter's rail its jump list", async () => {
+    const page = await read(`${ROUTE}/page.tsx`);
+    expect(page).toContain("codeOutline");
+    expect(page).toContain("outline={");
+  });
+
+  it("builds every subchapter URL from one function", async () => {
+    // Two identical implementations agreed only by luck; the appendix linked
+    // through one and the route's canonical URL came from the other.
+    const subchapters = await read("components/book/subchapters.ts");
+    expect(subchapters).toContain("export const subchapterHref = resourcePath");
+  });
+});

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "probe": "tsx scripts/probe-repos.mts",
     "probe:design": "tsx scripts/probe-design.mts",
+    "probe:resources": "tsx scripts/probe-resources.mts",
     "verify:contrast": "tsx scripts/audit-contrast.mts",
     "sync:skills-sh": "tsx scripts/sync-skills-sh.mts",
     "test": "vitest run",
