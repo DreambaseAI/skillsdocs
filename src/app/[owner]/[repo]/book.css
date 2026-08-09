@@ -83,10 +83,14 @@
   @media (min-width: 64rem) {
     .book-frame {
       --book-gutter: 2.5rem;
+      /* `--rail-r-w` rather than `--rail-w-right`: focus mode collapses the
+         track through that variable, and between 1024 and 1280 this is the
+         only rule setting the tracks. Hardcoding the width here left the rail
+         invisible but still occupying 260px — a hole, not a focus mode. */
       grid-template-columns:
         minmax(0, 6rem)
         minmax(var(--book-col-min), 1fr)
-        minmax(0, var(--rail-w-right));
+        minmax(0, var(--rail-r-w));
     }
 
     .book-frame:not(.book-frame--solo) > .book-column {
@@ -1913,4 +1917,184 @@
  */
 .book-chapternav__link:focus-visible {
   outline-offset: calc(-1 * var(--focus-ring-width, 2px));
+}
+
+/* ═══════════════════════════════════════════════════════════ focus mode */
+
+/*
+ * The rails retire and the column takes a little of their room.
+ *
+ * Registering the two widths as typed custom properties is what makes this
+ * animate at all: a bare `--rail-l-w` is an unparsed token, so the grid jumps
+ * between track sizes. Typed as `<length>`, the browser interpolates it and
+ * the transition below animates `grid-template-columns` for free.
+ */
+@property --rail-l-w {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --rail-r-w {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+@layer components {
+  /*
+   * The live strip each rail keeps when retired.
+   *
+   * Not zero, deliberately. A rail collapsed to nothing cannot be hovered, so
+   * the only way back would be a keyboard shortcut the reader has to already
+   * know. A strip this wide is invisible against the gutter but catches the
+   * pointer as it travels toward where the rail was.
+   */
+  .book-frame {
+    --rail-stub: 1.75rem;
+    --rail-l-w: var(--rail-w);
+    --rail-r-w: var(--rail-w-right);
+  }
+
+  @media (min-width: 64rem) {
+    .book-frame:not(.book-frame--solo) > .book-rail:not(.book-rail--left) {
+      opacity: var(--rail-r-op, 1);
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .book-frame > .book-rail--left {
+      opacity: var(--rail-l-op, 1);
+    }
+
+    /* Drive the tracks from the same two lengths the opacities use, so a rail
+       can never be visible in a track that has already collapsed. */
+    .book-frame {
+      grid-template-columns:
+        minmax(0, var(--rail-l-w))
+        minmax(var(--book-col-min), 1fr)
+        minmax(0, var(--rail-r-w));
+    }
+  }
+
+  [data-focus-mode="on"] .book-frame {
+    --rail-l-w: var(--rail-stub);
+    --rail-r-w: var(--rail-stub);
+    --rail-l-op: 0;
+    --rail-r-op: 0;
+  }
+
+  /*
+   * Coming back. Hover is the discoverable route; `:focus-within` is the
+   * required one — a keyboard reader must never Tab onto something they
+   * cannot see (WCAG 2.4.7). Per side, because revealing the contents rail
+   * when someone reaches for the headings rail is a different page moving
+   * under them than the one they pointed at.
+   */
+  [data-focus-mode="on"] .book-frame:has(> .book-rail--left:hover),
+  [data-focus-mode="on"] .book-frame:has(> .book-rail--left:focus-within) {
+    --rail-l-w: var(--rail-w);
+    --rail-l-op: 1;
+  }
+
+  [data-focus-mode="on"]
+    .book-frame:has(> .book-rail:not(.book-rail--left):hover),
+  [data-focus-mode="on"]
+    .book-frame:has(> .book-rail:not(.book-rail--left):focus-within) {
+    --rail-r-w: var(--rail-w-right);
+    --rail-r-op: 1;
+  }
+
+  /*
+   * "A little of their room", not all of it. The rails free ~30rem between
+   * them, and handing that to the measure would undo the reader's own line
+   * length. Only the bleed grows, so code blocks, tables and figures — the
+   * things that were always cramped — get the space, and the prose stays
+   * exactly where it was set.
+   */
+  [data-focus-mode="on"] .book-column {
+    max-inline-size: calc(var(--reader-bleed) * 1.14);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .book-frame {
+      transition:
+        --rail-l-w 420ms var(--ease-out-quint),
+        --rail-r-w 420ms var(--ease-out-quint);
+    }
+
+    .book-frame > .book-rail {
+      transition: opacity 300ms var(--ease-out-quint);
+    }
+
+    .book-column {
+      transition: max-inline-size 420ms var(--ease-out-quint);
+    }
+  }
+
+  /* Both attributes are on <html>, so this is compound, not descendant. */
+  [data-motion="reduce"] .book-frame,
+  [data-motion="reduce"] .book-frame > .book-rail,
+  [data-motion="reduce"] .book-column {
+    transition: none;
+  }
+
+  /*
+   * A retired rail is still in the tab order, and must be: `:focus-within`
+   * only fires once something inside has focus, so the rail has to be
+   * focusable while invisible for the reveal to ever happen. What it must not
+   * be is *clickable* while invisible — a link nobody can see swallowing a
+   * click in the gutter is worse than no link.
+   */
+  /*
+   * The hot zone reaches the window edge.
+   *
+   * A retired rail's strip sits *inside* the frame's gutter — measured at
+   * 1600px, the left strip occupies x=80..108. So a pointer at x=6, which is
+   * exactly where you throw the mouse when you want the sidebar back, landed
+   * on the gutter and nothing happened. Hovering at x=90 worked perfectly,
+   * which is the tell: the mechanism was right and only the target was wrong.
+   *
+   * Negative margin widens the rail's *box* out to the window edge; the
+   * matching padding keeps its *content* exactly where it was. Nothing moves,
+   * and the whole edge band is live. A pseudo-element cannot do this job — at
+   * `z-index: -1` it paints behind the frame and never hit-tests, and above it
+   * would swallow clicks on the rail's own links once revealed.
+   */
+  [data-focus-mode="on"] .book-frame > .book-rail::after {
+    content: "";
+    position: fixed;
+    inset-block: var(--header-h) 0;
+    inline-size: 5rem;
+  }
+
+  [data-focus-mode="on"] .book-frame > .book-rail--left::after {
+    inset-inline-start: 0;
+  }
+
+  [data-focus-mode="on"] .book-frame > .book-rail:not(.book-rail--left)::after {
+    inset-inline-end: 0;
+  }
+
+  /*
+   * Once a rail is back, its strip stops claiming the gutter — otherwise the
+   * band would keep swallowing pointer events over content the reader can now
+   * see, and a rail revealed by keyboard would be held open by a mouse
+   * resting anywhere near the edge.
+   */
+  [data-focus-mode="on"] .book-frame:has(> .book-rail--left:focus-within)
+    > .book-rail--left::after,
+  [data-focus-mode="on"]
+    .book-frame:has(> .book-rail:not(.book-rail--left):focus-within)
+    > .book-rail:not(.book-rail--left)::after {
+    display: none;
+  }
+
+  [data-focus-mode="on"] .book-frame > .book-rail a {
+    pointer-events: none;
+  }
+
+  [data-focus-mode="on"] .book-frame > .book-rail:hover a,
+  [data-focus-mode="on"] .book-frame > .book-rail:focus-within a {
+    pointer-events: auto;
+  }
 }

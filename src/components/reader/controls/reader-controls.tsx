@@ -19,12 +19,22 @@
  * is a settings button most people never press.
  */
 
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowExpandIcon,
+  ArrowShrinkIcon,
+  Cancel01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { announce } from "@/components/chrome/live-regions";
 import { ShortcutsDialog } from "@/components/chrome/shortcuts-dialog";
+import { Kbd } from "@/components/ui/kbd";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { FocusMode } from "@/components/reader/focus-mode";
 import { ReaderPanel } from "@/components/reader/controls/panel";
 import { sizeAnnouncement } from "@/components/reader/controls/size-stepper";
@@ -128,11 +138,68 @@ export interface ReaderControlsProps {
   className?: string;
 }
 
+/**
+ * Focus mode as a first-class control.
+ *
+ * It used to be a switch on the third row of a popover, which is a strange
+ * place for something you reach for *because* you want fewer things in the
+ * way. It is a toolbar button now: one press, no panel, and its pressed state
+ * is visible without opening anything.
+ *
+ * Desktop only. On a phone there are no rails to retire — the contents are
+ * already a sheet — so the button would toggle nothing.
+ */
+function FocusModeButton({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            data-slot="focus-trigger"
+            // `aria-pressed` and not a switch role: this is a button whose
+            // effect persists, which is exactly what a toggle button is for,
+            // and it keeps the control one tab stop instead of two.
+            aria-pressed={enabled}
+            aria-label={enabled ? "Exit focus mode" : "Focus mode"}
+            onClick={onToggle}
+            className="aria-pressed:bg-accent aria-pressed:text-issue-accent"
+          />
+        }
+      >
+        <HugeiconsIcon
+          icon={enabled ? ArrowShrinkIcon : ArrowExpandIcon}
+          className="size-4"
+          aria-hidden
+        />
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        {enabled ? "Exit focus mode" : "Focus mode"}
+        <Kbd className="ml-2">Z</Kbd>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function ReaderControls({ className }: ReaderControlsProps) {
   const { prefs, extras, update, setFocusMode } = useReaderPrefs();
   const [open, setOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const isDesktop = useMediaQuery("(min-width: 768px)");
+  /*
+   * Focus mode retires the rails, and the first rail appears at 64rem. Below
+   * that the button was present and did essentially nothing — it nudged the
+   * bleed by 22px and hid furniture that was already a sheet.
+   */
+  const hasRails = useMediaQuery("(min-width: 64rem)");
   const pillSlot = usePillSlot(!isDesktop);
 
   useShortcut("controls", () => setOpen((wasOpen) => !wasOpen));
@@ -141,10 +208,18 @@ export function ReaderControls({ className }: ReaderControlsProps) {
   // `Z` — hide the chrome. Advertised in the keymap with a key cap since the
   // beginning and subscribed by nothing, so the key was cancelled and nothing
   // happened. This component already owns the switch.
-  useShortcut("immersive", () => {
+  const toggleFocus = useCallback(() => {
     const next = !extras.focusMode;
     setFocusMode(next);
-    announce(next ? "Focus mode on. Press Escape to exit." : "Focus mode off.");
+    announce(
+      next
+        ? "Focus mode on. The rails are hidden; hover either edge or press Escape."
+        : "Focus mode off.",
+    );
+  }, [extras.focusMode, setFocusMode]);
+
+  useShortcut("immersive", () => {
+    toggleFocus();
   });
 
   const stepSize = useCallback(
@@ -177,7 +252,11 @@ export function ReaderControls({ className }: ReaderControlsProps) {
   return (
     <>
       {isDesktop ? (
-        <Popover open={open} onOpenChange={setOpen} modal={false}>
+        <>
+          {hasRails ? (
+            <FocusModeButton enabled={extras.focusMode} onToggle={toggleFocus} />
+          ) : null}
+          <Popover open={open} onOpenChange={setOpen} modal={false}>
           <PopoverTrigger
             render={
               <Button
@@ -214,8 +293,9 @@ export function ReaderControls({ className }: ReaderControlsProps) {
               <ClosePanelButton onClose={() => setOpen(false)} />
             </PopoverHeader>
             {panel}
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+        </>
       ) : (
         <>
           {(() => {

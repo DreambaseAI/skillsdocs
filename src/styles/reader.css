@@ -396,39 +396,11 @@
     transition: scale 90ms linear;
   }
 
-  /* ────────────────────────────────────────────────────────  focus mode */
-
-  [data-focus-mode="on"] .reader :is(p, li, blockquote, pre, figure, h1, h2, h3, h4) {
-    opacity: var(--focus-dim, 0.32);
-  }
-
-  [data-focus-mode="on"] .reader [data-focus-active] {
-    opacity: 1;
-  }
-
-  [data-focus-mode="on"] .reader [data-focus-active] :is(p, li, blockquote, pre, figure) {
-    opacity: 1;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    [data-focus-mode="on"] .reader :is(p, li, blockquote, pre, figure, h1, h2, h3, h4) {
-      transition: opacity 160ms linear;
-    }
-  }
-
-  /* Both attributes live on <html>, so these are compound selectors, not
-     descendant ones. Written as `[a] [b]` they would never match. */
-  [data-motion="reduce"][data-focus-mode="on"] .reader * {
-    transition: none;
-  }
-
-  /* Dimming *is* a contrast reduction, so at high contrast the mode has to
-     stop being itself rather than fight the setting that was asked for. */
-  [data-contrast="high"][data-focus-mode="on"]
-    .reader
-    :is(p, li, blockquote, pre, figure, h1, h2, h3, h4) {
-    opacity: 1;
-  }
+  /* Focus mode moved to `book.css`: it now retires the rails rather than
+     dimming the prose, so it belongs with the grid that owns them. Dimming
+     text was a contrast reduction, which forced the whole mode off at
+     `data-contrast="high"` — the readers most likely to want fewer
+     distractions were the ones who could not have it. */
 
   /* ───────────────────────────────────────────────── the controls surface */
 
