@@ -83,7 +83,7 @@ import {
   SHIKI_THEMES,
   SPECIAL_LANGS,
 } from "@/lib/markdown/highlighter";
-import { formatBytes } from "@/lib/resources";
+import { countLines, formatBytes } from "@/lib/resources";
 import { cn } from "@/lib/utils";
 
 import { CodeFileFrame } from "./code-block-frame";
@@ -224,6 +224,8 @@ function findElement(parent: Root | Element, tagName: string): Element | undefin
 function forDisplay(code: string): string {
   return code.replace(/^﻿/, "").replace(/\r\n?/g, "\n").replace(/\n$/, "");
 }
+// The count that goes in the header is `countLines`, shared with the loader so
+// the rail's "Lines" stat cannot disagree with it. Keep `forDisplay` in step.
 
 export interface HighlightOptions {
   showLineNumbers?: boolean;
@@ -269,7 +271,7 @@ export async function highlightCode(
     node: codeEl ? toJsxRuntime(codeEl, JSX_OPTIONS) : text,
     preClassName,
     language: resolved,
-    lines: text === "" ? 0 : text.split("\n").length,
+    lines: countLines(text),
   };
 }
 

@@ -53,18 +53,29 @@ async function json<T>(path: string): Promise<T> {
 /**
  * Read the shape of a rendered subchapter out of its HTML.
  *
- * Order matters. A preview *is* a code frame with a truncation notice beside
- * it, so the notice is tested first; the binary notice and the not-found UI
- * exclude a frame entirely, so they are unambiguous.
+ * **Positive markers are tested first, and that is a correctness requirement,
+ * not a style choice.** `notFound()` on this route is raised inside the
+ * Suspense boundary, so Next serialises the segment's `not-found.tsx` into the
+ * RSC flight payload of *every* subchapter response — a rendered one included.
+ * The copy "does not ship that file" therefore appears exactly once in the HTML
+ * of a page that rendered a 4 KB font licence perfectly well. Testing it first
+ * classified all 788 files in the three showcase repos as `missing` and made
+ * this probe incapable of ever passing.
+ *
+ * The discriminator is the *rendered DOM*: a page is missing only when none of
+ * the four content shapes left a mark on it.
+ *
+ * Among the positives, order still matters. A preview is a code frame plus a
+ * truncation notice, so the notice is tested before the bare frame.
  */
 function classifyPage(html: string): Observed {
-  if (html.includes("does not ship that file")) return "missing";
-  if (html.includes("Could not be read")) return "unavailable";
-  if (html.includes("Not reproduced here")) return "binary";
   const hasFrame = html.includes("code-line__no");
   if (hasFrame && /First \d+ lines/.test(html)) return "preview";
   if (hasFrame) return "code";
   if (html.includes('class="prose')) return "prose";
+  if (html.includes("Not reproduced here")) return "binary";
+  if (html.includes("Could not be read")) return "unavailable";
+  if (html.includes("does not ship that file")) return "missing";
   return "unknown";
 }
 

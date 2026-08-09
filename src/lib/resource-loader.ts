@@ -6,6 +6,7 @@ import { fetchRawText, rawUrl, repoTag } from "@/lib/github";
 import { renderMarkdown, type RenderedMarkdown } from "@/lib/markdown";
 import type { Skill } from "@/lib/skills";
 import {
+  countLines,
   findResource,
   formatBytes,
   previewHead,
@@ -285,7 +286,11 @@ async function loadBody(
    * highlights it off the same Shiki singleton the prose pipeline uses, so
    * there is still exactly one highlighter and one theme pair.
    */
-  return { view: "code", source, lines: source.split("\n").length };
+  // `countLines`, not `split("\n").length`: the code frame normalises before
+  // it counts (CRLF folded, one trailing newline dropped), so a raw count made
+  // the rail say "Lines 99" beside a header reading "98 lines" on the same
+  // page for every POSIX file, which ends in a newline.
+  return { view: "code", source, lines: countLines(source) };
 }
 
 /**

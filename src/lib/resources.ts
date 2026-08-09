@@ -539,6 +539,27 @@ export function resourceDir(path: string): string {
  * else's Python and the helper had nothing left to protect.
  */
 
+/**
+ * How many lines a file has, as the reader will see them counted.
+ *
+ * There is exactly one definition of this because there are two surfaces
+ * showing it — the code frame's header ("Python · 98 lines") and the rail's
+ * "Lines" stat — and they disagreed. The frame normalises before it counts
+ * (`forDisplay` in `ai-elements/code-block.tsx`: CRLF folded, one trailing
+ * newline dropped, so a POSIX file does not show a phantom final line), while
+ * the loader counted the raw bytes. A 98-line script therefore read "98 lines"
+ * in its header and "Lines 99" in its rail, on the same page.
+ *
+ * Both now call this. Keep it in step with `forDisplay`.
+ */
+export function countLines(source: string): number {
+  const normalised = source
+    .replace(/^﻿/, "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\n$/, "");
+  return normalised === "" ? 0 : normalised.split("\n").length;
+}
+
 export interface PreviewHead {
   source: string;
   lines: number;
