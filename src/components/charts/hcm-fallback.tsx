@@ -166,7 +166,9 @@ function HcmBars({
         <text
           fill="CanvasText"
           fontSize="9"
-          key={label}
+          // Position, not text: labels arrive truncated for the axis, so two
+          // distinct categories can share a string.
+          key={`${label}-${i}`}
           textAnchor="middle"
           x={i * slot + slot / 2}
           y={VIEW_H - 3}

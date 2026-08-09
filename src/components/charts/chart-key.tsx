@@ -32,8 +32,9 @@ export function ChartKey({
 }) {
   return (
     <ul className={cn("chart-key", className)}>
-      {entries.map((entry) => (
-        <li className="chart-key-item" key={entry.label}>
+      {entries.map((entry, i) => (
+        // Series index, not label: two categories can share a display string.
+        <li className="chart-key-item" key={`${entry.label}-${i}`}>
           <span
             aria-hidden="true"
             className="chart-key-swatch"

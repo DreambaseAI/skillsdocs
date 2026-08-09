@@ -19,7 +19,8 @@
     "verify:source": "vitest run tests/guards",
     "verify:lighthouse": "lhci autorun",
     "verify": "pnpm tsc --noEmit && pnpm lint && pnpm vitest run && pnpm verify:contrast && pnpm test:e2e",
-    "shots": "tsx scripts/shots.mts"
+    "shots": "tsx scripts/shots.mts",
+    "check:console": "tsx scripts/check-console.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

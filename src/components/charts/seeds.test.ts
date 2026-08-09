@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { isSeed, seedOf } from "@/components/dither-kit/palette";
 import { deriveIssueTheme } from "@/lib/design/theme";
-import { compactNumber, exactNumber, percentOf, truncateLabel } from "./format";
+import {
+  compactNumber,
+  exactNumber,
+  percentOf,
+  shortenLabels,
+  truncateLabel,
+} from "./format";
 import { chartSeedsFromTheme, seedAt, seedFromColor } from "./seeds";
 
 const theme = deriveIssueTheme("anthropics", null);
@@ -101,8 +107,59 @@ describe("chart formatting", () => {
   });
 
   it("truncates to the requested width, ellipsis included", () => {
-    expect(truncateLabel("vercel-labs/skills", 10)).toBe("vercel-la…");
+    // Repo-preserving now: the tail is what distinguishes these labels.
+    expect(truncateLabel("vercel-labs/skills", 10)).toBe("ve…/skills");
     expect(truncateLabel("vercel-la…", 10)).toHaveLength(10);
     expect(truncateLabel("short", 10)).toBe("short");
+  });
+});
+
+describe("truncateLabel", () => {
+  it("keeps the repo whole and shortens the owner", () => {
+    // The real collision: both used to become "vercel-l…".
+    expect(truncateLabel("vercel-labs/skills", 12)).toBe("verc…/skills");
+    // The repo alone is exactly the budget, so it survives whole.
+    expect(truncateLabel("vercel-labs/agent-skills", 12)).toBe("agent-skills");
+  });
+
+  it("leaves short labels alone", () => {
+    expect(truncateLabel("prisma/skills", 20)).toBe("prisma/skills");
+    expect(truncateLabel("skills", 12)).toBe("skills");
+  });
+
+  it("never exceeds the budget", () => {
+    const labels = [
+      "vercel-labs/skills",
+      "vercel-labs/agent-skills",
+      "microsoft/azure-skills",
+      "googleworkspace/agent-skills-for-google-workspace",
+      "a/b",
+      "noslashbutverylongindeed",
+    ];
+    for (const l of labels) {
+      expect(truncateLabel(l, 12).length, l).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it("keeps the twelve most-installed books distinguishable", () => {
+    // A duplicate here is both a misleading axis and a duplicate React key.
+    const labels = [
+      "mattpocock/skills",
+      "microsoft/azure-skills",
+      "heygen-com/hyperframes",
+      "vercel-labs/skills",
+      "anthropics/skills",
+      "obra/superpowers",
+      "github/awesome-copilot",
+      "vercel-labs/agent-skills",
+      "pbakaus/impeccable",
+      "firebase/agent-skills",
+      "prisma/skills",
+      "googleworkspace/agent-skills",
+    ];
+
+    const short = shortenLabels(labels, 12);
+    expect(new Set(short).size).toBe(short.length);
+    for (const s of short) expect(s.length).toBeLessThanOrEqual(12);
   });
 });

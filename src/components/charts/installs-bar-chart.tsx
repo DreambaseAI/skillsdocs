@@ -18,7 +18,7 @@ import { Grid } from "@/components/dither-kit/grid";
 import { XAxis } from "@/components/dither-kit/x-axis";
 import { YAxis } from "@/components/dither-kit/y-axis";
 import { AccessibleChart } from "./accessible-chart";
-import { compactNumber, exactNumber, percentOf, truncateLabel } from "./format";
+import { compactNumber, exactNumber, percentOf, shortenLabels, truncateLabel } from "./format";
 import { HcmFallback } from "./hcm-fallback";
 import { type ChartSeeds, seedAt } from "./seeds";
 import {
@@ -99,7 +99,7 @@ export function InstallsBarChart({
       description={description}
       hcm={
         <HcmFallback
-          categories={items.map((i) => truncateLabel(i.label, 9))}
+          categories={shortenLabels(items.map((i) => i.label), 9)}
           id="installs"
           kind="bar"
           series={[{ label: "Installs", values: items.map((i) => i.installs) }]}
