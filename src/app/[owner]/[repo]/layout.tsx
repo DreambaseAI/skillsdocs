@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import {
+  BookShortcuts,
+  type BookShortcutsProps,
+} from "@/components/book/book-shortcuts";
 import { SiteHeader } from "@/components/chrome/site-header";
+import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
 import { ReaderControls } from "@/components/reader/controls";
 import { loadBook } from "./loader";
 import { issueThemeCss } from "@/lib/design/theme";
-import { paths } from "@/lib/site";
+import { external, installCommand, paths } from "@/lib/site";
 import "./book.css";
 
 /**
@@ -36,11 +41,39 @@ export default function BookLayout(props: LayoutProps<"/[owner]/[repo]">) {
         <IssueTheme params={props.params} />
       </Suspense>
 
+      {/* The chapter-context keys — `]` `[` `→` `←` `T` `G B` `G H` `C` `⇧C`.
+          Same reason as the controls below: the layout is on the cover, on a
+          chapter and on a subchapter file exactly once, so one subscriber owns
+          each action and no action double-fires across a route change. It
+          renders nothing; the Suspense boundary is here because the island
+          awaits `params`, not because there is anything to see. */}
+      <Suspense fallback={null}>
+        <BookKeys params={props.params} />
+      </Suspense>
+
       {/* The reading controls mount here, not on the page, so they survive
           navigation between the cover and every chapter — and so exactly one
           instance owns the `,` / `+` / `-` shortcuts. On a phone the trigger
-          portals itself into the contents pill. */}
-      <SiteHeader actions={<ReaderControls />}>
+          portals itself into the contents pill.
+
+          The palette rides alongside them, and that is the fix for `/` and
+          `⌘K` being dead on every reading route: `CommandPalette` owns the
+          `search` action and was mounted only by the homepage and `/search`.
+          It belongs in the header rather than the root layout because the root
+          layout is shared with API-ish and error routes that must not pull the
+          ~20 KB corpus, and because this is where the affordance was missing —
+          a reader inside a book had no search button at all. Its own Suspense
+          boundary keeps a cold skills.sh scrape off the critical path. */}
+      <SiteHeader
+        actions={
+          <>
+            <Suspense fallback={<PaletteFallback />}>
+              <PaletteSlot />
+            </Suspense>
+            <ReaderControls />
+          </>
+        }
+      >
         <Suspense fallback={<IdentityFallback />}>
           <Identity params={props.params} />
         </Suspense>
@@ -73,6 +106,48 @@ async function IssueTheme({
   // The string is built by `issueThemeCss` from re-validated tokens only — no
   // value from a third-party design.md reaches this element unsanitised.
   return <style>{css}</style>;
+}
+
+/**
+ * Hands the keyboard layer the book, as plain data.
+ *
+ * Everything crossing into `BookShortcuts` is a string or an array of strings,
+ * so the client bundle never sees a `Book`. Failures are swallowed for the same
+ * reason `IssueTheme` swallows them: a layout that throws takes the whole book
+ * down, and no shortcut is worth the page.
+ */
+async function BookKeys({
+  params,
+}: Pick<LayoutProps<"/[owner]/[repo]">, "params">) {
+  const requested = await params;
+
+  // Resolved outside the JSX, because an exception thrown while *constructing*
+  // an element is the only kind this catch could ever see — React renders the
+  // component later, where only an error boundary can reach it.
+  let props: BookShortcutsProps | null = null;
+  try {
+    const result = await loadBook(requested.owner, requested.repo);
+    if (result.kind !== "ok") return null;
+
+    // The resolved identity, not the URL's: GitHub follows renames, and a
+    // `G H` that opened the pre-rename path would 404 on GitHub itself.
+    const { owner, repo } = result.book.repo;
+
+    props = {
+      coverHref: paths.book(owner, repo),
+      githubUrl: external.repo(owner, repo),
+      installCommand: installCommand(owner, repo),
+      chapters: result.book.skills.map((skill) => ({
+        slug: skill.slug,
+        href: paths.chapter(owner, repo, skill.slug),
+        title: skill.title,
+      })),
+    };
+  } catch {
+    return null;
+  }
+
+  return <BookShortcuts {...props} />;
 }
 
 async function Identity({

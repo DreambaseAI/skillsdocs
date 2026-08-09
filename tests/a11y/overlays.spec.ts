@@ -129,8 +129,10 @@ test.describe("overlay states are audited, not assumed", () => {
 /* --------------------------------------------------------------- keymap */
 
 test.describe("the keymap does what it advertises", () => {
-  // The palette mounts on the routes that carry the masthead (home, search,
-  // the 404 shell), so that is where `/` and ⌘K are testable.
+  // The palette now mounts on the reading routes too — it rides in the book
+  // header alongside the reading controls, which is what made `/` and ⌘K work
+  // inside a book. Home is still where these three run, because it is the one
+  // route that carries the palette and *not* the reader's own chrome.
   test("/ opens the palette, and Escape closes it", async ({ page }, info) => {
     interactionOnly(info.project.name);
     test.fixme(routeMissing("home"), missingRouteNote("home"));
@@ -214,9 +216,11 @@ test.describe("the keymap does what it advertises", () => {
     test.fixme(routeMissing("chapter"), missingRouteNote("chapter"));
 
     await gotoReady(page, ROUTES.chapter);
-    // The stored choice, not the class: the first press moves "system" to the
-    // scheme it was already resolving to, which is a real state change the
-    // class alone cannot show.
+    // The stored choice, not the class. Two of the three settings render the
+    // same pixels — "system" *is* light or dark — so one edge of the cycle
+    // necessarily leaves the class alone. `nextScheme` puts that edge on the
+    // return to "system" rather than on the first press, but the setting is
+    // still the only thing that changes on every press.
     const stored = () => page.evaluate(() => window.localStorage.getItem("theme"));
     expect(await stored()).toBeNull();
 

@@ -15,6 +15,7 @@ import {
   emitShortcut,
   hasShortcutListener,
   normalizeKey,
+  ownsKeyNatively,
   type ShortcutAction,
   type ShortcutSettings,
   shouldHandle,
@@ -23,14 +24,24 @@ import {
 /**
  * Actions whose key would otherwise do something in the browser we do not want.
  *
- * The page-turn aliases are deliberately absent: Space and the arrow keys
- * already scroll, and scrolling is what "next page" means in a scroll-mode
- * reader. Cancelling the native behaviour to reimplement it would break
- * momentum, spatial navigation and every AT that drives the caret.
+ * The page-turn pair is in here now, and that is a reversal worth stating.
+ * While nothing implemented `pageDown`/`pageUp` the honest thing was to leave
+ * Space and the arrows to the browser — native scrolling *is* a page turn.
+ * Now that `BookShortcuts` owns the scroll (a measured 90% of the viewport,
+ * smooth or instant according to the tri-state motion preference), leaving the
+ * default in place would run both: measured, Space moved the document 1.9
+ * viewports in one press.
+ *
+ * The two things that made the old comment right are preserved, but by
+ * `ownsKeyNatively` rather than by declining to act: Space still activates the
+ * focused button, and the arrow keys still belong to any slider, radio group
+ * or tab list that has focus.
  */
 const PREVENT_DEFAULT: ReadonlySet<ShortcutAction> = new Set([
   "nextChapter",
   "prevChapter",
+  "pageDown",
+  "pageUp",
   "toc",
   "search",
   "controls",
@@ -106,6 +117,15 @@ export function useReaderShortcuts(settings: ShortcutSettings): ReaderShortcutsS
 
       const key = normalizeKey(event);
       if (!key) return;
+
+      // Escape (a) again, one level finer. `shouldHandle` asks "is this text?";
+      // this asks "does the focused control already mean something by this
+      // key?" — Space on a button, `→` on a slider. Both must reach the widget
+      // untouched, and neither is an editable target.
+      if (ownsKeyNatively(key, event.target)) {
+        if (pendingRef.current) clearChord();
+        return;
+      }
 
       const armed = pendingRef.current;
       if (armed) {

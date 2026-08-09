@@ -37,10 +37,42 @@ export const SCHEME_OPTIONS: SchemeOption[] = [
   { value: "system", label: "System", icon: ComputerIcon },
 ];
 
-const SCHEME_ORDER: ColorScheme[] = ["light", "dark", "system"];
-
 function isScheme(value: unknown): value is ColorScheme {
   return value === "light" || value === "dark" || value === "system";
+}
+
+/**
+ * The next scheme in the `D` cycle.
+ *
+ * Two of the three states render identically — "system" *is* light or dark —
+ * so any 3-cycle over them contains exactly one step that changes nothing on
+ * screen. That is arithmetic, not a bug. The bug was *which* step it landed on.
+ *
+ * The old order was a fixed `light → dark → system`, so a reader on the default
+ * "system" setting with a light OS pressed `D` and got "light": same class on
+ * `<html>`, same pixels, no evidence anything had happened. Measured in
+ * Chromium at `prefers-color-scheme: light` — press 1 `system → light`
+ * (`class="… light"` both sides), press 2 `light → dark`, press 3
+ * `dark → system` (light again). The key was live the whole time; it just
+ * opened with a no-op, which reads exactly like a dead binding.
+ *
+ * So the cycle is now oriented against the OS: leave "system" for the scheme
+ * it is *not*, cross to the scheme it is, and only then return to "system" —
+ * putting the unavoidable no-op on the one edge where nothing changing is the
+ * expected outcome ("match my system", which is what you were already seeing).
+ *
+ *   OS light:  system → dark → light → system
+ *   OS dark:   system → light → dark → system
+ */
+export function nextScheme(
+  value: ColorScheme,
+  systemPrefersDark: boolean,
+): ColorScheme {
+  const matching: ColorScheme = systemPrefersDark ? "dark" : "light";
+  const opposing: ColorScheme = systemPrefersDark ? "light" : "dark";
+  if (value === "system") return opposing;
+  if (value === opposing) return matching;
+  return "system";
 }
 
 const NEVER_CHANGES = () => () => {};
@@ -67,11 +99,12 @@ export function useHydrated(): boolean {
  * until hydrated; both sides then render "system" and there is no mismatch.
  */
 function useScheme() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme, systemTheme } = useTheme();
   const mounted = useHydrated();
 
   const value: ColorScheme = mounted && isScheme(theme) ? theme : "system";
   const resolved = mounted && resolvedTheme === "dark" ? "dark" : "light";
+  const systemPrefersDark = mounted && systemTheme === "dark";
 
   const change = useCallback(
     (next: ColorScheme) => {
@@ -88,7 +121,7 @@ function useScheme() {
     [setTheme],
   );
 
-  return { value, resolved, mounted, change };
+  return { value, resolved, systemPrefersDark, mounted, change };
 }
 
 /* --------------------------------------------------------------- segmented */
@@ -149,16 +182,16 @@ export interface ThemeToggleButtonProps {
  * so a live region on the button itself would double up.
  */
 export function ThemeToggleButton({ className }: ThemeToggleButtonProps) {
-  const { value, resolved, mounted, change } = useScheme();
+  const { value, resolved, systemPrefersDark, mounted, change } = useScheme();
 
   const current = SCHEME_OPTIONS.find((o) => o.value === value) ?? SCHEME_OPTIONS[2];
-  const next = SCHEME_ORDER[(SCHEME_ORDER.indexOf(value) + 1) % SCHEME_ORDER.length];
+  const next = nextScheme(value, systemPrefersDark);
   const nextLabel = SCHEME_OPTIONS.find((o) => o.value === next)?.label ?? next;
 
-  // The `D` shortcut. Documented in the keymap since the beginning and, until
-  // now, subscribed by nothing: pressing `D` cancelled the keystroke and
-  // changed no theme. `change()` already announces the result, so the
-  // keyboard path and the pointer path say the same thing.
+  // The `D` shortcut. `change()` already announces the result, so the keyboard
+  // path and the pointer path say the same thing — and `nextScheme` is what
+  // makes the first press of `D` from the default "system" state actually
+  // repaint the page instead of quietly reassigning it the same colours.
   useShortcut("themeCycle", () => change(next));
 
   // Before mount we cannot know the resolved scheme, so show the neutral

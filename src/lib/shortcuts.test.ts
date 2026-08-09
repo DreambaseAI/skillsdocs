@@ -18,6 +18,7 @@ import {
   normalizeKey,
   onShortcut,
   onShortcutRegistryChange,
+  ownsKeyNatively,
   parseBindings,
   resetShortcutListeners,
   serializeBindings,
@@ -240,6 +241,47 @@ describe("formatKey", () => {
     expect(formatKey("shift+space")).toEqual(["⇧", "Space"]);
     expect(formatKey("arrowright")).toEqual(["→"]);
   });
+
+  /**
+   * `+` is the separator *and* a key we bind. Splitting naively made
+   * `"+".split("+")` produce `["", ""]`, so the "Larger text" row in the
+   * shortcuts dialog rendered two blank grey key caps followed by `=`. Seen in
+   * a screenshot, not inferred.
+   */
+  it("keeps a literal + that is the key, not a separator", () => {
+    expect(formatKey("+")).toEqual(["+"]);
+    expect(formatKey("shift+=")).toEqual(["⇧", "="]);
+    // Both halves of the pair, and the unshifted layouts they exist for.
+    expect(formatKey("=")).toEqual(["="]);
+    expect(formatKey("_")).toEqual(["_"]);
+    expect(formatKey("-")).toEqual(["-"]);
+    // A modifier in front of the plus still separates.
+    expect(formatKey("shift++")).toEqual(["⇧", "+"]);
+    expect(formatKey("mod++", "mac")).toEqual(["⌘", "+"]);
+  });
+
+  it("does not treat an unknown prefix as a modifier", () => {
+    // `hyper` is not something `normalizeKey` emits, so the whole token is the
+    // key rather than a modifier plus a void.
+    expect(formatKey("hyper+x")).toEqual(["hyper+x"]);
+  });
+
+  /**
+   * The screenshot check, as an assertion: every cap the dialog can draw has
+   * something in it. An empty `<Kbd>` is a key the reader cannot learn.
+   */
+  it("renders a non-empty cap for every default binding", () => {
+    for (const def of SHORTCUTS) {
+      for (const binding of bindingsFor(def.action, DEFAULT_SHORTCUT_SETTINGS)) {
+        const caps = formatKey(binding);
+        expect(caps.length, `${def.action} · ${binding}`).toBeGreaterThan(0);
+        for (const cap of caps) {
+          expect(cap.trim(), `${def.action} · ${binding} → ${JSON.stringify(caps)}`)
+            .not.toBe("");
+        }
+      }
+    }
+  });
 });
 
 /* ─────────────────────────────────── WCAG 2.1.4 — all three escapes ── */
@@ -356,6 +398,66 @@ describe("escape (c): remapping", () => {
   it("drops entries for actions that no longer exist", () => {
     const parsed = parseBindings("toc:o;wormhole:w;garbage");
     expect(parsed.bindings).toEqual({ toc: ["o"] });
+  });
+});
+
+/**
+ * The fourth escape, and the one the other three could not cover.
+ *
+ * Space and the arrow keys are the only bindings whose default belongs to a
+ * *control* rather than to the browser, and the dispatcher now cancels them —
+ * it has to, or the browser's own Space scroll lands on top of the reader's
+ * page-turn. Without this check that cancellation would have taken keyboard
+ * activation away from every button on the site and the arrow keys away from
+ * every slider, radio group and tab list, none of which `isEditableTarget`
+ * classifies as off-limits.
+ */
+describe("keys the focused control already owns", () => {
+  /** A minimal element whose `closest` matches the listed selectors. */
+  function element(matches: string[]): EventTarget {
+    return {
+      tagName: "DIV",
+      closest: (selector: string) =>
+        selector.split(",").some((part) => matches.includes(part.trim())) ? {} : null,
+    } as unknown as EventTarget;
+  }
+
+  const nothing = element([]);
+
+  it("leaves Space to a focused button, link or summary", () => {
+    for (const selector of ["button", "a[href]", "summary", '[role="button"]']) {
+      expect(ownsKeyNatively("space", element([selector]))).toBe(true);
+      expect(ownsKeyNatively("shift+space", element([selector]))).toBe(true);
+    }
+  });
+
+  it("leaves the arrow keys to a slider, radio group or tab list", () => {
+    for (const selector of ['[role="slider"]', '[role="radiogroup"]', '[role="tablist"]']) {
+      expect(ownsKeyNatively("arrowright", element([selector]))).toBe(true);
+      expect(ownsKeyNatively("arrowleft", element([selector]))).toBe(true);
+    }
+  });
+
+  it("does not confuse the two sets", () => {
+    // A button does not own `→`, and a slider does not own Space.
+    expect(ownsKeyNatively("arrowright", element(["button"]))).toBe(false);
+    expect(ownsKeyNatively("space", element(['[role="slider"]']))).toBe(false);
+  });
+
+  it("claims nothing for a key that is not Space or an arrow", () => {
+    for (const k of ["]", "t", "d", "mod+k", "?", "g"]) {
+      expect(ownsKeyNatively(k, element(["button"]))).toBe(false);
+    }
+  });
+
+  it("lets the page turn when focus is on ordinary reading content", () => {
+    expect(ownsKeyNatively("space", nothing)).toBe(false);
+    expect(ownsKeyNatively("arrowright", nothing)).toBe(false);
+  });
+
+  it("is false for a null or DOM-less target", () => {
+    expect(ownsKeyNatively("space", null)).toBe(false);
+    expect(ownsKeyNatively("space", {} as EventTarget)).toBe(false);
   });
 });
 

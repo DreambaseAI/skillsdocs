@@ -216,10 +216,48 @@ export function normalizeKey(event: KeyboardEvent): string {
   return parts.join("+");
 }
 
+/**
+ * The modifiers `normalizeKey` can emit, and therefore the only prefixes
+ * `splitToken` is allowed to peel off.
+ */
+const MODIFIER_TOKENS: ReadonlySet<string> = new Set(["mod", "alt", "shift"]);
+
+/**
+ * Split one binding token into modifiers plus the key itself.
+ *
+ * `token.split("+")` is the obvious implementation and it is wrong, because
+ * `+` is both our separator *and* a key we bind: `"+".split("+")` is
+ * `["", ""]`, which the dialog rendered as two blank grey key caps next to
+ * "Larger text". Same trap as the one documented on the `sizeUp` binding
+ * above, one layer down.
+ *
+ * So the separator is only a separator when what precedes it is a modifier we
+ * actually emit. Everything left over is the key, `+` included — which also
+ * makes a rebind to `Shift` + `+` render as `⇧ +` rather than `⇧` and a void.
+ */
+function splitToken(token: string): string[] {
+  const parts: string[] = [];
+  let rest = token;
+
+  for (;;) {
+    const at = rest.indexOf("+");
+    // `at === 0` means the token *starts* with the plus — it is the key, not a
+    // separator. `-1` means there is nothing left to peel.
+    if (at <= 0) break;
+    const head = rest.slice(0, at);
+    if (!MODIFIER_TOKENS.has(head)) break;
+    parts.push(head);
+    rest = rest.slice(at + 1);
+  }
+
+  parts.push(rest);
+  return parts;
+}
+
 /** Human-facing rendering of a normalised key, for the dialog and tooltips. */
 export function formatKey(key: string, platform: "mac" | "other" = "other"): string[] {
   return key.split(" ").flatMap((token) =>
-    token.split("+").map((part) => {
+    splitToken(token).map((part) => {
       if (part === "mod") return platform === "mac" ? "⌘" : "Ctrl";
       if (part === "alt") return platform === "mac" ? "⌥" : "Alt";
       if (part === "shift") return "⇧";
@@ -262,6 +300,96 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   if (el.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]'))
     return true;
   return false;
+}
+
+/* ------------------------------------------------ native key ownership */
+
+const ARROW_KEYS: ReadonlySet<string> = new Set([
+  "arrowleft",
+  "arrowright",
+  "arrowup",
+  "arrowdown",
+]);
+
+/**
+ * Composite widgets that drive themselves with the arrow keys.
+ *
+ * Every one of these is an APG pattern whose keyboard contract *is* the arrow
+ * keys: a slider's step, a radio group's roving selection, a tab list's
+ * movement. `→` is also "next page", and the page-turn is the one that has to
+ * yield — a reader nudging the measure slider must not have the article jump a
+ * screen underneath the panel.
+ */
+const ARROW_OWNERS = [
+  '[role="slider"]',
+  '[role="radiogroup"]',
+  '[role="radio"]',
+  '[role="tablist"]',
+  '[role="tab"]',
+  '[role="listbox"]',
+  '[role="option"]',
+  '[role="combobox"]',
+  '[role="menu"]',
+  '[role="menubar"]',
+  '[role="menuitem"]',
+  '[role="tree"]',
+  '[role="grid"]',
+  '[role="spinbutton"]',
+  'input[type="range"]',
+  "select",
+].join(",");
+
+/**
+ * Anything Space *activates* rather than scrolls.
+ *
+ * Space is the second binding for "page down", and the moment the dispatcher
+ * started cancelling it — which it must, or the browser's own Space scroll
+ * lands on top of ours and the page moves 180% of a viewport — every button on
+ * the page would have lost its keyboard activation. Space belongs to the
+ * focused control whenever there is one.
+ */
+const SPACE_OWNERS = [
+  "a[href]",
+  "button",
+  "summary",
+  "input",
+  "textarea",
+  "select",
+  '[role="button"]',
+  '[role="link"]',
+  '[role="checkbox"]',
+  '[role="switch"]',
+  '[role="tab"]',
+  '[role="menuitem"]',
+  '[role="menuitemcheckbox"]',
+  '[role="menuitemradio"]',
+  '[role="option"]',
+  '[role="radio"]',
+].join(",");
+
+/**
+ * Does the focused element already own this key?
+ *
+ * Only asked of Space and the arrow keys, because they are the only bindings
+ * whose default behaviour is a *control's* behaviour rather than the browser's.
+ * `isEditableTarget` cannot answer this: a Base UI slider is not editable, not
+ * a dialog, and not a text field, and it still owns `→`.
+ */
+export function ownsKeyNatively(key: string, target: EventTarget | null): boolean {
+  const selector =
+    key === "space" || key === "shift+space"
+      ? SPACE_OWNERS
+      : ARROW_KEYS.has(key)
+        ? ARROW_OWNERS
+        : null;
+  if (!selector) return false;
+
+  // Duck-typed for the same reason `isEditableTarget` is: a node from another
+  // realm fails `instanceof`, and this must be testable without a DOM.
+  if (!target || typeof target !== "object") return false;
+  const el = target as Partial<HTMLElement>;
+  if (typeof el.closest !== "function") return false;
+  return el.closest(selector) !== null;
 }
 
 /**

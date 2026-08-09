@@ -134,7 +134,16 @@ export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      {/*
+        A column that owns its own height, so the list can take whatever the
+        viewport has left after the header, the switch and the footnote.
+        It used to be a plain block with the list capped at `52dvh`: on a
+        1100px screen that reserved 572px for sixteen rows and pushed the whole
+        Actions group — search, copy install, copy link, help — below a silent
+        cut, with 250px of unused dialog underneath it. Measured: four rows
+        laid out at y=970..1090 against a dialog ending at y=966.
+      */}
+      <DialogContent className="flex max-h-[calc(100dvh-3rem)] flex-col gap-4 sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
@@ -168,7 +177,9 @@ export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
           </p>
         ) : null}
 
-        <div className="max-h-[52dvh] overflow-y-auto overscroll-contain pr-1">
+        {/* `min-h-0` is load-bearing: without it a flex child refuses to
+            shrink below its content and the scroll never engages. */}
+        <div className="reader-panel--scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
           {GROUPS.map((group) => {
             const rows = SHORTCUTS.filter((s) => s.group === group);
             if (rows.length === 0) return null;

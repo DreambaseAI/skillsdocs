@@ -21,7 +21,8 @@
     "verify:lighthouse": "lhci autorun",
     "verify": "pnpm tsc --noEmit && pnpm lint && pnpm vitest run && pnpm verify:contrast && pnpm test:e2e",
     "shots": "tsx scripts/shots.mts",
-    "check:console": "tsx scripts/check-console.mts"
+    "check:console": "tsx scripts/check-console.mts",
+    "check:shortcuts": "tsx scripts/check-shortcuts.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
