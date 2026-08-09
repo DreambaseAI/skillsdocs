@@ -19,11 +19,7 @@
  * is a settings button most people never press.
  */
 
-import {
-  ArrowExpandIcon,
-  ArrowShrinkIcon,
-  Cancel01Icon,
-} from "@hugeicons/core-free-icons";
+import { Cancel01Icon, FocusIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -175,11 +171,7 @@ function FocusModeButton({
           />
         }
       >
-        <HugeiconsIcon
-          icon={enabled ? ArrowShrinkIcon : ArrowExpandIcon}
-          className="size-4"
-          aria-hidden
-        />
+        <HugeiconsIcon icon={FocusIcon} className="size-4" aria-hidden />
       </TooltipTrigger>
       <TooltipContent side="bottom">
         {enabled ? "Exit focus mode" : "Focus mode"}
