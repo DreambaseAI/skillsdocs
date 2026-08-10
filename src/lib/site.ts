@@ -194,14 +194,15 @@ export function isValidRepo(repo: string): boolean {
 
 /**
  * Pull `owner/repo` out of anything a reader might paste: a github.com URL, a
- * raw URL, an `npx skills add` command, or the bare slug. Returns null when
- * the input isn't a plausible repo reference.
+ * raw URL, an `npx skills add` or `/plugin marketplace add` command, or the
+ * bare slug. Returns null when the input isn't a plausible repo reference.
  */
 export function parseRepoReference(
   input: string,
 ): { owner: string; repo: string } | null {
   const cleaned = input
     .trim()
+    .replace(/^\/?plugin\s+marketplace\s+add\s+/i, "")
     .replace(/^(?:npx |pnpm dlx |bunx )?skills add\s+/i, "")
     .replace(/^git\+/, "")
     .replace(/\.git$/, "");

@@ -55,6 +55,8 @@ describe("parseRepoReference", () => {
       "git+https://github.com/anthropics/skills.git",
       "npx skills add anthropics/skills",
       "pnpm dlx skills add anthropics/skills",
+      "/plugin marketplace add anthropics/skills",
+      "plugin marketplace add anthropics/skills",
       "anthropics/skills",
       "/anthropics/skills",
     ]) {

@@ -21,10 +21,10 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Contents } from "@/components/home/contents";
 import { ContentsSkeleton } from "@/components/home/contents-skeleton";
+import { HeroEquation } from "@/components/home/hero-equation";
 import { IssueAccentRules } from "@/components/home/issue-accent";
 import { Masthead } from "@/components/home/masthead";
 import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
-import { RepoSwapField } from "@/components/home/repo-swap-field";
 import { Shelf } from "@/components/home/shelf";
 import { SiteFooter } from "@/components/home/site-footer";
 import { getFeaturedBooks } from "@/lib/featured";
@@ -76,27 +76,13 @@ export default function HomePage() {
           aria-labelledby="hero-heading"
           className="border-rule/70 border-b"
         >
-          <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start lg:gap-16">
-            <div>
-              <p className="text-ink-muted text-[0.72rem] font-semibold tracking-[0.2em] uppercase">
-                Turn a repo of skills into a book
-              </p>
-              <h1
-                id="hero-heading"
-                className="font-display text-ink-strong mt-5 text-[clamp(2.4rem,6.5vw,4.25rem)] leading-[0.98] tracking-[-0.03em] text-balance"
-              >
-                Human readable agent skills.
-              </h1>
-              <p className="text-ink mt-6 max-w-xl text-lg leading-[1.55] text-pretty sm:text-xl">
-                Agent skills are often hard to read and understand. This is a
-                human readable format for agent skills designed for a
-                pleasurable reading experience.
-              </p>
-            </div>
-
-            <div className="border-rule bg-paper-raised/50 rounded-3xl border p-5 sm:p-7">
-              <RepoSwapField host={HOST} />
-            </div>
+          {/* Single column: the equation is the headline, so it gets the full
+              measure instead of sharing the fold with a card. */}
+          <div className="mx-auto flex max-w-6xl flex-col gap-7 px-5 py-14 sm:px-8 sm:py-20">
+            <p className="text-ink-muted text-[0.72rem] font-semibold tracking-[0.2em] uppercase">
+              Turn a repo of skills into a book
+            </p>
+            <HeroEquation host={HOST} />
           </div>
         </section>
 
