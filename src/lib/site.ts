@@ -126,6 +126,8 @@ export const paths = {
   bookJson: (owner: string, repo: string) => `/api/v1/books/${enc(owner)}/${enc(repo)}`,
   chapterJson: (owner: string, repo: string, slug: string) =>
     `/api/v1/books/${enc(owner)}/${enc(repo)}/skills/${enc(slug)}`,
+  bookIcon: (owner: string, repo: string) =>
+    `/api/icon/${enc(owner)}/${enc(repo)}`,
   bookManifest: (owner: string, repo: string) =>
     `/${enc(owner)}/${enc(repo)}/.well-known/agent-skills/index.json`,
 } as const;

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import {
@@ -10,6 +11,7 @@ import { ReaderControls } from "@/components/reader/controls";
 import { loadBook } from "./loader";
 import { issueThemeCss } from "@/lib/design/theme";
 import { external, installCommand, paths } from "@/lib/site";
+import { bookIcons } from "@/lib/site-icons";
 import "./book.css";
 
 /**
@@ -31,6 +33,13 @@ import "./book.css";
  * streams in, the neutral `--issue-*` defaults from tokens.css apply, which is
  * exactly right for a page that has not chosen its colours yet.
  */
+
+export async function generateMetadata(
+  props: LayoutProps<"/[owner]/[repo]">,
+): Promise<Metadata> {
+  const { owner, repo } = await props.params;
+  return { icons: bookIcons(owner, repo) };
+}
 
 export default function BookLayout(props: LayoutProps<"/[owner]/[repo]">) {
   return (

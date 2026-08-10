@@ -22,6 +22,7 @@ import { ImageResponse } from "next/og";
 import { probeRepoStatus } from "@/lib/upstream";
 import { getBook, issueNumberFor } from "@/lib/book";
 import { formatHex, parseColor } from "@/lib/color";
+import { fetchImageDataUri } from "@/lib/image-data-uri";
 import { SITE_NAME } from "@/lib/site";
 
 export const alt = "Agent Skills book cover";
@@ -74,43 +75,6 @@ function compact(n: number): string {
   return String(n);
 }
 
-/**
- * Identify an image from its magic bytes.
- *
- * Not from `Content-Type`: Satori hands the declared type straight to its
- * decoder, so one mislabelled response — a PNG served as `image/jpeg` — throws
- * `RangeError: Offset is outside the bounds of the DataView` and takes the
- * whole card down with it. Observed while building this; the bytes are the only
- * thing worth trusting. Anything not on this list (WebP, AVIF, SVG) is dropped
- * rather than guessed at, and the monogram tile renders instead.
- */
-function sniffImageType(bytes: Buffer): string | null {
-  if (bytes.length < 12) return null;
-  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
-    return "image/png";
-  }
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
-  return null;
-}
-
-async function avatarDataUri(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "github-skills-book" },
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!res.ok) return null;
-    const bytes = Buffer.from(await res.arrayBuffer());
-    if (bytes.byteLength > 200_000) return null;
-    const type = sniffImageType(bytes);
-    if (!type) return null;
-    return `data:${type};base64,${bytes.toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
-
 interface Cover {
   owner: string;
   repo: string;
@@ -136,7 +100,7 @@ async function coverFor(owner: string, repo: string): Promise<Cover | null> {
   try {
     const book = await getBook(owner, repo);
     const [avatar] = await Promise.all([
-      avatarDataUri(`${book.repo.ownerAvatar}${book.repo.ownerAvatar.includes("?") ? "&" : "?"}s=200`),
+      fetchImageDataUri(`${book.repo.ownerAvatar}${book.repo.ownerAvatar.includes("?") ? "&" : "?"}s=200`),
     ]);
     return {
       owner: book.repo.owner,

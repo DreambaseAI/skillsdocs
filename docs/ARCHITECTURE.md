@@ -105,6 +105,7 @@ Every route below. `use cache` scopes are marked; **anything not marked is dynam
 | `/opengraph-image` | `app/opengraph-image.tsx` |
 | `/[owner]/[repo]/opengraph-image` | Per-book OG (owner avatar, repo, skill count, stars) |
 | `/[owner]/[repo]/[skill]/opengraph-image` | Per-chapter OG |
+| `/api/icon/[owner]/[repo]` | Per-book 64×64 PNG favicon (owner avatar + issue accent) |
 | `POST /api/revalidate` | Webhook; `revalidateTag(\`repo:${o}/${r}\`, 'max')` behind `REVALIDATE_SECRET` |
 
 ## 1.4 The rendering rule that shapes everything
@@ -180,6 +181,7 @@ githubskills/
    │  │     ├─ page.tsx              WS-4  chapter
    │  │     └─ opengraph-image.tsx   WS-6
    │  └─ api/
+   │     ├─ icon/[owner]/[repo]/route.ts                  WS-6  per-book favicon
    │     ├─ md/[owner]/[repo]/route.ts               WS-6  whole book as text/markdown
    │     ├─ md/[owner]/[repo]/[skill]/route.ts       WS-6  one chapter as text/markdown
    │     ├─ well-known/agent-skills/route.ts         WS-6  site-level manifest
@@ -254,6 +256,9 @@ githubskills/
    │  └─ use-media.ts                WS-5  matchMedia with SSR-safe default
    └─ lib/
       ├─ site.ts                     WS-0  SITE_URL, SITE_NAME, installCommand(), absoluteUrl()
+      ├─ site-icons.ts               WS-0  hosted defaults + per-book icon metadata
+      ├─ book-icon.ts                WS-6  owner-avatar favicon renderer
+      ├─ image-data-uri.ts           WS-6  validated raster fetches for metadata images
       ├─ utils.ts                    WS-0  (exists) cn()
       ├─ color.ts                    WS-3  (exists) OKLCH↔sRGB, gamut map, WCAG, hueFromString
       ├─ github.ts                   WS-1  (exists) repo/tree/owner/raw fetchers → convert to `use cache`
