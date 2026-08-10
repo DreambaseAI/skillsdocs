@@ -71,3 +71,28 @@ console.log(
     .map((s) => `${s.source}/${s.skillId} ${s.installs.toLocaleString()}`)
     .join(" · ")}`,
 );
+
+/*
+ * A closing note, because the counts printed above make this look like it
+ * publishes something. It does not.
+ *
+ * The snapshot is a FALLBACK. `getLeaderboard()` scrapes skills.sh live on an
+ * hourly cache and only reads this file when the scrape fails or returns
+ * implausibly little. Committing a refresh changes nothing a visitor sees.
+ */
+console.log(
+  [
+    "",
+    "This file is a fallback, not the live source.",
+    "  Install counts on the site refresh hourly from skills.sh on their own.",
+    "  These bytes are only read when that scrape fails or changes shape.",
+    "",
+    "  Commit it, but you rarely need to run this: before a launch, after a",
+    "  skills.sh shape change, or if the leaderboard shrinks a lot (preferLive",
+    "  rejects a live scrape smaller than half this file).",
+    "",
+    "  To add repos to the front page — which this cannot do — use:",
+    "    pnpm sync:seeds",
+    "",
+  ].join("\n"),
+);

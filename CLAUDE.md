@@ -47,6 +47,28 @@ unified/remark/rehype.
   Suspense-wrapped child.
 - **`next/font` options must be inline literals.** A spread fails the build.
 
+## Data refresh
+
+Three separate things, often confused:
+
+| What | How it updates | You do |
+|---|---|---|
+| Install counts on the site | Live scrape of skills.sh, hourly cache | nothing |
+| `data/skills-sh-snapshot.json` | `pnpm sync:skills-sh` | **rarely** — see below |
+| Which repos are on the front page | `pnpm sync:seeds --write` | review, then commit |
+
+The snapshot is a **fallback**, not the source. It is a build-time import so it
+must stay committed, but refreshing it changes nothing a visitor sees — the
+live path already refreshes hourly. It is 369KB on one line, so every refresh
+rewrites the whole file in git history. Run it before a launch, after a
+skills.sh shape change, or if the leaderboard shrinks a lot (`preferLive`
+rejects a live scrape smaller than half the snapshot, so a stale-and-too-large
+snapshot is the one failure mode that bites).
+
+`sync:skills-sh` cannot add a repo. The front page is built from `SEED_REPOS`,
+so a repo trending on skills.sh stays invisible there until `sync:seeds` adds
+it — though it is readable at its URL immediately.
+
 ## Data model
 
 One repo = one issue. One `SKILL.md` = one chapter.
