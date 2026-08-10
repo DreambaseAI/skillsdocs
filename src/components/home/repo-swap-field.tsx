@@ -71,8 +71,10 @@ export function RepoSwapField({
   useEffect(() => {
     const id = window.setTimeout(() => {
       if (!typing) setStatus("");
-      else if (parsed) setStatus(`Opens ${host}/${parsed.owner}/${parsed.repo}`);
-      else setStatus("Not a repository reference yet. Enter will search instead.");
+      else if (parsed)
+        setStatus(`Opens ${host}/${parsed.owner}/${parsed.repo}`);
+      else
+        setStatus("Not a repository reference yet. Enter will search instead.");
     }, 600);
     return () => window.clearTimeout(id);
   }, [host, parsed, typing]);
@@ -84,7 +86,7 @@ export function RepoSwapField({
       announce(`Opening ${parsed.owner}/${parsed.repo}`);
       router.push(paths.book(parsed.owner, parsed.repo));
     },
-    [parsed, router],
+    [parsed, router]
   );
 
   const fill = useCallback((example: string) => {
@@ -93,7 +95,12 @@ export function RepoSwapField({
   }, []);
 
   return (
-    <form action={paths.search()} method="get" onSubmit={submit} className="flex flex-col gap-5">
+    <form
+      action={paths.search()}
+      method="get"
+      onSubmit={submit}
+      className="flex flex-col gap-5"
+    >
       {/* ---------------------------------------------- the swap, made visible */}
       <p
         className="font-display text-ink-strong flex flex-wrap items-end text-[clamp(1.3rem,3.8vw,2.15rem)] leading-[1.15] tracking-[-0.02em]"
@@ -115,7 +122,7 @@ export function RepoSwapField({
         <span
           className={cn(
             "max-w-full truncate",
-            parsed || !typing ? "text-ink" : "text-ink-muted/50",
+            parsed || !typing ? "text-ink" : "text-ink-muted/50"
           )}
         >
           /{owner ?? "…"}/{repo ?? "…"}
@@ -163,14 +170,16 @@ export function RepoSwapField({
 
           <Button type="submit" size="lg" className="h-12 shrink-0 px-5">
             {parsed ? "Open the book" : "Search"}
-            <HugeiconsIcon icon={ArrowRight02Icon} data-icon="inline-end" aria-hidden />
+            <HugeiconsIcon
+              icon={ArrowRight02Icon}
+              data-icon="inline-end"
+              aria-hidden
+            />
           </Button>
         </div>
 
         <FieldDescription id={hintId} className="text-ink-muted">
-          A URL, an <code className="font-mono text-[0.9em]">owner/repo</code> slug, or a whole{" "}
-          <code className="font-mono text-[0.9em]">npx skills add</code> command — all of them
-          work.
+          Simply replace github.com with skillsdocs.com.
         </FieldDescription>
 
         {/* The one thing a screen-reader user cannot get from the display line. */}
@@ -180,7 +189,7 @@ export function RepoSwapField({
 
         {destination && (
           <p className="text-ink-muted text-sm">
-            Goes to{" "}
+            Resolves to{" "}
             <span className="text-issue-accent font-mono text-[0.92em]">
               {host}
               {destination}
@@ -191,7 +200,9 @@ export function RepoSwapField({
 
       {/* --------------------------------------------------------- try one */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-ink-muted text-xs tracking-[0.12em] uppercase">Try</span>
+        <span className="text-ink-muted text-xs tracking-[0.12em] uppercase">
+          Try it:
+        </span>
         {EXAMPLES.map((example) => (
           <Button
             key={example}

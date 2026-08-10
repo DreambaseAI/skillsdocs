@@ -29,7 +29,12 @@ import { Shelf } from "@/components/home/shelf";
 import { SiteFooter } from "@/components/home/site-footer";
 import { getFeaturedBooks } from "@/lib/featured";
 import { JsonLd, siteJsonLd } from "@/lib/jsonld";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
+import {
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TAGLINE,
+  SITE_URL,
+} from "@/lib/site";
 
 export const metadata: Metadata = {
   title: `${SITE_NAME} — ${SITE_TAGLINE}`,
@@ -67,22 +72,25 @@ export default function HomePage() {
             of every other section on the page — `Your shelf`, `The index` and
             the masthead all measured 176 at 1440 while the hero measured 144,
             which reads as a misprint rather than as emphasis. */}
-        <section aria-labelledby="hero-heading" className="border-rule/70 border-b">
+        <section
+          aria-labelledby="hero-heading"
+          className="border-rule/70 border-b"
+        >
           <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start lg:gap-16">
             <div>
               <p className="text-ink-muted text-[0.72rem] font-semibold tracking-[0.2em] uppercase">
-                One repo, one issue · One SKILL.md, one chapter
+                Turn a repo of skills into a book
               </p>
               <h1
                 id="hero-heading"
                 className="font-display text-ink-strong mt-5 text-[clamp(2.4rem,6.5vw,4.25rem)] leading-[0.98] tracking-[-0.03em] text-balance"
               >
-                Any repo of agent skills, read as a book.
+                Human readable agent skills.
               </h1>
               <p className="text-ink mt-6 max-w-xl text-lg leading-[1.55] text-pretty sm:text-xl">
-                Typeset, branded to the owner&rsquo;s own design system, and served as clean
-                markdown to whichever agent asks for it. No clone, no file browser, no
-                twelve-point grey on white.
+                Agent skills are often hard to read and understand. This is a
+                human readable format for agent skills designed for a
+                pleasurable reading experience.
               </p>
             </div>
 
