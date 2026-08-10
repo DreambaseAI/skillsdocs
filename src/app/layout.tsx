@@ -17,6 +17,9 @@ import {
 } from "@/lib/site";
 import "./globals.css";
 
+const ICON_BASE_URL =
+  "https://raw.githubusercontent.com/aliasesapp/dreamstack-images/refs/heads/main/images/skillsdocs/favicon";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: `${SITE_NAME} — ${SITE_TAGLINE}`, template: `%s · ${SITE_NAME}` },
@@ -25,6 +28,18 @@ export const metadata: Metadata = {
   authors: [AUTHOR],
   creator: AUTHOR.name,
   publisher: PUBLISHER.name,
+  icons: {
+    icon: [
+      { url: `${ICON_BASE_URL}/favicon.svg`, type: "image/svg+xml", sizes: "any" },
+      { url: `${ICON_BASE_URL}/favicon.ico`, type: "image/x-icon" },
+    ],
+    shortcut: `${ICON_BASE_URL}/favicon.ico`,
+    apple: {
+      url: `${ICON_BASE_URL}/apple-touch-icon.png`,
+      type: "image/png",
+      sizes: "180x180",
+    },
+  },
   keywords: [
     "agent skills",
     "SKILL.md",
