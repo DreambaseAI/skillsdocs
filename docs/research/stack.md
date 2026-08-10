@@ -1,7 +1,7 @@
 # GitHub Skills Book — Stack Research
 
 **Date:** 2026-08-08 · **Author:** research agent
-**Verified against:** `next@16.3.0` installed at `/Users/kyleledbetter/Sites/githubskills/node_modules/next`, the version-matched docs bundled at `node_modules/next/dist/docs/` (444 files), `nextjs.org/blog/next-16`, `nextjs.org/blog/next-16-3`, the live npm registry, and the actual component source pulled from `https://www.tripwire.sh/r/*.json`.
+**Verified against:** `next@16.3.0` installed at `/Users/username/Sites/githubskills/node_modules/next`, the version-matched docs bundled at `node_modules/next/dist/docs/` (444 files), `nextjs.org/blog/next-16`, `nextjs.org/blog/next-16-3`, the live npm registry, and the actual component source pulled from `https://www.tripwire.sh/r/*.json`.
 
 Everything below marked **[V]** was verified by reading real files/responses. **[I]** = inferred/judgement call.
 

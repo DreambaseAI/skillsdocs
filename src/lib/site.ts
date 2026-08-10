@@ -7,12 +7,16 @@
  */
 
 export const SITE_NAME = "Skills Docs";
-export const SITE_TAGLINE = "Read any skills repo like documentation deserves.";
+export const SITE_TAGLINE = "Human-readable agent skills documentation.";
 export const SITE_DESCRIPTION =
-  "Turn any GitHub repository of agent skills into beautifully typeset, branded documentation. Change “github” to “skillsdocs” in any repo URL and read it properly.";
+  "Turn any repository of agent skills into beautifully typeset, branded documentation. Change “github” to “skillsdocs” in any repo URL and read it properly.";
 
-export const AUTHOR = { name: "Kyle Ledbetter", url: "https://github.com/kyleledbetter" };
+export const AUTHOR = {
+  name: "Kyle Ledbetter",
+  url: "https://x.com/kyleledbetter",
+};
 export const PUBLISHER = { name: "Dreambase", url: "https://dreambase.com" };
+export const REPO_URL = "https://github.com/DreambaseAI/skillsdocs";
 export const COPYRIGHT_YEAR = 2026;
 
 export const SKILLS_SH = "https://www.skills.sh";
@@ -27,8 +31,7 @@ export const AGENT_SKILLS_SPEC = "https://agentskills.io/specification";
  * and it does not depend on a mail server nobody has provisioned. Both are
  * overridable by env so a deployment can point at its own.
  */
-export const SOURCE_URL =
-  process.env.NEXT_PUBLIC_SOURCE_URL ?? `${AUTHOR.url}/skillsdocs`;
+export const SOURCE_URL = process.env.NEXT_PUBLIC_SOURCE_URL ?? REPO_URL;
 
 export const TAKEDOWN_URL =
   process.env.NEXT_PUBLIC_TAKEDOWN_URL ??
@@ -53,8 +56,8 @@ const CONFIGURED_SITE_URL =
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : null);
+    ? `https://${process.env.VERCEL_URL}`
+    : null);
 
 /**
  * A production build with no origin configured bakes `http://localhost:3000`
@@ -89,7 +92,7 @@ if (
     `[site] NEXT_PUBLIC_SITE_URL is not set; falling back to ${PRODUCTION_ORIGIN} ` +
       "as the canonical origin, in sitemap.xml, in llms.txt and in every " +
       "absolute URL. Correct for production, wrong for a preview — set " +
-      "NEXT_PUBLIC_SITE_URL (or VERCEL_PROJECT_PRODUCTION_URL) there.",
+      "NEXT_PUBLIC_SITE_URL (or VERCEL_PROJECT_PRODUCTION_URL) there."
   );
 }
 
@@ -102,7 +105,9 @@ if (
  */
 export const SITE_URL = (
   CONFIGURED_SITE_URL ??
-  (process.env.NODE_ENV === "production" ? PRODUCTION_ORIGIN : "http://localhost:3000")
+  (process.env.NODE_ENV === "production"
+    ? PRODUCTION_ORIGIN
+    : "http://localhost:3000")
 ).replace(/\/+$/, "");
 
 export function absoluteUrl(path: string): string {
@@ -120,10 +125,12 @@ export const paths = {
   chapter: (owner: string, repo: string, slug: string) =>
     `/${enc(owner)}/${enc(repo)}/${enc(slug)}`,
   /** Markdown twin of a book — this is the book's `llms-full.txt`. */
-  bookMarkdown: (owner: string, repo: string) => `/${enc(owner)}/${enc(repo)}.md`,
+  bookMarkdown: (owner: string, repo: string) =>
+    `/${enc(owner)}/${enc(repo)}.md`,
   chapterMarkdown: (owner: string, repo: string, slug: string) =>
     `/${enc(owner)}/${enc(repo)}/${enc(slug)}.md`,
-  bookJson: (owner: string, repo: string) => `/api/v1/books/${enc(owner)}/${enc(repo)}`,
+  bookJson: (owner: string, repo: string) =>
+    `/api/v1/books/${enc(owner)}/${enc(repo)}`,
   chapterJson: (owner: string, repo: string, slug: string) =>
     `/api/v1/books/${enc(owner)}/${enc(repo)}/skills/${enc(slug)}`,
   bookIcon: (owner: string, repo: string) =>
@@ -153,9 +160,15 @@ export const external = {
   avatar: (owner: string, size = 128) =>
     `https://github.com/${enc(owner)}.png?size=${size}`,
   file: (owner: string, repo: string, ref: string, path: string) =>
-    `https://github.com/${owner}/${repo}/blob/${ref}/${path.split("/").map(enc).join("/")}`,
+    `https://github.com/${owner}/${repo}/blob/${ref}/${path
+      .split("/")
+      .map(enc)
+      .join("/")}`,
   raw: (owner: string, repo: string, ref: string, path: string) =>
-    `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path.split("/").map(enc).join("/")}`,
+    `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path
+      .split("/")
+      .map(enc)
+      .join("/")}`,
   skillsSh: (owner: string, repo: string) => `${SKILLS_SH}/${owner}/${repo}`,
 } as const;
 
@@ -198,7 +211,7 @@ export function isValidRepo(repo: string): boolean {
  * bare slug. Returns null when the input isn't a plausible repo reference.
  */
 export function parseRepoReference(
-  input: string,
+  input: string
 ): { owner: string; repo: string } | null {
   const cleaned = input
     .trim()

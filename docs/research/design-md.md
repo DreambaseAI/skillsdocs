@@ -59,7 +59,7 @@ tokens**; it is a link index. **Do not use `llms.txt` as a theme source.**
 
 ### 2.3 GitHub owner → website → design.md chain
 
-`OwnerMeta.blog` (already returned by `fetchOwnerMeta` in `/Users/kyleledbetter/Sites/githubskills/src/lib/github.ts:222`) resolves cleanly **[verified]**:
+`OwnerMeta.blog` (already returned by `fetchOwnerMeta` in `/Users/username/Sites/githubskills/src/lib/github.ts:222`) resolves cleanly **[verified]**:
 
 | GitHub org | `blog` field | `/design.md` |
 |---|---|---|
@@ -771,7 +771,7 @@ cannot cover the dynamic case — use a `<link rel="stylesheet" precedence="..."
 Fetched corpus, analysis scripts, and the reference OKLCH implementation used for every number above:
 
 ```
-/private/tmp/claude-501/-Users-kyleledbetter-Sites-githubskills/8e089d66-b4d0-4762-a2da-70027e823fb8/scratchpad/
+/private/tmp/claude-501/-Users-username-Sites-githubskills/8e089d66-b4d0-4762-a2da-70027e823fb8/scratchpad/
   dm/{vercel.com,resend.com,dreambase.com,clerk.com,linear.app}.designmd   # live probes
   reg/*.md                    # all 74 VoltAgent registry DESIGN.md files
   vercel-brand.css            # 108 KB Geist token source

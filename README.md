@@ -118,7 +118,7 @@ specified at [agentskills.io](https://agentskills.io/specification).
 
 ## Licence
 
-Source code MIT © 2026 [Kyle Ledbetter](https://github.com/kyleledbetter). See
+Source code MIT © 2026 [Dream, Inc.](https://github.com/DreambaseAI/skillsdocs). See
 [LICENSE](./LICENSE).
 
 Skill documents rendered here belong to their authors and remain under whatever
