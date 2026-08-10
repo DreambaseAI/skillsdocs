@@ -7,10 +7,9 @@
  * and a reader scanning for a specific repo should not have to know it was
  * promoted.
  *
- * The cover story is skills.sh's own editor's pick where there is one. That is
- * a deliberate choice to inherit someone else's editorial judgement rather
- * than invent ours: `featuredRepo`/`featuredSkill` is maintained by the people
- * who run the install registry, and it moves.
+ * The cover story is an explicit editorial choice. If that book is ever absent
+ * from the verified catalogue, the page falls back to the most-installed book
+ * rather than failing to render.
  *
  * ## The index is banded
  *
@@ -51,10 +50,13 @@ const HOUSE_CHART_SEEDS = chartSeedsFromTheme(
 /** How many books the installs chart compares. Beyond this the bars are noise. */
 const CHART_TOP_N = 12;
 
+const COVER_STORY = "emilkowalski/skills";
+
 function pickLead(books: FeaturedBook[]): FeaturedBook {
-  // Books arrive sorted by installs, so the first pick that carries an
-  // editor's nomination is both endorsed and consequential.
-  return books.find((book) => book.featuredSkill && book.skillCount > 1) ?? books[0];
+  return (
+    books.find((book) => `${book.owner}/${book.repo}` === COVER_STORY) ??
+    books[0]
+  );
 }
 
 /* ------------------------------------------------------------------ bands */
