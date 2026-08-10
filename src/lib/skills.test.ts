@@ -281,6 +281,20 @@ describe("noise exclusion", () => {
     ).toEqual(["dreambase-skill-creator"]);
   });
 
+  it("drops Go testdata trees (larksuite/cli)", () => {
+    // Found by `pnpm sync:seeds`, which verifies every candidate with this
+    // same discovery: the repo reported 28 skills and one of them was a
+    // fixture from a linter's own test corpus.
+    expect(
+      slugs(
+        tree(
+          "skills/lark-wiki/SKILL.md",
+          "internal/qualitygate/skillscan/testdata/skills/lark-demo/SKILL.md",
+        ),
+      ),
+    ).toEqual(["lark-wiki"]);
+  });
+
   it("drops test fixtures (langchain-ai/deepagents)", () => {
     expect(
       slugs(

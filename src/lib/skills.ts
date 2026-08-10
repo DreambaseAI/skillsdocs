@@ -137,6 +137,15 @@ const NOISE_ANCESTORS = new Set([
   "examples",
   "fixtures",
   "__fixtures__",
+  // Go's convention, and not a rare one: larksuite/cli publishes a real
+  // `skills/` tree AND `internal/qualitygate/skillscan/testdata/skills/
+  // lark-demo/SKILL.md`, which was surfacing as a 29th chapter called
+  // "Lark Demo" that nobody wrote.
+  "testdata",
+  "test-data",
+  "__mocks__",
+  "mocks",
+  "golden",
   "test",
   "tests",
   "__tests__",
