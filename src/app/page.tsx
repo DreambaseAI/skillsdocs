@@ -57,7 +57,7 @@ export default function HomePage() {
       <IssueAccentRules />
 
       <Masthead
-        strapline="Any skills repo, read as a book"
+        strapline="Read skills as a book"
         palette={
           <Suspense fallback={<PaletteFallback />}>
             <PaletteSlot />

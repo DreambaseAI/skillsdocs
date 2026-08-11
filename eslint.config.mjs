@@ -41,6 +41,14 @@ const eslintConfig = defineConfig([
   ...nextTs,
 
   {
+    name: "next/native-images",
+    files: ["**/*.{js,jsx,ts,tsx}"],
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
+
+  {
     name: "a11y/strict",
     files: ["**/*.{js,jsx,ts,tsx}"],
 

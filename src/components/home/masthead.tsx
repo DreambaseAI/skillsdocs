@@ -17,7 +17,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ThemeToggleButton } from "@/components/chrome/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { AUTHOR, SITE_NAME, paths } from "@/lib/site";
+import { SITE_NAME, SOURCE_URL, paths } from "@/lib/site";
+import { SITE_ICONS } from "@/lib/site-icons";
 
 export interface MastheadProps {
   palette: ReactNode;
@@ -39,15 +40,25 @@ export function Masthead({ palette, strapline }: MastheadProps) {
             to 347px of horizontal scroll. It truncates rather than pushes. */}
         <Link
           href={paths.home()}
-          className="text-ink-strong hover:text-issue-accent min-w-0 truncate text-[0.7rem] font-semibold tracking-[0.13em] uppercase transition-colors sm:text-[0.78rem] sm:tracking-[0.2em]"
+          className="text-ink-strong flex items-center gap-2 hover:text-issue-accent min-w-0 truncate text-[0.7rem] font-semibold tracking-[0.13em] uppercase transition-colors sm:text-[0.78rem] sm:tracking-[0.2em]"
         >
+          <img
+            src={SITE_ICONS.icon[0].url}
+            alt={SITE_NAME}
+            className="size-4"
+          />
           {SITE_NAME}
         </Link>
 
         {strapline && (
           <>
-            <span className="bg-rule/70 mx-1 hidden h-4 w-px sm:block" aria-hidden />
-            <p className="text-ink-muted hidden truncate text-xs md:block">{strapline}</p>
+            <span
+              className="bg-rule/70 mx-1 hidden h-4 w-px sm:block"
+              aria-hidden
+            />
+            <p className="text-ink-muted hidden truncate text-xs md:block">
+              {strapline}
+            </p>
           </>
         )}
 
@@ -63,14 +74,18 @@ export function Masthead({ palette, strapline }: MastheadProps) {
             nativeButton={false}
             render={
               <a
-                href={AUTHOR.url}
+                href={SOURCE_URL}
                 aria-label={`${SITE_NAME} on GitHub`}
                 target="_blank"
                 rel="noopener noreferrer"
               />
             }
           >
-            <HugeiconsIcon icon={Github01Icon} data-icon="inline-start" aria-hidden />
+            <HugeiconsIcon
+              icon={Github01Icon}
+              data-icon="inline-start"
+              aria-hidden
+            />
           </Button>
         </div>
       </div>
