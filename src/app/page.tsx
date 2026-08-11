@@ -78,7 +78,7 @@ export default function HomePage() {
         >
           {/* Single column: the equation is the headline, so it gets the full
               measure instead of sharing the fold with a card. */}
-          <div className="mx-auto flex max-w-6xl flex-col gap-7 px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mx-auto flex max-w-6xl flex-col gap-5 px-5 py-10 sm:gap-7 sm:px-8 sm:py-20">
             <p className="text-ink-muted text-[0.72rem] font-semibold tracking-[0.2em] uppercase">
               Turn a repo of skills into a book
             </p>
