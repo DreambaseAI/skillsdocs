@@ -22,11 +22,11 @@ import { StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import Link from "next/link";
-import posthog from "posthog-js";
 import { announce } from "@/components/chrome/live-regions";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { Button } from "@/components/ui/button";
 import { useFavorites } from "@/hooks/use-favorites";
+import { capture } from "@/lib/analytics";
 import { external, paths } from "@/lib/site";
 
 export function Shelf() {
@@ -64,7 +64,7 @@ export function Shelf() {
             onClick={() => {
               const itemCount = rows.length;
               clear();
-              posthog.capture("shelf_cleared", { item_count: itemCount });
+              capture("shelf_cleared", { item_count: itemCount });
               announce("Shelf cleared");
             }}
           >

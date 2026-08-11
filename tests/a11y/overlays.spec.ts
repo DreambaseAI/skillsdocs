@@ -37,6 +37,12 @@ async function openPalette(page: Page) {
   return dialog;
 }
 
+async function waitForSearchShortcut(page: Page) {
+  await expect(
+    page.getByRole("button", { name: /search skills/i }).first(),
+  ).toHaveAttribute("data-shortcut-ready", "true");
+}
+
 /* ------------------------------------------------------------ open states */
 
 test.describe("overlay states are audited, not assumed", () => {
@@ -138,6 +144,7 @@ test.describe("the keymap does what it advertises", () => {
     test.fixme(routeMissing("home"), missingRouteNote("home"));
 
     await gotoReady(page, ROUTES.home);
+    await waitForSearchShortcut(page);
     await page.keyboard.press("/");
     await expect(page.getByRole("combobox")).toBeVisible();
     await page.keyboard.press("Escape");
@@ -153,6 +160,7 @@ test.describe("the keymap does what it advertises", () => {
       [STORAGE_KEY],
     );
     await gotoReady(page, ROUTES.home);
+    await waitForSearchShortcut(page);
 
     // Escape (b) of WCAG 2.1.4. Before this, `/` was bound by the palette's own
     // window listener, which consulted neither the switch nor the rebinding
@@ -176,6 +184,7 @@ test.describe("the keymap does what it advertises", () => {
       [STORAGE_KEY],
     );
     await gotoReady(page, ROUTES.home);
+    await waitForSearchShortcut(page);
 
     await page.keyboard.press("/");
     await expect(page.getByRole("combobox")).toHaveCount(0);

@@ -31,7 +31,6 @@ import { ArrowRight02Icon, Book02Icon, Search01Icon } from "@hugeicons/core-free
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import posthog from "posthog-js";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,8 @@ import {
 } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { useShortcut } from "@/hooks/use-shortcut";
+import { useShortcut, useShortcutAvailable } from "@/hooks/use-shortcut";
+import { capture } from "@/lib/analytics";
 import { foldIndex, searchFolded, type SearchDoc } from "@/lib/search";
 import { paths, parseRepoReference } from "@/lib/site";
 import { cn } from "@/lib/utils";
@@ -73,10 +73,11 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
   // single-character shortcut is inert inside a text field — so a toggle here
   // only ever reads as a toggle for ⌘K.
   useShortcut("search", () => setOpen((value) => !value));
+  const shortcutReady = useShortcutAvailable("search");
 
   const go = useCallback(
     (href: string, label: string) => {
-      posthog.capture("search_result_opened", {
+      capture("search_result_opened", {
         result_type: href.startsWith("/search") ? "search" : "content",
       });
       setOpen(false);
@@ -165,6 +166,7 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
     <>
       <Button
         type="button"
+        data-shortcut-ready={shortcutReady ? "true" : undefined}
         variant="outline"
         size="sm"
         className={cn("border-rule text-ink-muted hover:text-ink gap-2", className)}

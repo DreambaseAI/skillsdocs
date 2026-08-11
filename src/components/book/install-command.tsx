@@ -3,9 +3,9 @@
 import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import posthog from "posthog-js";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
+import { capture } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 /**
@@ -70,7 +70,7 @@ export function CopyButton({ value, label, className }: CopyButtonProps) {
   const copy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(value);
-      posthog.capture("install_command_copied", { command_type: label });
+      capture("install_command_copied", { command_type: label });
       setCopied(true);
       announce(`${label} copied to the clipboard.`);
       if (timer.current) clearTimeout(timer.current);
