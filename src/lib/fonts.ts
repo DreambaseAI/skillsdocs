@@ -158,12 +158,16 @@ export const jetbrainsMono = JetBrains_Mono({
  * The Braille Institute's legibility face. "Next" is the 2025 revision:
  * variable 200–800 with true italics, strictly better than the static v1.
  */
+// Next.js ships no fallback metrics for either Atkinson face yet, so the
+// automatic size-adjusted fallback is opted out of rather than warned about
+// on every compile; `reader/metrics.ts` normalises these families anyway.
 export const atkinson = Atkinson_Hyperlegible_Next({
   variable: "--font-atkinson",
   subsets: ["latin"],
   display: "swap",
   preload: false,
   style: ["normal", "italic"],
+  adjustFontFallback: false,
 });
 
 export const atkinsonMono = Atkinson_Hyperlegible_Mono({
@@ -172,6 +176,7 @@ export const atkinsonMono = Atkinson_Hyperlegible_Mono({
   display: "swap",
   preload: false,
   style: ["normal", "italic"],
+  adjustFontFallback: false,
 });
 
 /* ------------------------------------------------------------ catalog */
