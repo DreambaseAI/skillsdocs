@@ -69,35 +69,66 @@ export function BookSkeleton() {
       <span className="sr-only">Setting the issue. One moment.</span>
 
       {/*
-        The cover band, at the real height, on the real (untinted, because the
-        accent has not resolved) paper. Everything below it is the real frame.
+        The opening spread at its real geometry: the issue rule, the cover on
+        its (neutral, because the accent has not resolved) stock, the inside
+        page. Everything below it is the real frame.
       */}
-      <div className="book-coverband" aria-hidden="true">
-        <div className="book-coverband__inner">
-          <div className="book-coverband__masthead">
-            <span className="book-mark">
-              <Ghost className="size-1/2 rounded-sm" />
-            </span>
-            <div className="flex flex-col gap-2">
-              <Ghost className="h-2.5 w-20" />
-              <Ghost className="h-3.5 w-32" />
+      <div className="book-spread" aria-hidden="true">
+        <div className="book-spread__head">
+          <div className="book-spread__headinner">
+            <Ghost className="h-2.5 w-24" pulse={false} />
+            <span className="bg-rule/80 h-px flex-1" />
+            <Ghost className="h-2.5 w-44" pulse={false} />
+          </div>
+        </div>
+
+        <div className="book-spread__grid">
+          {/* The cover, ink not yet landed. Stock ghosts, not paper ghosts. */}
+          <div className="book-spread__cover cover-face">
+            <Ghost className="bg-(--cover-ink)/12 h-2.5 w-32" />
+            <div className="relative flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <Ghost className="bg-(--cover-ink)/12 size-10 rounded-[0.625rem]" />
+                <Ghost className="bg-(--cover-ink)/12 h-2.5 w-24" />
+              </div>
+              <Ghost className="bg-(--cover-ink)/12 h-[clamp(2.4rem,8.5vw,4.6rem)] w-4/5 rounded-md" />
+              <hr className="cover-rule" />
+              <div className="flex flex-col gap-2">
+                {DECK_LINES.map((w) => (
+                  <Ghost key={w} className="bg-(--cover-ink)/12 h-3.5" width={w} />
+                ))}
+              </div>
+              <Ghost className="bg-(--cover-ink)/12 h-12 w-44 rounded-full" />
+            </div>
+            <Ghost className="bg-(--cover-ink)/12 h-2.5 w-40" />
+          </div>
+
+          {/* The inside page: install panel, then the chapter preview. */}
+          <div className="book-spread__inside">
+            <div className="border-rule flex items-baseline justify-between border-b pb-3.5">
+              <Ghost className="h-2.5 w-28" pulse={false} />
+              <Ghost className="h-2.5 w-6" pulse={false} />
+            </div>
+            <Ghost className="mt-7 h-2.5 w-20" />
+            <Ghost className="mt-3.5 h-12 w-full rounded-lg" />
+            <Ghost className="mt-3.5 h-2.5 w-64" pulse={false} />
+            <Ghost className="mt-9 h-2.5 w-24" />
+            <div className="mt-3">
+              {ENTRY_TITLE_WIDTHS.slice(0, 5).map((titleWidth, i) => (
+                <div
+                  key={titleWidth}
+                  className="border-rule/80 grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-baseline gap-x-4 border-b py-4"
+                >
+                  <Ghost className="h-3 w-6" pulse={i < 3} />
+                  <div className="flex flex-col gap-2">
+                    <Ghost className="h-5" pulse={i < 3} width={titleWidth} />
+                    <Ghost className="h-3" pulse={i < 3} width={ENTRY_DEK_WIDTHS[i]} />
+                  </div>
+                  <Ghost className="h-3 w-10" pulse={i < 3} />
+                </div>
+              ))}
             </div>
           </div>
-
-          <Ghost className="h-4 w-32 rounded-sm" />
-          {/* One bar at the display line's own height, not two button-shaped
-              slabs. */}
-          <Ghost className="h-[clamp(3rem,11vw,6rem)] w-3/5 rounded-md" />
-
-          <hr className="book-rule book-rule--issue" />
-
-          <div className="flex max-w-[46rem] flex-col gap-2.5">
-            {DECK_LINES.map((w) => (
-              <Ghost key={w} className="h-5" width={w} />
-            ))}
-          </div>
-
-          <Ghost className="h-3 w-64" />
         </div>
       </div>
 

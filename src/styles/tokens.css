@@ -175,6 +175,24 @@
   --issue-accent-foreground: oklch(0.14 0 0);
 }
 
+/* ═══════════════════════════════════ Printed objects: covers and spines */
+
+/*
+ * A cover is ink on stock, not a surface that follows the colour scheme: the
+ * same dark plate in light mode and dark mode, washed with the issue accent
+ * via color-mix at the point of use. These are the only tokens the cover and
+ * spine treatments may build from; the shades exist so the highlight/shadow
+ * overlays that model the object need no literals outside this file.
+ */
+:root {
+  --cover-ground: oklch(0.165 0.008 55);
+  --cover-ink: oklch(0.965 0.008 85);
+  --cover-ink-muted: oklch(0.965 0.008 85 / 0.68);
+  --cover-shade: oklch(0 0 0 / 0.35);
+  --cover-shade-strong: oklch(0 0 0 / 0.6);
+  --cover-sheen: oklch(1 0 0 / 0.16);
+}
+
 /* ═════════════════════════════════════════ D. Reader typography inputs */
 
 :root {

@@ -97,6 +97,10 @@ export function BookContentsList({
       aria-label="Chapters"
       className={cn(inSheet && "pb-8")}
       id={inSheet ? undefined : "book-rail-contents"}
+      // Programmatically focusable: the spread's "All N chapters" control
+      // sends focus here so a keyboard or screen-reader user lands in the
+      // list they asked for, not back where they were.
+      tabIndex={inSheet ? undefined : -1}
     >
       {/*
         The head states where you *are*; the link goes where you are not.

@@ -2,7 +2,8 @@
 
 import { ArrowUp01Icon, Menu01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { OPEN_CONTENTS_EVENT } from "@/components/book/all-chapters-link";
 import { useHideOnScroll } from "@/hooks/use-hide-on-scroll";
 import {
   Sheet,
@@ -48,6 +49,15 @@ export function MobileContents({
   // reading is the one thing a floating control must never be. Mirrors the
   // site header exactly, and never hides while the sheet is open.
   const hidden = useHideOnScroll(!open);
+
+  // The spread's "All N chapters" control opens the sheet from anywhere the
+  // contents rail is not on screen. An event, not a prop: the control is a
+  // server-rendered leaf several trees away.
+  useEffect(() => {
+    const openSheet = () => setOpen(true);
+    window.addEventListener(OPEN_CONTENTS_EVENT, openSheet);
+    return () => window.removeEventListener(OPEN_CONTENTS_EVENT, openSheet);
+  }, []);
 
   return (
     <>

@@ -1,176 +1,78 @@
-import { ArrowDown01Icon, CheckmarkBadge01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
-import { Deck } from "@/components/book/deck";
+import Link from "next/link";
+import { AllChaptersLink } from "@/components/book/all-chapters-link";
+import { InlineMarkup } from "@/components/book/deck";
 import {
   editorialDate,
+  folio,
   licenceLabel,
   plural,
   readingTime,
+  shortReadingTime,
 } from "@/components/book/format";
 import { InstallCommand } from "@/components/book/install-command";
 import { chartSeedsFromTheme, InstallSparkline } from "@/components/charts";
+import { COVER_STAR_CLASS } from "@/components/home/cover-star";
+import { FavoriteButton } from "@/components/home/favorite-button";
+import { compact } from "@/components/home/format";
 import type { Book } from "@/lib/book";
-import { external, installCommand, marketplaceCommand } from "@/lib/site";
+import { dekOf } from "@/lib/deck";
+import {
+  external,
+  installCommand,
+  marketplaceCommand,
+  paths,
+  SITE_NAME,
+} from "@/lib/site";
+import { cn } from "@/lib/utils";
 
 /**
- * The cover, and the masthead that follows it.
+ * The issue's opening spread.
  *
- * ## Why the cover is a band and not a block
+ * Left page: the cover — dark stock washed with the issue accent, the owner's
+ * mark, the display title, the dek, and one action: start reading. Right
+ * page: "Inside this issue" — the install command, the provenance line, and
+ * the first chapters, with the full contents one anchor away. The spread
+ * replaces the old full-bleed cover band: the same facts, but composed as a
+ * magazine opened flat rather than a title page followed by furniture.
  *
- * It used to be a headline inside the reading column: the same 692px measure
- * as body text, flanked on the left by a 17-item contents rail and on the
- * right by a stats rail of comparable visual mass. Measured, the title block
- * occupied 3.8% of the first viewport at 1920 and the composition was
- * byte-identical at 1024, 1440 and 1920 apart from the margins — zero art
- * direction. The eye path on `/anthropics/skills` went: 96px title, then the
- * 17-line rail (the largest text mass on screen), then the stats table, and
- * only *fourth* the one sentence that says what the book is.
- *
- * So the cover now escapes the three-track grid entirely. It is a full-bleed
- * band rendered above `.book-frame`, which means the rails do not exist inside
- * it — they begin where the contents begins, which is where they are useful.
- * Order on the band is: mark and issue line, title, accent rule, standfirst,
- * one line of scale, scroll cue. The install commands and the masthead table
- * are demoted below it, into the column, where a reader who has decided to
- * stay can find them.
- *
- * ## Why the title has a step-down
- *
- * `clamp()` alone does not know how many characters it is setting. At
- * `stripe/ai` a two-letter repo name at the clamp ceiling left 85% of the line
- * empty while the rule beneath still ran the full width. `--cover-cap` is a
- * per-length ceiling so a short name is set large but not absurd, and a
- * 24-character name is set to fit.
+ * The cover is a `.cover-face` (cover.css): it keeps its own ink in both
+ * colour schemes, because a printed cover does not change colour with the
+ * room's lights. Everything on the right page sits on ordinary paper tokens.
  */
 
 export interface BookCoverProps {
   book: Book;
 }
 
+const MONO_LABEL =
+  "font-mono text-[0.62rem] font-medium tracking-[0.18em] uppercase";
+
 /**
- * Ceiling for the display title, by name length.
- *
- * Two decisions in one table: very short names must not float in an empty
- * line, and very long ones must not need three lines at 1440. The break points
- * were read off the real corpus — `ai` (2), `skills` (6), `azure-skills` (12),
- * `agent-toolkit-for-aws` (21).
+ * Ceiling for the display title, by name length, tuned to the cover column
+ * rather than the old full-bleed band. Break points read off the real corpus —
+ * `ai` (2), `skills` (6), `azure-skills` (12), `agent-toolkit-for-aws` (21).
  */
 function titleCap(name: string): string {
   const n = name.length;
-  if (n <= 4) return "7rem";
-  if (n <= 10) return "9rem";
-  if (n <= 16) return "7rem";
-  if (n <= 24) return "5.5rem";
-  return "4.25rem";
+  if (n <= 4) return "5.5rem";
+  if (n <= 10) return "4.6rem";
+  if (n <= 16) return "3.4rem";
+  if (n <= 24) return "2.8rem";
+  return "2.3rem";
 }
 
-export function BookCoverBand({ book }: BookCoverProps) {
-  const { repo, owner, signal } = book;
+/** How many chapters the inside page previews before deferring to the TOC. */
+const PREVIEW_CHAPTERS = 5;
+
+export function BookCoverSpread({ book }: BookCoverProps) {
+  const { repo, owner, marketplace } = book;
   const chapters = book.skills.length;
-
-  return (
-    <header
-      id="cover"
-      className="book-coverband scroll-mt-24"
-      style={{ "--cover-cap": titleCap(repo.repo) } as React.CSSProperties}
-    >
-      <div className="book-coverband__inner">
-        <div className="book-coverband__masthead">
-          <span className="book-mark">
-            {repo.ownerAvatar ? (
-              <Image
-                src={repo.ownerAvatar}
-                alt=""
-                width={128}
-                height={128}
-                priority
-                unoptimized={false}
-              />
-            ) : (
-              <span className="book-mark__fallback" aria-hidden="true">
-                {repo.owner.slice(0, 2)}
-              </span>
-            )}
-          </span>
-
-          <div className="flex min-w-0 flex-col gap-0.5">
-            {/* The issue number is a magazine affectation and says so: it is a
-                stable hash of owner/repo, not a sequence anyone can count. */}
-            <span className="book-eyebrow book-eyebrow--accent">
-              Issue No.&nbsp;{book.issueNumber}
-            </span>
-            <span className="text-ink-muted truncate text-sm">
-              {owner?.name ?? repo.owner}
-              {signal?.official ? (
-                <>
-                  {" · "}
-                  <span className="text-ink-strong inline-flex items-center gap-1 align-baseline">
-                    <HugeiconsIcon
-                      icon={CheckmarkBadge01Icon}
-                      className="size-3.5 translate-y-0.5"
-                      aria-hidden
-                    />
-                    Official
-                  </span>
-                </>
-              ) : null}
-            </span>
-          </div>
-        </div>
-
-        <h1 className="book-cover__title">
-          <span className="book-cover__owner">{repo.owner} /</span>
-          {repo.repo}
-        </h1>
-
-        {/* The rule is the issue's, not the house's. It is the single largest
-            piece of accent ink on the page and it costs nothing. */}
-        <hr className="book-rule book-rule--issue" />
-
-        {/* Second in the visual order now, and set larger: this is the one
-            sentence that says what the book *is*, and it used to land fourth. */}
-        {repo.description ? (
-          <Deck text={repo.description} max={220} className="book-coverband__deck" />
-        ) : (
-          <p className="book-standfirst book-coverband__deck text-ink-muted">
-            {chapters > 0
-              ? `${chapters} ${plural(chapters, "skill")} published from this repository. No description was given upstream, so this issue takes its voice from the chapters themselves.`
-              : "This repository publishes no description."}
-          </p>
-        )}
-
-        {chapters > 0 ? (
-          <p className="book-caption book-coverband__scale">
-            {chapters} {plural(chapters, "chapter")} · {readingTime(book.totalReadingMinutes)}{" "}
-            · {book.totalWords.toLocaleString("en-GB")} words
-            {book.parts.length > 1 ? ` · ${book.parts.length} parts` : ""}
-          </p>
-        ) : null}
-      </div>
-
-      {/* A band this tall has to say that something follows it. */}
-      <a href="#contents" className="book-coverband__cue">
-        <span className="book-eyebrow m-0">Contents</span>
-        <HugeiconsIcon icon={ArrowDown01Icon} className="size-4" aria-hidden />
-      </a>
-    </header>
-  );
-}
-
-/**
- * The masthead: install commands, provenance, and the install curve.
- *
- * Split out of the cover so the band above can be a cover. Stars and installs
- * are deliberately *not* repeated here — the right rail's At-a-glance table
- * already states both, and printing five numbers three times on one page is
- * how a masthead turns into a dashboard.
- */
-export function BookMasthead({ book }: BookCoverProps) {
-  const { repo, signal, marketplace, theme } = book;
+  const first = book.skills[0];
   const updated = editorialDate(repo.pushedAt);
+  const preview = book.skills.slice(0, PREVIEW_CHAPTERS);
 
-  const rows = [
+  const installRows = [
     { label: "Install command", command: installCommand(repo.owner, repo.repo) },
     ...(marketplace
       ? [
@@ -184,12 +86,242 @@ export function BookMasthead({ book }: BookCoverProps) {
   ];
 
   return (
-    <section className="book-measure flex flex-col gap-6" aria-labelledby="masthead-title">
-      <h2 id="masthead-title" className="book-eyebrow m-0">
-        Install and provenance
-      </h2>
+    <header
+      id="cover"
+      className="book-spread scroll-mt-24"
+      style={{ "--cover-cap": titleCap(repo.repo) } as React.CSSProperties}
+    >
+      {/* ------------------------------------------------- the issue rule */}
+      <div className="book-spread__head">
+        <div className="book-spread__headinner">
+          <span className={cn(MONO_LABEL, "text-issue-accent shrink-0")}>
+            Issue No.&nbsp;{book.issueNumber}
+          </span>
+          <span className="bg-rule/80 h-px min-w-6 flex-1" aria-hidden />
+          <span
+            className={cn(MONO_LABEL, "text-ink-muted truncate text-right")}
+          >
+            {owner?.name ?? repo.owner}
+            {updated ? <> · Updated {updated}</> : null}
+            <span className="max-sm:hidden">
+              {" "}
+              · {repo.archived ? "Archived" : "In print"}
+            </span>
+          </span>
+        </div>
+      </div>
 
-      <InstallCommand rows={rows} />
+      <div className="book-spread__grid">
+        {/* ------------------------------------------------------ the cover */}
+        <div className="book-spread__cover cover-face">
+          <div className="relative flex items-center justify-between gap-4">
+            <span className={cn(MONO_LABEL, "cover-muted")}>
+              {SITE_NAME} · No.&nbsp;{book.issueNumber}
+            </span>
+            <FavoriteButton
+              owner={repo.owner}
+              repo={repo.repo}
+              size="icon"
+              className={COVER_STAR_CLASS}
+            />
+          </div>
+
+          <div className="relative min-w-0">
+            <div className="mb-4 flex items-center gap-3">
+              {repo.ownerAvatar ? (
+                <Image
+                  src={repo.ownerAvatar}
+                  alt=""
+                  width={128}
+                  height={128}
+                  priority
+                  className="cover-avatar size-10 shrink-0"
+                  aria-hidden
+                />
+              ) : null}
+              <span className={cn(MONO_LABEL, "cover-muted truncate")}>
+                {owner?.name ?? repo.owner}
+              </span>
+            </div>
+
+            <h1 className="book-spread__title">
+              <span className="sr-only">{repo.owner} / </span>
+              {repo.repo}
+            </h1>
+
+            <hr className="cover-rule mt-5" />
+
+            {repo.description ? (
+              <p className="cover-muted mt-4 max-w-prose text-[0.95rem] leading-normal text-pretty">
+                <InlineMarkup text={dekOf(repo.description, 160)} />
+              </p>
+            ) : (
+              <p className="cover-muted mt-4 max-w-prose text-[0.95rem] leading-normal text-pretty">
+                {chapters} {plural(chapters, "skill")} published from this
+                repository, read as one issue.
+              </p>
+            )}
+
+            {first ? (
+              <Link
+                href={paths.chapter(repo.owner, repo.repo, first.slug)}
+                className="cover-cta mt-6 h-12 px-6 text-[0.85rem]"
+              >
+                Start reading — {shortReadingTime(first.readingMinutes)}
+                <span aria-hidden>→</span>
+              </Link>
+            ) : null}
+          </div>
+
+          <div
+            className={cn(
+              MONO_LABEL,
+              "cover-muted relative flex justify-between gap-4",
+            )}
+          >
+            <span>
+              {chapters} {plural(chapters, "chapter")}
+            </span>
+            <span>{book.totalWords.toLocaleString("en-GB")} words</span>
+          </div>
+        </div>
+
+        {/* ------------------------------------------------ the inside page */}
+        <div className="book-spread__inside">
+          <div
+            className={cn(
+              MONO_LABEL,
+              "text-ink-muted border-rule flex items-baseline justify-between gap-4 border-b pb-3.5",
+            )}
+          >
+            <span>Inside this issue</span>
+            <span aria-hidden>p. i</span>
+          </div>
+
+          {/* 1 — install */}
+          <section aria-labelledby="masthead-title" className="mt-7">
+            <h2
+              id="masthead-title"
+              className={cn(MONO_LABEL, "text-issue-accent scroll-mt-24")}
+            >
+              1 — Install
+            </h2>
+            <InstallCommand rows={installRows} className="mt-3.5" />
+            <p
+              className={cn(
+                MONO_LABEL,
+                "text-ink-muted mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 normal-case",
+              )}
+            >
+              <span>{licenceLabel(repo.license)}</span>
+              <span>{compact(repo.stars)} stars</span>
+              <span className="max-sm:hidden">
+                {book.totalWords.toLocaleString("en-GB")} words
+              </span>
+              {updated ? <span>Updated {updated}</span> : null}
+            </p>
+          </section>
+
+          {/* 2 — chapters. Carries `#contents`: this preview is the page's
+              contents now, so the skip link, the `T` shortcut and the section
+              rail all land here. */}
+          <section
+            id="contents"
+            tabIndex={-1}
+            aria-labelledby="spread-chapters"
+            className="mt-9 scroll-mt-24"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2
+                id="spread-chapters"
+                className={cn(MONO_LABEL, "text-issue-accent")}
+              >
+                2 — Chapters
+              </h2>
+              <span className={cn(MONO_LABEL, "text-ink-muted")}>
+                {chapters} {plural(chapters, "skill")} ·{" "}
+                {readingTime(book.totalReadingMinutes)}
+              </span>
+            </div>
+
+            <ol className="mt-1">
+              {preview.map((skill, index) => (
+                <li key={skill.slug} className="border-rule/80 border-b">
+                  <Link
+                    href={paths.chapter(repo.owner, repo.repo, skill.slug)}
+                    className="group/ch hover:bg-paper-raised/60 grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-baseline gap-x-4 py-4 transition-colors"
+                  >
+                    <span
+                      className="text-issue-accent font-mono text-[0.78rem] font-medium"
+                      aria-hidden
+                    >
+                      {folio(index + 1)}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="font-display text-ink-strong group-hover/ch:text-issue-accent block text-[1.35rem] leading-snug tracking-[-0.012em] text-balance transition-colors">
+                        {skill.title}
+                      </span>
+                      {skill.description ? (
+                        <span className="text-ink-muted mt-1 block text-sm leading-snug text-pretty">
+                          <InlineMarkup text={dekOf(skill.description, 110)} />
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="text-ink-muted font-mono text-[0.72rem] tabular-nums">
+                      {shortReadingTime(skill.readingMinutes)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+
+            {chapters > preview.length ? (
+              <AllChaptersLink chapters={chapters} />
+            ) : null}
+          </section>
+
+          {/* the folio line */}
+          <div
+            className={cn(
+              MONO_LABEL,
+              "text-ink-muted/80 border-rule mt-9 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 border-t pt-4",
+            )}
+          >
+            <span>
+              {SITE_NAME} · Issue No.&nbsp;{book.issueNumber}
+            </span>
+            <a
+              href={paths.bookMarkdown(repo.owner, repo.repo)}
+              className="hover:text-issue-accent transition-colors"
+            >
+              Whole issue as markdown <span aria-hidden>↗</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/**
+ * The provenance table, in the reading column below the contents.
+ *
+ * The install commands moved up onto the opening spread, where a reader
+ * decides; what stays here is what a reader *evaluating* wants — owner,
+ * licence, dates, origin, the install curve — stated once, in one place.
+ */
+export function BookMasthead({ book }: BookCoverProps) {
+  const { repo, signal, theme } = book;
+  const updated = editorialDate(repo.pushedAt);
+
+  return (
+    <section
+      className="book-measure flex flex-col gap-6"
+      aria-labelledby="provenance-title"
+    >
+      <h2 id="provenance-title" className="book-eyebrow m-0">
+        Provenance
+      </h2>
 
       <dl className="book-masthead">
         <MastheadCell label="Owner">
@@ -225,7 +357,7 @@ export function BookMasthead({ book }: BookCoverProps) {
         </MastheadCell>
 
         {/* Archived and fork are provenance a reader evaluating a repository
-            needs, and nothing on the page said either. */}
+            needs, and nothing else on the page says either. */}
         {repo.archived ? (
           <MastheadCell label="Status">
             <span className="text-ink-strong">Archived upstream</span>
@@ -244,10 +376,8 @@ export function BookMasthead({ book }: BookCoverProps) {
       {signal && signal.weeklyInstalls.length > 1 ? (
         /*
          * "The wire" — the issue's one real data graphic, painted in the
-         * issue's own colours. Unlike the word-sized sparklines in the
-         * homepage index, this is a single instance on a page the reader has
-         * chosen to be on, so it can afford a canvas, a caption, and the
-         * accessible data table that `AccessibleChart` puts under every chart.
+         * issue's own colours, with the accessible data table that
+         * `AccessibleChart` puts under every chart.
          */
         <InstallSparkline
           weeklyInstalls={signal.weeklyInstalls}

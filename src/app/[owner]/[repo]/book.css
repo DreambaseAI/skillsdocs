@@ -134,12 +134,12 @@
   }
 
   /*
-   * Below `lg` the `.book-pill` is fixed over the foot of the column, so the
-   * column has to reserve the space the pill occupies — its own height, the
-   * gap under it, and the home-indicator inset — or the last lines of a
-   * chapter sit permanently underneath it.
+   * Below the contents rail's breakpoint the `.book-pill` is fixed over the
+   * foot of the column, so the column has to reserve the space the pill
+   * occupies — its own height, the gap under it, and the home-indicator inset
+   * — or the last lines of a chapter sit permanently underneath it.
    */
-  @media (max-width: 63.999rem) {
+  @media (max-width: 79.999rem) {
     .book-column {
       padding-block-end: calc(6rem + 2.75rem + var(--safe-b));
     }
@@ -348,141 +348,120 @@
   /* ═══════════════════════════════════════════════════════════════ cover */
 
   /*
-   * The cover band.
+   * The opening spread.
    *
-   * Full-bleed and outside `.book-frame`, so the two rails — which together
-   * were the largest text mass on the first screen — begin at the contents
-   * instead of flanking the title. It is the one surface on the site where the
-   * issue's accent does real work rather than tinting four words: the paper
-   * itself is washed 4% accent, the rule under the title is accent, and the
-   * owner's mark sits on an accent plate. Measured before that, accent ink was
-   * 0.06–0.5% of the page area on four of the five test issues.
-   *
-   * `min-block-size` is one viewport *less the header*, and the scroll cue at
-   * the foot sits inside it — a band that exactly fills the screen with nothing
-   * at its edge tells the reader the page has ended.
+   * Full-bleed and outside `.book-frame`, so the rails — which together were
+   * the largest text mass on the first screen — begin at the contents instead
+   * of flanking the title. Left page is the cover proper, built on the
+   * `.cover-face` stock from cover.css so the issue accent does real work;
+   * right page is "Inside this issue" on ordinary paper. Above both runs the
+   * issue rule, the dateline a magazine prints across the top of a spread.
    */
-  .book-coverband {
+  .book-spread {
     --band-gutter: max(1.25rem, 5vw);
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-block-size: min(calc(100dvh - var(--header-h)), 52rem);
-    padding-block: clamp(3rem, 9vh, 6.5rem) clamp(4.5rem, 10vh, 7rem);
-    background: color-mix(in oklab, var(--issue-accent) 6%, var(--paper));
     border-block-end: 1px solid var(--rule);
   }
 
   @media (min-width: 64rem) {
-    .book-coverband {
+    .book-spread {
       --band-gutter: 2.5rem;
     }
   }
 
   @media (min-width: 80rem) {
-    .book-coverband {
+    .book-spread {
       --band-gutter: 3rem;
     }
   }
 
-  .book-coverband__inner {
+  .book-spread__head {
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .book-spread__headinner {
     inline-size: 100%;
     max-inline-size: 96rem;
     margin-inline: auto;
-    padding-inline: var(--band-gutter);
     display: flex;
-    flex-direction: column;
-    gap: clamp(1.25rem, 2.6vw, 2rem);
-  }
-
-  .book-coverband__masthead {
-    display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 1rem;
+    gap: 1.1rem;
+    padding: 0.95rem var(--band-gutter);
   }
 
-  /* The deck is second in the visual order and set larger than a chapter's:
-     on a cover it is the sentence that has to earn the whole issue. */
-  .book-coverband__deck {
-    font-size: clamp(1.15rem, 1.9vw, 1.563rem);
-    max-inline-size: 46rem;
-    margin: 0;
-  }
-
-  .book-coverband__scale {
-    margin: 0;
-  }
-
-  /*
-   * Below `lg` the floating contents pill occupies exactly this spot and
-   * already says "Contents", so the cue would be a second copy of the same
-   * control sitting on top of the first.
-   */
-  .book-coverband__cue {
-    display: none;
-    position: absolute;
-    inset-block-end: clamp(1.25rem, 3vh, 2.25rem);
-    inset-inline-start: 50%;
-    translate: -50% 0;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--ink-muted);
-    text-decoration: none;
-    padding: 0.35rem 0.9rem;
-    border: 1px solid var(--rule);
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--paper) 70%, transparent);
+  .book-spread__grid {
+    inline-size: 100%;
+    max-inline-size: 96rem;
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   @media (min-width: 64rem) {
-    .book-coverband__cue {
-      display: inline-flex;
+    .book-spread__grid {
+      grid-template-columns: clamp(20rem, 34vw, 27.5rem) minmax(0, 1fr);
     }
   }
 
-  .book-coverband__cue:hover {
-    color: var(--ink-strong);
-    border-color: var(--issue-accent);
+  /*
+   * The cover column. Content is `position: relative` against the
+   * `.cover-face` texture pseudo-elements; the extra start padding clears the
+   * bind strip the face paints down its spine edge.
+   */
+  .book-spread__cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: clamp(2rem, 6vh, 3.5rem);
+    min-block-size: min(78dvh, 34rem);
+    padding: 1.9rem var(--band-gutter) 2rem
+      calc(var(--band-gutter) + 0.9rem);
   }
 
-  @media (forced-colors: active) {
-    .book-coverband {
-      background: Canvas;
+  @media (min-width: 64rem) {
+    .book-spread__cover {
+      min-block-size: min(calc(100dvh - var(--header-h) - 3.25rem), 46rem);
+      padding-block: 2.4rem;
+      padding-inline-end: 2.25rem;
     }
   }
 
-  .book-cover__title {
+  .book-spread__title {
+    position: relative;
     font-family: var(--display-font-family);
     /* The ceiling is per-name-length; `--cover-cap` is set inline by
-       `book-cover.tsx` so two lowercase letters are not set at 96px in an
-       otherwise empty line. */
-    font-size: clamp(3rem, 11vw, var(--cover-cap, 6rem));
-    line-height: 0.95;
-    letter-spacing: -0.03em;
+       `book-cover.tsx` so two lowercase letters are not set at 88px in an
+       otherwise empty column. */
+    font-size: clamp(2.4rem, 8.5vw, var(--cover-cap, 4.6rem));
+    line-height: 0.96;
+    letter-spacing: -0.02em;
     font-weight: 400;
-    color: var(--ink-strong);
+    color: var(--cover-ink);
+    overflow-wrap: break-word;
     text-wrap: balance;
     /* Optical alignment: a display cap sits inside its own side bearing, so
-       the visual left edge lands a hair right of the rule above it. */
-    margin-inline-start: -0.035em;
+       the visual left edge lands a hair right of the rule beneath it. */
+    margin-inline-start: -0.03em;
   }
 
   @supports (text-box: trim-both cap alphabetic) {
-    .book-cover__title {
+    .book-spread__title {
       text-box: trim-both cap alphabetic;
     }
   }
 
-  .book-cover__owner {
-    font-family: var(--display-font-family);
-    display: block;
-    font-size: clamp(1.1rem, 2.6vw, 1.6rem);
-    line-height: 1.1;
-    letter-spacing: -0.01em;
-    font-weight: 400;
-    color: var(--ink-muted);
+  /* The inside page. Bounded: past ~52rem a contents row's leader from title
+     to minutes is longer than the eye can carry. */
+  .book-spread__inside {
+    display: flex;
+    flex-direction: column;
+    max-inline-size: 62rem;
+    padding: 2.1rem var(--band-gutter) 2.4rem;
+  }
+
+  @media (min-width: 64rem) {
+    .book-spread__inside {
+      padding-block: 2.4rem;
+    }
   }
 
   /*
@@ -1776,7 +1755,10 @@
     }
   }
 
-  @media (min-width: 64rem) {
+  /* The pill retires when the contents rail arrives at 80rem — not at 64rem,
+     which used to leave the 1024–1280px band with no chapter list at all once
+     the column stopped printing one. */
+  @media (min-width: 80rem) {
     .book-pill {
       display: none;
     }
@@ -1884,7 +1866,7 @@
       padding-inline: 0;
     }
 
-    .book-cover {
+    .book-spread__cover {
       min-block-size: auto;
       break-after: page;
     }

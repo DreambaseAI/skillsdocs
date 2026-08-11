@@ -10,6 +10,7 @@
 @import "../styles/prose.css";
 @import "../styles/code.css";
 @import "../styles/chart.css";
+@import "../styles/cover.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -198,5 +199,13 @@
   body {
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* The hero field's resting caret (`typesetter.tsx`). Steps, not a fade: a
+   text caret snaps. */
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
   }
 }

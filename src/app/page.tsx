@@ -1,39 +1,42 @@
 /**
  * The newsstand.
  *
- * Three jobs, in order of importance:
+ * Front-page order: the publication's own nameplate over a dateline of real
+ * figures, then the fold — the submission line on the left, this week's cover
+ * standing on the newsstand at the right — then the shelf of spines, then the
+ * full contents. Everything above the fold exists to make one rule obvious:
+ * change `github.com` to this host and you get a book.
  *
- * 1. Teach the URL swap. Everything above the fold exists to make one rule
- *    obvious — change `github.com` to this host and you get a book.
- * 2. Be a contents page, not a landing page. A lead story, three features, and
- *    a full typographic index of every verified repo.
- * 3. Never depend on a third party to render. `getFeaturedBooks()` is
- *    contractually non-empty and falls back to a committed snapshot, so the
- *    page has 89 books even with skills.sh unreachable.
+ * Never depends on a third party to render. `getFeaturedBooks()` is
+ * contractually non-empty and falls back to a committed snapshot, so the page
+ * has 89 books even with skills.sh unreachable.
  *
  * Cache Components: nothing here reads params, searchParams, cookies or
  * headers, and every data call is `use cache`, so the whole route prerenders.
- * The two Suspense boundaries exist for the cold-instance case, where the
- * cache misses and the catalogue has to be rebuilt from the network.
+ * The Suspense boundaries exist for the cold-instance case, where the cache
+ * misses and the catalogue has to be rebuilt from the network — the dateline
+ * figures, the cover plate and the shelf each land without reflowing the
+ * furniture around them.
  */
 
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Contents } from "@/components/home/contents";
 import { ContentsSkeleton } from "@/components/home/contents-skeleton";
-import { HeroEquation } from "@/components/home/hero-equation";
-import { IssueAccentRules } from "@/components/home/issue-accent";
+import { HeroCover, HeroCoverFallback } from "@/components/home/hero-cover";
+import { IssueAccentRules, ownerAccentStyle } from "@/components/home/issue-accent";
 import { Masthead } from "@/components/home/masthead";
+import { Dateline, DatelineFallback, Nameplate } from "@/components/home/nameplate";
 import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
-import { Shelf } from "@/components/home/shelf";
 import { SiteFooter } from "@/components/home/site-footer";
+import { ShelfBooks, ShelfFallback } from "@/components/home/spine-shelf";
+import { Typesetter } from "@/components/home/typesetter";
 import { getFeaturedBooks } from "@/lib/featured";
 import { JsonLd, siteJsonLd } from "@/lib/jsonld";
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_TAGLINE,
-  SITE_URL,
 } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -42,8 +45,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-/** Bare host, so the hero can show the substitution rather than describe it. */
-const HOST = new URL(SITE_URL).host;
+/** Entrance stagger: pure CSS via `@starting-style`, no hydration involved. */
+const REVEAL =
+  "transition-[opacity,translate] duration-500 ease-(--ease-out-quint) starting:opacity-0 motion-safe:starting:translate-y-2";
 
 async function ContentsSection() {
   const books = await getFeaturedBooks();
@@ -66,29 +70,65 @@ export default function HomePage() {
       />
 
       <main id="main" tabIndex={-1} className="bg-paper text-ink flex-1">
-        {/* ------------------------------------------------------------ hero */}
-        {/* The gutter lives on the `max-w-6xl` box, not on the section around
-            it. With the padding outside, the hero's content started 32px left
-            of every other section on the page — `Your shelf`, `The index` and
-            the masthead all measured 176 at 1440 while the hero measured 144,
-            which reads as a misprint rather than as emphasis. */}
+        {/* -------------------------------------------------- the nameplate */}
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <Nameplate />
+          <div className="mt-6 sm:mt-8">
+            <Suspense fallback={<DatelineFallback />}>
+              <Dateline />
+            </Suspense>
+          </div>
+        </div>
+
+        {/* --------------------------------------------------------- the fold */}
         <section
           aria-labelledby="hero-heading"
           className="border-rule/70 border-b"
         >
-          {/* Single column: the equation is the headline, so it gets the full
-              measure instead of sharing the fold with a card. */}
-          <div className="mx-auto flex max-w-6xl flex-col gap-5 px-5 py-10 sm:gap-7 sm:px-8 sm:py-20">
-            <p className="text-ink-muted text-[0.72rem] font-semibold tracking-[0.2em] uppercase">
-              Turn a repo of skills into a book
-            </p>
-            <HeroEquation host={HOST} />
+          {/* `minmax(0, …)`: the field's intrinsic width must not steal track
+              space from the headline's column. */}
+          <div className="mx-auto grid max-w-6xl grid-cols-1 px-5 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            {/* The house side: headline and the submission line. */}
+            <div
+              data-issue="skillsdocs"
+              style={ownerAccentStyle("skillsdocs")}
+              className="flex flex-col justify-center gap-8 py-10 sm:gap-9 sm:py-14 lg:py-16 lg:pr-12"
+            >
+              <p
+                className={`text-issue-accent flex items-center gap-3 font-mono text-[0.62rem] font-medium tracking-[0.22em] uppercase max-lg:hidden ${REVEAL}`}
+              >
+                <span className="bg-issue-accent h-px w-6" aria-hidden />
+                This week&rsquo;s cover
+              </p>
+
+              <h2
+                id="hero-heading"
+                className={`font-display text-ink-strong text-[clamp(2rem,4.2vw,3.2rem)] leading-[1.05] tracking-[-0.022em] text-pretty ${REVEAL} delay-70`}
+              >
+                Human readable skills
+                <br className="max-sm:hidden" /> for{" "}
+                <em className="text-issue-accent italic">agents.</em>
+              </h2>
+
+              <div className={`${REVEAL} delay-140`}>
+                <Typesetter />
+              </div>
+            </div>
+
+            {/* The newsstand side: this week's cover, in its own colours. */}
+            <div className="border-rule/70 max-lg:border-t lg:border-l">
+              <Suspense fallback={<HeroCoverFallback />}>
+                <HeroCover />
+              </Suspense>
+            </div>
           </div>
         </section>
 
-        {/* ------------------------------------------------------- contents */}
+        {/* ---------------------------------------------- shelf and contents */}
         <div className="mx-auto flex max-w-6xl flex-col gap-16 px-5 py-14 sm:gap-20 sm:px-8 sm:py-20">
-          <Shelf />
+          <Suspense fallback={<ShelfFallback />}>
+            <ShelfBooks />
+          </Suspense>
 
           <Suspense fallback={<ContentsSkeleton />}>
             <ContentsSection />

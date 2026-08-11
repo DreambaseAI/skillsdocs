@@ -1,31 +1,24 @@
 /**
- * The three ways a book appears on the contents page.
+ * The two ways a book appears in the index.
  *
- * A magazine's contents page is not a grid — it is a lead story, a few
- * secondary features, and then an index set in small type with folios. These
- * are those three treatments, and they share the row data rather than the
- * layout, which is the point: nine identical cards would tell a reader that
- * nine repos are equally worth their time, and they are not.
- *
- * Every treatment carries `data-issue` and the owner's accent variables, so
- * the page reads as a newsstand of different mastheads rather than one
- * template repeated. Server components throughout; only the star and the
- * share menu are interactive.
+ * The cover story lives in the hero now (`cover-plate.tsx`), so what remains
+ * here is the index proper: a front-of-book row with room to breathe, and a
+ * set-solid tail row. Both carry `data-issue` and the owner's accent
+ * variables, so the page reads as a newsstand of different mastheads rather
+ * than one template repeated. Server components throughout; only the star is
+ * interactive.
  */
 
-import { Book02Icon, Download04Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import Link from "next/link";
 import { InlineMarkup } from "@/components/book/deck";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { ownerAccentStyle } from "@/components/home/issue-accent";
-import { ShareMenu } from "@/components/home/share-menu";
-import { Sparkline, trendGlyph, trendLabel } from "@/components/home/sparkline";
+import { Sparkline, trendGlyph } from "@/components/home/sparkline";
 import { compact } from "@/components/home/format";
 import { dekOf } from "@/lib/deck";
 import type { FeaturedBook } from "@/lib/featured";
-import { absoluteUrl, external, installCommand, paths } from "@/lib/site";
+import { paths } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 /* --------------------------------------------------------------- utilities */
@@ -45,205 +38,15 @@ function OwnerAvatar({
       alt=""
       width={size}
       height={size}
-      className={cn("border-rule bg-paper-raised shrink-0 rounded-xl border object-cover", className)}
+      className={cn(
+        "border-rule bg-paper-raised shrink-0 rounded-xl border object-cover",
+        className
+      )}
       // Decorative: the owner's login is always adjacent in text.
       aria-hidden
     />
   );
 }
-
-/* ------------------------------------------------------------- lead story */
-
-export interface LeadStoryProps {
-  book: FeaturedBook;
-  /** Its rank in the index, printed as the issue folio. */
-  issue: number;
-}
-
-export function LeadStory({ book, issue }: LeadStoryProps) {
-  const href = paths.book(book.owner, book.repo);
-  const trend = trendLabel(book.weeklyInstalls);
-
-  return (
-    <article
-      data-issue={book.owner.toLowerCase()}
-      style={ownerAccentStyle(book.owner)}
-      className="border-rule bg-paper-raised/60 relative rounded-3xl border p-6 sm:p-9"
-    >
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
-        <div className="min-w-0 flex-1">
-          <p className="text-issue-accent flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.72rem] font-semibold tracking-[0.18em] uppercase">
-            <span>Cover story</span>
-            <span className="bg-issue-accent/40 hidden h-px w-8 sm:block" aria-hidden />
-            <span className="text-ink-muted">Issue {String(issue).padStart(2, "0")}</span>
-          </p>
-
-          <div className="mt-5 flex items-start gap-4">
-            <OwnerAvatar book={book} size={64} className="size-14 rounded-2xl sm:size-16" />
-            <div className="min-w-0">
-              {/* `break-words`: at 320 CSS px (1280 at 400% zoom, WCAG
-                  1.4.10) `microsoft/azure-skills` set at 30px is 230px wide in
-                  a 158px column and pushed the document to 347px of horizontal
-                  scroll. A repo name has no spaces to break at. */}
-              <h3 className="font-display text-ink-strong text-[clamp(1.9rem,5vw,3.25rem)] leading-[1.02] tracking-[-0.025em] break-words text-balance">
-                <Link href={href} className="hover:text-issue-accent transition-colors">
-                  <span className="text-ink-muted font-normal">{book.owner}/</span>
-                  {book.repo}
-                </Link>
-              </h3>
-              {book.official && (
-                <p className="text-ink-muted mt-2 text-xs tracking-[0.12em] uppercase">
-                  Official on skills.sh
-                </p>
-              )}
-            </div>
-          </div>
-
-          {book.description && (
-            // Through `deckOf`, like every other description surface: bounded
-            // on a word boundary rather than a pixel column, typeset with real
-            // apostrophes, and with inline code set as code instead of printed
-            // with its backticks.
-            <p className="text-ink mt-5 max-w-prose text-lg leading-[1.5] text-pretty sm:text-xl">
-              <InlineMarkup text={dekOf(book.description, 220)} />
-            </p>
-          )}
-
-          {book.featuredSkill && (
-            <p className="text-ink-muted mt-4 text-sm">
-              Editor&rsquo;s pick:{" "}
-              <Link
-                href={paths.chapter(book.owner, book.repo, book.featuredSkill)}
-                className="text-issue-accent font-medium underline decoration-1 underline-offset-4"
-              >
-                {book.featuredSkill}
-              </Link>
-            </p>
-          )}
-
-          <dl className="text-ink-muted mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <HugeiconsIcon icon={Book02Icon} className="size-4" aria-hidden />
-              <dt className="sr-only">Chapters</dt>
-              <dd>
-                <span className="text-ink-strong font-medium">{book.skillCount}</span>{" "}
-                {book.skillCount === 1 ? "chapter" : "chapters"}
-              </dd>
-            </div>
-            <div className="flex items-center gap-2">
-              <HugeiconsIcon icon={Download04Icon} className="size-4" aria-hidden />
-              <dt className="sr-only">Installs</dt>
-              <dd>
-                <span className="text-ink-strong font-medium">{compact(book.installs)}</span>{" "}
-                installs
-              </dd>
-            </div>
-            {trend && (
-              <div className="text-issue-accent flex items-center gap-2">
-                <Sparkline values={book.weeklyInstalls} area className="h-6 w-20" />
-                <dt className="sr-only">Trend</dt>
-                <dd className="text-ink-muted">{trend}</dd>
-              </div>
-            )}
-          </dl>
-
-          <div className="mt-8 flex flex-wrap items-center gap-2">
-            <Link
-              href={href}
-              className="bg-issue-accent text-issue-accent-foreground focus-visible:ring-issue-accent/40 inline-flex h-11 items-center rounded-full px-6 text-sm font-medium transition-opacity hover:opacity-90 focus-visible:ring-3"
-            >
-              Read the issue
-            </Link>
-            <FavoriteButton owner={book.owner} repo={book.repo} size="icon" />
-            <ShareMenu
-              url={absoluteUrl(href)}
-              title={`${book.owner}/${book.repo}`}
-              summary={book.description ?? "Agent skills, read as a book."}
-            />
-            <a
-              href={external.repo(book.owner, book.repo)}
-              className="text-ink-muted hover:text-ink ml-auto text-sm underline decoration-1 underline-offset-4"
-            >
-              On GitHub
-            </a>
-          </div>
-        </div>
-
-        <aside className="border-rule bg-paper w-full shrink-0 rounded-2xl border p-5 lg:w-72">
-          <p className="text-ink-muted text-[0.7rem] font-semibold tracking-[0.16em] uppercase">
-            Install
-          </p>
-          <code className="text-ink mt-3 block font-mono text-[0.82rem] leading-relaxed break-all">
-            {installCommand(book.owner, book.repo)}
-          </code>
-          <dl className="border-rule text-ink-muted mt-5 grid grid-cols-2 gap-y-3 border-t pt-5 text-xs">
-            <dt>Stars</dt>
-            <dd className="text-ink text-right">{compact(book.stars)}</dd>
-            <dt>Licence</dt>
-            <dd className="text-ink truncate text-right">{book.license ?? "None declared"}</dd>
-            <dt>Layout</dt>
-            <dd className="text-ink truncate text-right font-mono text-[0.7rem]">{book.layout}</dd>
-          </dl>
-        </aside>
-      </div>
-    </article>
-  );
-}
-
-/* ---------------------------------------------------------- feature cards */
-
-export function FeatureCard({ book, issue }: { book: FeaturedBook; issue: number }) {
-  const href = paths.book(book.owner, book.repo);
-
-  return (
-    <article
-      data-issue={book.owner.toLowerCase()}
-      style={ownerAccentStyle(book.owner)}
-      className="border-rule hover:border-issue-accent/50 group/card relative flex flex-col rounded-2xl border p-5 transition-colors"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <OwnerAvatar book={book} size={40} className="size-10" />
-        <span className="text-ink-muted font-mono text-[0.7rem] tracking-widest">
-          {String(issue).padStart(2, "0")}
-        </span>
-      </div>
-
-      <h3 className="font-display text-ink-strong mt-4 text-xl leading-tight tracking-[-0.015em]">
-        <Link href={href} className="after:absolute after:inset-0 after:content-['']">
-          <span className="text-ink-muted font-normal">{book.owner}/</span>
-          {book.repo}
-        </Link>
-      </h3>
-
-      {book.description && (
-        // No `line-clamp`: a fixed pixel column cuts mid-token (`Anthropic's
-        // look-…`) and leaves dead space under a short description. The budget
-        // is characters, applied on a word boundary, server-side.
-        <p className="text-ink-muted mt-2 text-sm leading-relaxed">
-          <InlineMarkup text={dekOf(book.description, 150)} />
-        </p>
-      )}
-
-      <div className="text-ink-muted mt-auto flex items-end justify-between gap-3 pt-5 text-xs">
-        <span>
-          <span className="text-ink-strong font-medium">{book.skillCount}</span>{" "}
-          {book.skillCount === 1 ? "chapter" : "chapters"} ·{" "}
-          <span className="text-ink-strong font-medium">{compact(book.installs)}</span> installs
-        </span>
-        <span className="text-issue-accent">
-          <Sparkline values={book.weeklyInstalls} className="h-5 w-16" />
-        </span>
-      </div>
-
-      {/* Sits above the card-wide link overlay so the star stays clickable. */}
-      <div className="absolute top-3 right-3 z-1 opacity-0 transition-opacity group-focus-within/card:opacity-100 group-hover/card:opacity-100">
-        <FavoriteButton owner={book.owner} repo={book.repo} />
-      </div>
-    </article>
-  );
-}
-
-/* ------------------------------------------------------------- index rows */
 
 /**
  * The index is two treatments, not one.
@@ -263,14 +66,16 @@ export function FeatureCard({ book, issue }: { book: FeaturedBook; issue: number
  * - {@link IndexTailRow} — set solid at 15px, in two columns, under band rules
  *   by order of magnitude, with the trend reduced to a single glyph.
  *
- * The star is hover- and focus-gated in both, which is what `FeatureCard`
- * already did correctly and these rows did not.
+ * The star is hover- and focus-gated in both.
  */
 
 function Folio({ issue, className }: { issue: number; className?: string }) {
   return (
     <span
-      className={cn("text-ink-muted font-display shrink-0 text-right tabular-nums", className)}
+      className={cn(
+        "text-ink-muted font-display shrink-0 text-right tabular-nums",
+        className
+      )}
       aria-hidden
     >
       {String(issue).padStart(2, "0")}
@@ -279,23 +84,39 @@ function Folio({ issue, className }: { issue: number; className?: string }) {
 }
 
 /** The star, hidden until the row is hovered or focused — unless it is set. */
-function RowStar({ book, className }: { book: FeaturedBook; className?: string }) {
+function RowStar({
+  book,
+  className,
+}: {
+  book: FeaturedBook;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
-        "z-1 shrink-0 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[aria-pressed=true]]:opacity-100",
+        "z-1 shrink-0 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-aria-pressed:opacity-100",
         // Touch has no hover, so on a phone the resting state is the only
         // state and the control has to stay visible.
         "max-md:opacity-100",
-        className,
+        className
       )}
     >
-      <FavoriteButton owner={book.owner} repo={book.repo} className="size-9 sm:size-8" />
+      <FavoriteButton
+        owner={book.owner}
+        repo={book.repo}
+        className="size-9 sm:size-8"
+      />
     </span>
   );
 }
 
-export function IndexLeadRow({ book, issue }: { book: FeaturedBook; issue: number }) {
+export function IndexLeadRow({
+  book,
+  issue,
+}: {
+  book: FeaturedBook;
+  issue: number;
+}) {
   const href = paths.book(book.owner, book.repo);
   const dek = book.description ? dekOf(book.description) : "";
 
@@ -347,7 +168,13 @@ export function IndexLeadRow({ book, issue }: { book: FeaturedBook; issue: numbe
   );
 }
 
-export function IndexTailRow({ book, issue }: { book: FeaturedBook; issue: number }) {
+export function IndexTailRow({
+  book,
+  issue,
+}: {
+  book: FeaturedBook;
+  issue: number;
+}) {
   const href = paths.book(book.owner, book.repo);
   const trend = trendGlyph(book.weeklyInstalls);
 
@@ -402,7 +229,11 @@ export function IndexTailRow({ book, issue }: { book: FeaturedBook; issue: numbe
         {book.skillCount}
       </span>
       <span className="text-ink w-12 shrink-0 text-right text-xs tabular-nums">
-        {book.installs > 0 ? compact(book.installs) : <span className="text-ink-muted">—</span>}
+        {book.installs > 0 ? (
+          compact(book.installs)
+        ) : (
+          <span className="text-ink-muted">—</span>
+        )}
       </span>
 
       <RowStar book={book} className="self-center" />

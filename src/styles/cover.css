@@ -1,0 +1,286 @@
+/**
+ * cover.css — the printed objects.
+ *
+ * Cover plates (the home hero, the issue page) and shelf spines. Everything
+ * here renders a physical object — a magazine on a newsstand, a book on a
+ * shelf — so the surfaces are built from the `--cover-*` stock tokens and the
+ * issue accent, never from `--paper`/`--ink`: the object keeps its own ink in
+ * both colour schemes, the way print does.
+ *
+ * Colour discipline: no literals. Every value is a token or a color-mix of
+ * tokens; the accent arrives through `--issue-accent`, so a cover set inside
+ * `[data-issue]`/`.book-issue` is automatically in that issue's colours.
+ */
+
+@layer components {
+  /* ═══════════════════════════════════════════════════════ the cover face */
+
+  .cover-face {
+    position: relative;
+    overflow: hidden;
+    color: var(--cover-ink);
+    background:
+      radial-gradient(
+        90% 60% at 25% 10%,
+        color-mix(in oklab, var(--issue-accent) 52%, transparent),
+        transparent 62%
+      ),
+      linear-gradient(
+        195deg,
+        color-mix(in oklab, var(--issue-accent) 40%, var(--cover-ground)) 0%,
+        color-mix(in oklab, var(--issue-accent) 12%, var(--cover-ground)) 55%,
+        var(--cover-ground) 100%
+      );
+  }
+
+  /* Fine vertical scanlines: the halftone that keeps a flat gradient from
+     reading as a CSS gradient. Barely-there on purpose — at 6% they read as
+     pinstripes rather than paper grain. */
+  .cover-face::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--cover-ink) 2.5%, transparent) 0 1px,
+      transparent 1px 9px
+    );
+  }
+
+  /* The bind: a darkened strip with one sheen line, down the spine edge. */
+  .cover-face::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: 1.125rem;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      var(--cover-shade-strong),
+      var(--cover-sheen) 62%,
+      transparent
+    );
+    border-inline-end: 1px solid
+      color-mix(in oklab, var(--cover-ink) 9%, transparent);
+  }
+
+  .cover-face--flat::after {
+    display: none;
+  }
+
+  /* Hairline on stock, and the muted register. */
+  .cover-rule {
+    border: 0;
+    block-size: 1px;
+    margin: 0;
+    background: color-mix(in oklab, var(--cover-ink) 42%, transparent);
+  }
+
+  .cover-muted {
+    color: var(--cover-ink-muted);
+  }
+
+  /* The cover's own call to action: stock ink on stock ground, inverted. */
+  .cover-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    background: var(--cover-ink);
+    color: var(--cover-ground);
+    font-weight: 550;
+    text-decoration: none;
+    transition: opacity 140ms var(--ease-out-quint);
+  }
+
+  .cover-cta:hover {
+    opacity: 0.92;
+  }
+
+  .cover-cta:focus-visible {
+    outline: var(--focus-ring-width) solid var(--cover-ink);
+    outline-offset: 3px;
+  }
+
+  /* The owner's mark on stock: full colour, plated, unlike the letterpress
+     treatment `.book-mark` gives it on paper. */
+  .cover-avatar {
+    border-radius: 0.625rem;
+    border: 1px solid color-mix(in oklab, var(--cover-ink) 28%, transparent);
+    box-shadow: 0 4px 12px var(--cover-shade);
+    background: color-mix(in oklab, var(--cover-ink) 10%, var(--cover-ground));
+    object-fit: cover;
+  }
+
+  /* ═══════════════════════════════════════════════════════ the newsstand */
+
+  /* The ruled ground the hero's cover sits on: faint horizontal shelf lines
+     plus an accent wash rising behind the plate. */
+  .newsstand {
+    position: relative;
+    background:
+      radial-gradient(
+        120% 100% at 80% 0%,
+        color-mix(in oklab, var(--issue-accent) 14%, transparent),
+        transparent 62%
+      );
+  }
+
+  .newsstand::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, var(--rule) 65%, transparent) 0 1px,
+      transparent 1px 26px
+    );
+  }
+
+  /* The issue behind the issue: depth without content. */
+  .cover-behind {
+    position: absolute;
+    border-radius: 0.25rem;
+    background: linear-gradient(
+      200deg,
+      color-mix(in oklab, var(--ink) 22%, var(--paper)),
+      color-mix(in oklab, var(--ink) 38%, var(--paper))
+    );
+    border: 1px solid var(--rule);
+  }
+
+  /* ═════════════════════════════════════════════════════════════ spines */
+
+  .spine {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    flex: none;
+    gap: 0.5rem;
+    padding-block: 0.7rem 0.8rem;
+    border-radius: 3px 3px 0 0;
+    overflow: hidden;
+    color: var(--cover-ink);
+    box-shadow: 0 18px 34px -14px var(--cover-shade-strong);
+    background:
+      linear-gradient(
+        90deg,
+        var(--cover-shade-strong) 0 4%,
+        var(--cover-sheen) 8%,
+        transparent 24%,
+        transparent 52%,
+        var(--cover-shade) 90%,
+        var(--cover-shade-strong) 100%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--issue-accent) 34%, var(--cover-ground)),
+        color-mix(in oklab, var(--issue-accent) 8%, var(--cover-ground)) 60%,
+        var(--cover-ground)
+      );
+  }
+
+  /* The head of the bind catches the light. */
+  .spine::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 0;
+    block-size: 6px;
+    pointer-events: none;
+    background: linear-gradient(180deg, var(--cover-sheen), transparent);
+  }
+
+  .spine__title {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    rotate: 180deg;
+    min-block-size: 0;
+    max-inline-size: 100%;
+    overflow: hidden;
+    /* One column of glyphs, ellipsised along the spine if the scale-to-fit
+       maths in `shelf.tsx` ever loses to a pathological name. */
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--display-font-family);
+    letter-spacing: 0.01em;
+    text-shadow: 0 1px 2px var(--cover-shade-strong);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .spine__title:focus-visible {
+    outline: var(--focus-ring-width) solid var(--cover-ink);
+    outline-offset: -3px;
+    border-radius: 3px;
+  }
+
+  .spine__avatar {
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--cover-ink) 24%, transparent);
+    box-shadow: 0 2px 6px var(--cover-shade-strong);
+    background: color-mix(in oklab, var(--cover-ink) 10%, var(--cover-ground));
+    object-fit: cover;
+  }
+
+  /* The board the spines stand on. */
+  .shelf-board {
+    block-size: 0.8rem;
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--ink) 14%, var(--paper)),
+      color-mix(in oklab, var(--ink) 46%, var(--paper))
+    );
+    box-shadow: 0 -10px 22px -8px var(--cover-shade);
+  }
+
+  /* ══════════════════════════════════════════════ high contrast / print */
+
+  /* Windows HCM: the object treatments are decoration; the text is not. */
+  @media (forced-colors: active) {
+    .cover-face,
+    .spine,
+    .newsstand,
+    .cover-behind {
+      background: Canvas;
+      color: CanvasText;
+      border: 1px solid CanvasText;
+    }
+
+    .cover-face::before,
+    .cover-face::after,
+    .spine::before,
+    .newsstand::before {
+      display: none;
+    }
+
+    .cover-rule {
+      background: CanvasText;
+    }
+
+    .cover-muted,
+    .spine__title {
+      color: CanvasText;
+      text-shadow: none;
+    }
+
+    .cover-cta {
+      background: ButtonFace;
+      color: ButtonText;
+      border: 1px solid ButtonText;
+    }
+
+    .shelf-board {
+      background: CanvasText;
+    }
+  }
+}

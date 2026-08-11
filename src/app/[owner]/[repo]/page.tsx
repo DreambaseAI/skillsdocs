@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { BookCoverBand, BookMasthead } from "@/components/book/book-cover";
+import { BookCoverSpread, BookMasthead } from "@/components/book/book-cover";
 import { BookRail } from "@/components/book/book-rail";
 import { BookSkeleton } from "@/components/book/book-skeleton";
 import { Colophon } from "@/components/book/colophon";
@@ -9,7 +9,6 @@ import { dropCapMode } from "@/components/book/dropcap";
 import { MobileContents } from "@/components/book/mobile-contents";
 import { BookContentsList, RailLeft } from "@/components/book/rail-left";
 import { EmptyBook, RateLimited, UpstreamFailure } from "@/components/book/states";
-import { TableOfContents } from "@/components/book/table-of-contents";
 import { Markdown } from "@/components/reader/markdown";
 import { showcaseParams } from "@/lib/featured";
 import { bookJsonLd, JsonLd } from "@/lib/jsonld";
@@ -120,7 +119,7 @@ async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">
   const sections = [
     { id: "cover", label: "Cover" },
     { id: "contents", label: "Contents" },
-    { id: "masthead-title", label: "Install" },
+    { id: "provenance-title", label: "Provenance" },
     ...(front ? [{ id: "front-matter", label: "Front matter" }] : []),
     { id: "colophon", label: "Colophon" },
   ];
@@ -131,11 +130,11 @@ async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">
           every chapter, and only this branch knows the book resolved. */}
       <JsonLd data={bookJsonLd(book)} />
 
-      {/* The cover is a band, not a block: it escapes the three-track grid
+      {/* The cover is a spread, not a block: it escapes the three-track grid
           entirely so the rails start where the contents does. See the note at
           the top of `book-cover.tsx`. */}
       <div className="reader">
-        <BookCoverBand book={book} />
+        <BookCoverSpread book={book} />
       </div>
 
       <div className="book-frame">
@@ -143,12 +142,12 @@ async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">
 
         {/* `.reader` sits on the column, not the frame: WS-5 makes it the
             `reader` container query root, and the rails are not the column. */}
+        {/* No chapter list here: the opening spread previews the chapters and
+            the contents rail (or, below 1280px, the floating pill's sheet)
+            carries the full list. Printing it a third time in the column made
+            the same facts the largest text mass on the page. */}
         <div className="book-column reader">
           <div className="pt-10">
-            <TableOfContents book={book} />
-          </div>
-
-          <div className="mt-16">
             <BookMasthead book={book} />
           </div>
 

@@ -20,7 +20,7 @@
  * cutoff, so the label a row sits under is a fact about the row.
  */
 
-import { FeatureCard, IndexLeadRow, IndexTailRow, LeadStory } from "@/components/home/book-card";
+import { IndexLeadRow, IndexTailRow } from "@/components/home/book-card";
 import { chartSeedsFromTheme, InstallsBarChart } from "@/components/charts";
 import { compact } from "@/components/home/format";
 import { curatedManifest } from "@/components/home/issue-accent";
@@ -52,7 +52,9 @@ const CHART_TOP_N = 12;
 
 const COVER_STORY = "emilkowalski/skills";
 
-function pickLead(books: FeaturedBook[]): FeaturedBook {
+/** The cover story — shared with the hero, so the newsstand and the contents
+ * page agree on which issue is on the front this week. */
+export function pickLead(books: FeaturedBook[]): FeaturedBook {
   return (
     books.find((book) => `${book.owner}/${book.repo}` === COVER_STORY) ??
     books[0]
@@ -114,9 +116,7 @@ function IndexHeader() {
 }
 
 export function Contents({ books }: ContentsProps) {
-  const lead = pickLead(books);
   const rank = new Map(books.map((book, i) => [`${book.owner}/${book.repo}`, i + 1]));
-  const features = books.filter((book) => book !== lead).slice(0, 3);
 
   const chapters = books.reduce((sum, book) => sum + book.skillCount, 0);
   const installs = books.reduce((sum, book) => sum + book.installs, 0);
@@ -137,58 +137,6 @@ export function Contents({ books }: ContentsProps) {
 
   return (
     <div className="flex flex-col gap-16 sm:gap-20">
-      {/* ------------------------------------------------------- cover story */}
-      <section aria-labelledby="cover-heading">
-        <h2 id="cover-heading" className="sr-only">
-          Cover story
-        </h2>
-        <LeadStory book={lead} issue={rank.get(`${lead.owner}/${lead.repo}`) ?? 1} />
-      </section>
-
-      {/* --------------------------------------------------------- features */}
-      {/*
-        "Also in this issue" was wrong on its own terms: one repo is one issue,
-        so three other repos are three other issues, and the cards under that
-        heading each printed their own global folio — `01`, `03`, `04` — under
-        a section that had just called itself `ISSUE 02`. The skipped number
-        read as a card that failed to render.
-      */}
-      <section aria-labelledby="features-heading" className="flex flex-col gap-5">
-        <div className="border-rule flex items-baseline justify-between gap-4 border-b pb-3">
-          <h2
-            id="features-heading"
-            className="font-display text-ink-strong text-2xl tracking-[-0.015em]"
-          >
-            Also on the shelf
-          </h2>
-          <p className="text-ink-muted text-xs tracking-[0.12em] uppercase">Most installed</p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {features.map((book, i) => (
-            <FeatureCard key={`${book.owner}/${book.repo}`} book={book} issue={i + 1} />
-          ))}
-        </div>
-
-        {/*
-         * The one full chart on the homepage. The index rows below use a
-         * word-sized inline SVG instead: eighty-nine canvases, each with a
-         * mount-time measurement pass, is a performance problem rather than a
-         * data graphic, and at that size a sparkline is typographic furniture.
-         * Here the comparison between books is the actual point, so it earns
-         * axes, a caption, and the data table underneath.
-         */}
-        <InstallsBarChart
-          items={topInstalled.map((book) => ({
-            label: `${book.owner}/${book.repo}`,
-            installs: book.installs,
-          }))}
-          seeds={HOUSE_CHART_SEEDS}
-          subject="the most-installed books on the shelf"
-          className="mt-2"
-        />
-      </section>
-
       {/* ------------------------------------------------------------ index */}
       <section id="contents" aria-labelledby="index-heading" className="flex flex-col gap-5">
         <div className="border-ink-strong/80 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b-2 pb-3">
@@ -205,6 +153,23 @@ export function Contents({ books }: ContentsProps) {
             installs
           </p>
         </div>
+
+        {/*
+         * The one full chart on the homepage, opening the index the way a
+         * magazine opens its listings with a spread. The index rows below use
+         * a word-sized inline SVG instead: eighty-nine canvases, each with a
+         * mount-time measurement pass, is a performance problem rather than a
+         * data graphic. Here the comparison between books is the actual point,
+         * so it earns axes, a caption, and the data table underneath.
+         */}
+        <InstallsBarChart
+          items={topInstalled.map((book) => ({
+            label: `${book.owner}/${book.repo}`,
+            installs: book.installs,
+          }))}
+          seeds={HOUSE_CHART_SEEDS}
+          subject="the most-installed books on the shelf"
+        />
 
         {/* --------------------------------------------------- the lead band */}
         <section aria-labelledby="index-lead-heading">
