@@ -85,7 +85,8 @@ Then open any repository: <http://localhost:3000/anthropics/skills>
 export GITHUB_TOKEN=$(gh auth token)   # 60 req/hr → 5,000 req/hr
 ```
 
-Not required, but recommended — a book costs two GitHub API calls.
+Not required, but recommended — it unlocks the GraphQL path (repo + owner
+metadata in one point) and lifts the REST budget that pays for tree listings.
 
 ### Scripts
 

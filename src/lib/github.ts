@@ -1,12 +1,19 @@
 /**
  * GitHub data access.
  *
- * Budget discipline matters here: unauthenticated GitHub is 60 req/hr, so an
- * entire book is built from exactly TWO API calls (repo metadata + one
- * recursive tree) plus raw.githubusercontent reads, which are CDN-served and
- * not counted against the API quota.
+ * Budget discipline matters here. File bodies come from raw.githubusercontent,
+ * which is CDN-served and not counted against any API quota. The metered
+ * surface is metadata and the tree listing, and it is split across GitHub's
+ * two *independent* hourly budgets:
  *
- * Set GITHUB_TOKEN to lift the ceiling to 5000 req/hr.
+ *  - authenticated: repo + owner metadata travel as ONE GraphQL query
+ *    (`fetchRepoAndOwner`, 1 point of the separate 5,000-point GraphQL
+ *    budget), so the whole 5,000-req REST budget is left for the one
+ *    recursive-tree call a book needs.
+ *  - unauthenticated (60 req/hr, and GraphQL requires a token): falls back to
+ *    the REST fetchers below — repo metadata, owner metadata, tree.
+ *
+ * Set GITHUB_TOKEN to lift the REST ceiling to 5000 req/hr and unlock GraphQL.
  *
  * CACHING. Every fetcher below is a `use cache` function keyed on its
  * primitive arguments and tagged `repo:{owner}/{repo}`, so one webhook call to
@@ -295,6 +302,247 @@ export async function fetchOwnerMeta(login: string): Promise<OwnerMeta | null> {
     // Owner metadata is decorative — never fail a book over it.
     return null;
   }
+}
+
+/* ------------------------------------------------- combined GraphQL fetch */
+
+const GRAPHQL = `${API}/graphql`;
+
+/**
+ * Repo + owner metadata in one query. Costs 1 point of the GraphQL budget,
+ * which is separate from the 5,000-req REST budget the tree call spends.
+ *
+ * Two deliberate REST/GraphQL differences: `issues(states: OPEN)` excludes
+ * pull requests where REST's `open_issues_count` includes them (GraphQL is the
+ * more honest number), and Organizations have no `followers` connection, so
+ * org followers read 0.
+ */
+const BOOK_META_QUERY = /* GraphQL */ `
+  query BookMeta($owner: String!, $repo: String!) {
+    repository(owner: $owner, name: $repo) {
+      name
+      nameWithOwner
+      defaultBranchRef { name }
+      description
+      homepageUrl
+      stargazerCount
+      forkCount
+      watchers { totalCount }
+      issues(states: OPEN) { totalCount }
+      repositoryTopics(first: 20) { nodes { topic { name } } }
+      licenseInfo { key name spdxId }
+      pushedAt
+      createdAt
+      isArchived
+      isFork
+      url
+      owner {
+        __typename
+        login
+        avatarUrl
+        url
+        ... on User {
+          name
+          bio
+          websiteUrl
+          location
+          twitterUsername
+          repositories(privacy: PUBLIC) { totalCount }
+          followers { totalCount }
+        }
+        ... on Organization {
+          name
+          description
+          websiteUrl
+          location
+          twitterUsername
+          repositories(privacy: PUBLIC) { totalCount }
+        }
+      }
+    }
+  }
+`;
+
+interface GqlRepository {
+  name: string;
+  nameWithOwner: string;
+  defaultBranchRef: { name: string } | null;
+  description: string | null;
+  homepageUrl: string | null;
+  stargazerCount: number;
+  forkCount: number;
+  watchers: { totalCount: number };
+  issues: { totalCount: number };
+  repositoryTopics: { nodes: Array<{ topic: { name: string } } | null> | null };
+  licenseInfo: { key: string; name: string; spdxId: string | null } | null;
+  pushedAt: string | null;
+  createdAt: string | null;
+  isArchived: boolean;
+  isFork: boolean;
+  url: string;
+  owner: {
+    __typename: string;
+    login: string;
+    avatarUrl: string;
+    url: string;
+    name?: string | null;
+    bio?: string | null;
+    description?: string | null;
+    websiteUrl?: string | null;
+    location?: string | null;
+    twitterUsername?: string | null;
+    repositories?: { totalCount: number };
+    followers?: { totalCount: number };
+  };
+}
+
+function rateLimitedError(res: Response): GitHubError {
+  const reset = Number(res.headers.get("x-ratelimit-reset") ?? 0) * 1000;
+  return new GitHubError(
+    `GitHub GraphQL rate limit reached. Resets ${reset ? new Date(reset).toISOString() : "shortly"}.`,
+    429,
+    "rate-limited",
+  );
+}
+
+async function gqlRepoAndOwner(
+  owner: string,
+  repo: string,
+): Promise<{ repo: RepoMeta; owner: OwnerMeta }> {
+  let res: Response;
+  try {
+    res = await fetch(GRAPHQL, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        query: BOOK_META_QUERY,
+        variables: { owner, repo },
+      }),
+    });
+  } catch (cause) {
+    throw new GitHubError(
+      `Could not reach GitHub: ${(cause as Error).message}`,
+      0,
+      "network",
+    );
+  }
+
+  if (
+    (res.status === 403 || res.status === 429) &&
+    res.headers.get("x-ratelimit-remaining") === "0"
+  ) {
+    throw rateLimitedError(res);
+  }
+  if (!res.ok) {
+    throw new GitHubError(
+      `GitHub GraphQL responded ${res.status}`,
+      res.status,
+      "other",
+    );
+  }
+
+  const payload = (await res.json()) as {
+    data?: { repository: GqlRepository | null } | null;
+    errors?: Array<{ type?: string; message?: string }>;
+  };
+  const errors = payload.errors ?? [];
+  if (errors.some((e) => e.type === "RATE_LIMITED")) {
+    throw rateLimitedError(res);
+  }
+
+  const r = payload.data?.repository;
+  if (!r) {
+    // GraphQL reports a missing repo as `repository: null` + a NOT_FOUND
+    // error, all inside an HTTP 200.
+    if (errors.length === 0 || errors.some((e) => e.type === "NOT_FOUND")) {
+      throw new GitHubError(`Not found: ${owner}/${repo}`, 404, "not-found");
+    }
+    throw new GitHubError(
+      `GitHub GraphQL error: ${errors[0]?.message ?? "unknown"}`,
+      502,
+      "other",
+    );
+  }
+
+  const o = r.owner;
+  return {
+    repo: {
+      // Use GitHub's canonical casing, not whatever casing the URL had.
+      owner: o.login,
+      repo: r.name,
+      fullName: r.nameWithOwner,
+      defaultBranch: r.defaultBranchRef?.name ?? "HEAD",
+      description: r.description,
+      homepage: r.homepageUrl?.trim() || null,
+      stars: r.stargazerCount,
+      forks: r.forkCount,
+      watchers: r.watchers.totalCount,
+      openIssues: r.issues.totalCount,
+      topics: (r.repositoryTopics.nodes ?? [])
+        .filter((n): n is { topic: { name: string } } => n !== null)
+        .map((n) => n.topic.name),
+      license: r.licenseInfo
+        ? {
+            key: r.licenseInfo.key,
+            name: r.licenseInfo.name,
+            spdxId: r.licenseInfo.spdxId,
+          }
+        : null,
+      pushedAt: r.pushedAt,
+      createdAt: r.createdAt,
+      archived: r.isArchived,
+      isFork: r.isFork,
+      htmlUrl: r.url,
+      ownerAvatar: o.avatarUrl,
+      ownerType: o.__typename,
+      ownerUrl: o.url,
+    },
+    owner: {
+      login: o.login,
+      name: o.name ?? null,
+      // Users expose `bio`; Organizations expose `description`.
+      bio: o.bio ?? o.description ?? null,
+      blog: o.websiteUrl?.trim() || null,
+      avatar: o.avatarUrl,
+      htmlUrl: o.url,
+      type: o.__typename,
+      location: o.location ?? null,
+      twitter: o.twitterUsername ?? null,
+      publicRepos: o.repositories?.totalCount ?? 0,
+      followers: o.followers?.totalCount ?? 0,
+    },
+  };
+}
+
+/**
+ * The one metadata read a book performs.
+ *
+ * Authenticated, this is a single GraphQL point and spends nothing from the
+ * REST budget; if the GraphQL budget is ever exhausted it falls back to REST,
+ * so the two 5,000/hr pools back each other up. Unauthenticated (GraphQL
+ * requires a token), it is the two REST calls it always was.
+ */
+export async function fetchRepoAndOwner(
+  owner: string,
+  repo: string,
+): Promise<{ repo: RepoMeta; owner: OwnerMeta | null }> {
+  "use cache";
+  cacheLife("repo");
+  cacheTag(repoTag(owner, repo), ownerTag(owner));
+
+  if (process.env.GITHUB_TOKEN) {
+    try {
+      return await gqlRepoAndOwner(owner, repo);
+    } catch (error) {
+      const exhausted =
+        error instanceof GitHubError && error.kind === "rate-limited";
+      if (!exhausted) throw error;
+      // Fall through: the REST budget is metered independently.
+    }
+  }
+
+  const meta = await fetchRepoMeta(owner, repo);
+  return { repo: meta, owner: await fetchOwnerMeta(meta.owner) };
 }
 
 /* -------------------------------------------------------------- raw files */

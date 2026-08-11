@@ -465,7 +465,7 @@ export async function fetchRawTextBatch(urls: string[], concurrency?: number): P
 export async function rateLimitBudget(): Promise<{ limit: number; remaining: number; resetAt: string }>;  // new, for /api/v1/health
 ```
 
-**Hard constraint:** one book = **two** GitHub API calls (repo meta + one recursive tree) plus `raw.githubusercontent.com` reads, which are CDN-served and do not count against the quota. Never call the contents API per file. Never call the search API except as the truncation fallback.
+**Hard constraint:** one book = **one** REST call (the recursive tree) + **one** GraphQL point (`fetchRepoAndOwner`: repo + owner metadata together, on GraphQL's separate 5,000-point budget), plus `raw.githubusercontent.com` reads, which are CDN-served and do not count against either quota. Unauthenticated there is no GraphQL, so metadata falls back to REST and a book costs three REST calls. Never call the contents API per file. Never call the search API except as the truncation fallback.
 
 **`use cache` argument rule:** primitives only. Never pass a `URL`, a class instance, or a function into a cached function — the cache key serializer rejects them.
 

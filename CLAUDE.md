@@ -80,9 +80,11 @@ and identical position once a leading per-agent mirror prefix (`.claude/`,
 `.cursor/`, `providers/codex/`, …) is stripped. `pbakaus/impeccable` publishes
 fourteen copies with fourteen different SHAs, which is why the second key exists.
 
-A whole book costs **two GitHub API calls** — repo metadata and one recursive
-tree — plus raw.githubusercontent reads, which are CDN-served and not metered.
-Set `GITHUB_TOKEN` to raise the API ceiling from 60/hr to 5,000/hr.
+A whole book costs **one REST call** (the recursive tree) plus **one GraphQL
+point** (repo + owner metadata, on GraphQL's separate 5,000-point budget) —
+plus raw.githubusercontent reads, which are CDN-served and not metered.
+Unauthenticated there is no GraphQL, so a book falls back to three REST calls
+out of 60/hr. Set `GITHUB_TOKEN` to get 5,000/hr on each budget.
 
 ## Verify, don't assume
 

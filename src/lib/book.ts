@@ -3,9 +3,10 @@
  * front matter (README), branding and signal. This is the single entry point
  * the route handlers use.
  *
- * Cost contract: exactly TWO GitHub API calls per book (repo metadata + one
- * recursive tree). Everything else is raw.githubusercontent, which is
- * CDN-served and does not touch the API quota. Never call the contents API
+ * Cost contract: ONE GraphQL point (repo + owner metadata, its own 5,000/hr
+ * budget) plus ONE REST call (the recursive tree) per book when authenticated;
+ * three REST calls when not. Everything else is raw.githubusercontent, which
+ * is CDN-served and does not touch either quota. Never call the contents API
  * per file.
  */
 
@@ -14,10 +15,9 @@ import { getIssueTheme } from "./design/fetch";
 import { deriveIssueTheme } from "./design/theme";
 import type { IssueTheme } from "./design/types";
 import {
-  fetchOwnerMeta,
   fetchRawText,
   fetchRawTextBatch,
-  fetchRepoMeta,
+  fetchRepoAndOwner,
   fetchRepoTree,
   GitHubError,
   type OwnerMeta,
@@ -281,16 +281,16 @@ async function buildBook(
   ownerParam: string,
   repoParam: string,
 ): Promise<Book> {
-  // API call 1 of 2.
-  const repo = await fetchRepoMeta(ownerParam, repoParam);
+  // Repo + owner metadata: one GraphQL point when authenticated, two REST
+  // calls when not.
+  const { repo, owner: ownerMeta } = await fetchRepoAndOwner(
+    ownerParam,
+    repoParam,
+  );
   const { owner, repo: name, defaultBranch: ref } = repo;
 
-  // API call 2 of 2. Owner metadata is a third call but is cached per owner
-  // and shared across all of that owner's books.
-  const [tree, ownerMeta] = await Promise.all([
-    fetchRepoTree(owner, name, ref),
-    fetchOwnerMeta(owner),
-  ]);
+  // The book's one REST call.
+  const tree = await fetchRepoTree(owner, name, ref);
 
   const readmePath = findReadme(tree.entries);
   const repoLocalUrls = REPO_DESIGN_CANDIDATES.filter((p) =>
@@ -424,7 +424,7 @@ async function getSkillRawCached(
   cacheLife("repo");
   cacheTag(`repo:${owner}/${repo}`);
 
-  const meta = await fetchRepoMeta(owner, repo);
+  const { repo: meta } = await fetchRepoAndOwner(owner, repo);
   const tree = await fetchRepoTree(meta.owner, meta.repo, meta.defaultBranch);
   const stub = discoverSkills(tree.entries, meta.repo).find(
     (s) => s.slug === slug,

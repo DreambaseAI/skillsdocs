@@ -8,8 +8,10 @@ const nextConfig: NextConfig = {
 
   cacheLife: {
     // A repo's skills change on the order of days; stars and install counts
-    // move faster but are decorative. Serve stale freely, refresh hourly.
-    repo: { stale: 300, revalidate: 3600, expire: 86_400 },
+    // move faster but are decorative. Serve stale freely, refresh every six
+    // hours — the `REVALIDATE` intent in `lib/github.ts`. (This was 3600 for a
+    // while, which silently tripled the steady-state GitHub API spend.)
+    repo: { stale: 300, revalidate: 21_600, expire: 259_200 },
     // The skills.sh leaderboard is scraped from an undocumented payload.
     leaderboard: { stale: 600, revalidate: 3600, expire: 172_800 },
     // design.md is effectively static.

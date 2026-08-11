@@ -52,20 +52,23 @@ export async function GET(): Promise<Response> {
         remaining: reachable ? github.remaining : null,
         resetAt: github.resetAt || null,
         note: github.authenticated
-          ? "Authenticated: 5,000 requests/hour."
-          : "Unauthenticated: 60 requests/hour. A book costs two calls, plus one per new owner.",
+          ? "Authenticated: 5,000 REST requests/hour, plus a separate 5,000-point GraphQL budget carrying repo+owner metadata."
+          : "Unauthenticated: 60 requests/hour. A book costs three calls; owner metadata is shared per owner.",
       },
       budget: {
-        // Measured, not aspirational. `getBook` makes three core calls — repo
-        // metadata, one recursive tree, and owner metadata — and the design
-        // chain adds up to four more recursive-tree calls when it chases a
-        // `design.md` pointer. Owner metadata is amortised across an owner's
-        // books, so a cold book costs 3 in the common case and up to 7 in the
-        // worst. Publishing `2` overstated capacity by 1.5–2x for an agent
-        // pacing itself against this number.
-        callsPerBook: { typical: 3, worstCase: 7 },
-        booksRemaining: reachable ? Math.floor(github.remaining / 3) : null,
-        note: "booksRemaining assumes the typical cost. Owner metadata is shared across one owner's books; a repository whose design.md chases pointers costs more.",
+        // Measured, not aspirational. Authenticated, repo + owner metadata
+        // travel as one GraphQL point on a separate budget, so a cold book
+        // costs 1 REST call (the recursive tree); the design chain adds up to
+        // four more recursive-tree calls when it chases a `design.md` pointer.
+        // Unauthenticated there is no GraphQL, so metadata comes back to REST
+        // and a cold book costs 3 (up to 7 with design chases).
+        callsPerBook: github.authenticated
+          ? { typical: 1, worstCase: 5 }
+          : { typical: 3, worstCase: 7 },
+        booksRemaining: reachable
+          ? Math.floor(github.remaining / (github.authenticated ? 1 : 3))
+          : null,
+        note: "REST calls only; booksRemaining assumes the typical cost. Repo and owner metadata ride the GraphQL budget when authenticated. A repository whose design.md chases pointers costs more.",
       },
       links: {
         openapi: absoluteUrl("/api/v1/openapi.json"),
