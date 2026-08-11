@@ -30,6 +30,7 @@
 import { ArrowRight02Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 import {
   useCallback,
   useEffect,
@@ -288,6 +289,9 @@ export function HeroEquation({ host }: HeroEquationProps) {
       const target = parsed ?? (typing ? null : REPOS[repoIdx]);
       if (!target) return; // Let the GET form fall through to /search.
       event.preventDefault();
+      posthog.capture("repository_opened", {
+        entry_point: typing ? "repository_reference" : "hero_example",
+      });
       announce(`Opening ${target.owner}/${target.repo}`);
       router.push(paths.book(target.owner, target.repo));
     },

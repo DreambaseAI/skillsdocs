@@ -31,6 +31,7 @@ import { ArrowRight02Icon, Book02Icon, Search01Icon } from "@hugeicons/core-free
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,9 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
 
   const go = useCallback(
     (href: string, label: string) => {
+      posthog.capture("search_result_opened", {
+        result_type: href.startsWith("/search") ? "search" : "content",
+      });
       setOpen(false);
       announce(`Opening ${label}`);
       router.push(href);

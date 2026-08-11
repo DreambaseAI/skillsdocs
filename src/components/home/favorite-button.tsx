@@ -17,6 +17,7 @@
 
 import { StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import posthog from "posthog-js";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
 import { favoriteKey, useFavorites } from "@/hooks/use-favorites";
@@ -46,6 +47,7 @@ export function FavoriteButton({ owner, repo, className, size = "icon-sm" }: Fav
       className={cn("text-ink-muted hover:text-issue-accent", starred && "text-issue-accent", className)}
       onClick={() => {
         const next = toggle(key);
+        posthog.capture("shelf_item_toggled", { action: next ? "added" : "removed" });
         announce(
           next
             ? `${owner}/${repo} added to your shelf`

@@ -23,6 +23,7 @@
 import { Alert02Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
+import posthog from "posthog-js";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { paths } from "@/lib/site";
@@ -39,6 +40,7 @@ export default function GlobalErrorBoundary({
   useEffect(() => {
     // Server-side failures are already logged upstream; this catches the
     // client-side ones, which otherwise vanish.
+    posthog.captureException(error);
     console.error("[skillsdocs]", error);
   }, [error]);
 
