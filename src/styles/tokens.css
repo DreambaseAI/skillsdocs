@@ -12,7 +12,11 @@
  * Keeping the chrome constant across issues is what makes twenty different
  * skills repos still read as one publication. Per-issue branding
  * (`[data-issue]`) may only touch the `--issue-*` group, `--radius`, and
- * `--font-display`; it must never reach `--paper`, `--ink`, or a stone token.
+ * `--display-font-family`; it must never reach `--paper`, `--ink`, or a
+ * stone token. Handwritten CSS must reference `--display-font-family`, never
+ * the `--font-display` alias below: the alias resolves its var() chain at
+ * :root and inherits frozen, so scoped overrides (issue branding on
+ * `.book-issue`, reader presets) would never reach it.
  *
  * Every ink/paper pair below is verified by `scripts/audit-contrast.mts`,
  * which fails the build on regression. Do not hand-edit a value without

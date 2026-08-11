@@ -429,13 +429,6 @@ export function issueThemeCss(theme: IssueTheme, selector: string): string {
   if (ink) light.push(["--issue-ink", ink]);
 
   const displayFace = shippedFace(theme.fontResolution?.display?.id ?? null);
-  if (displayFace) {
-    // Only ever a variable we declared ourselves — never the brand's string.
-    light.push([
-      "--display-font-family",
-      `var(${displayFace.cssVar}), ${displayFace.fallback}`,
-    ]);
-  }
 
   const dark: Decls = [];
   const accentDark = sanitizeColor(theme.accentDark);
@@ -449,6 +442,19 @@ export function issueThemeCss(theme: IssueTheme, selector: string): string {
 
   const css = [
     block(selector, light),
+    // The brand display face holds only while the reader is on the default
+    // body face. Once they choose another family, `reader.css` re-points
+    // `--display-font-family` at that family so titles and text share one
+    // voice — a reader's explicit choice outranks the issue's branding.
+    // Only ever a variable we declared ourselves — never the brand's string.
+    displayFace
+      ? block(`[data-reader-font="literata"] ${selector}`, [
+          [
+            "--display-font-family",
+            `var(${displayFace.cssVar}), ${displayFace.fallback}`,
+          ],
+        ])
+      : "",
     block(`.dark ${selector},${selector}.dark`, dark),
     hcLight
       ? block(`[data-contrast="high"] ${selector}`, [["--issue-accent", hcLight]])

@@ -454,7 +454,7 @@
   }
 
   .book-cover__title {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     /* The ceiling is per-name-length; `--cover-cap` is set inline by
        `book-cover.tsx` so two lowercase letters are not set at 96px in an
        otherwise empty line. */
@@ -476,7 +476,7 @@
   }
 
   .book-cover__owner {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     display: block;
     font-size: clamp(1.1rem, 2.6vw, 1.6rem);
     line-height: 1.1;
@@ -562,7 +562,7 @@
   }
 
   .book-mark__fallback {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: 1.6rem;
     line-height: 1;
     color: var(--ink-muted);
@@ -680,7 +680,7 @@
    * and 0.059% on `microsoft/azure-skills`.
    */
   .book-entry__folio {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: 1.1rem;
     line-height: 1.2;
     color: var(--issue-accent);
@@ -699,7 +699,7 @@
   }
 
   .book-entry__title {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: clamp(1.15rem, 2.4vw, 1.45rem);
     line-height: 1.22;
     letter-spacing: -0.012em;
@@ -752,7 +752,7 @@
   }
 
   .book-opener__title {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: clamp(2.1rem, 5.4vw, 2.9rem);
     line-height: 1.05;
     letter-spacing: -0.022em;
@@ -772,7 +772,7 @@
      below it. A number that reflows into the text column at every width is
      just a badge; in the margin it is a folio. */
   .book-opener__folio {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: 0.95rem;
     letter-spacing: 0.08em;
     color: var(--ink-muted);
@@ -886,7 +886,7 @@
   }
 
   .book-appendix__label {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: clamp(1.3rem, 3.2vw, 1.7rem);
     line-height: 1.1;
     letter-spacing: -0.012em;
@@ -1007,7 +1007,7 @@
   }
 
   .book-appendix__folio {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: 0.98rem;
     line-height: 1.2;
     color: var(--issue-accent);
@@ -1039,7 +1039,7 @@
 
   .book-appendix__title {
     display: block;
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: 1.02rem;
     line-height: 1.25;
     letter-spacing: -0.008em;
@@ -1410,7 +1410,7 @@
   }
 
   .book-rail__upfolio {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: 1.15rem;
     line-height: 1;
     color: var(--issue-accent);
@@ -1428,7 +1428,7 @@
 
   .book-rail__uptitle {
     display: block;
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: 0.95rem;
     line-height: 1.2;
     color: var(--ink-strong);
@@ -1719,7 +1719,7 @@
   }
 
   .book-chapternav__title {
-    font-family: var(--font-display);
+    font-family: var(--display-font-family);
     font-size: 1.05rem;
     line-height: 1.25;
     color: var(--ink-strong);
