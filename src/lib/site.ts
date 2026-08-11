@@ -121,6 +121,12 @@ const enc = encodeURIComponent;
 export const paths = {
   home: () => "/",
   search: (q?: string) => (q ? `/search?q=${enc(q)}` : "/search"),
+  /**
+   * A shared shelf: one or more `owner/repo` keys, comma-joined. Slashes and
+   * commas are legal in a query value, so the URL stays human-readable —
+   * `/share?repos=anthropics/skills,vercel/ai`.
+   */
+  share: (keys: readonly string[]) => `/share?repos=${keys.join(",")}`,
   book: (owner: string, repo: string) => `/${enc(owner)}/${enc(repo)}`,
   chapter: (owner: string, repo: string, slug: string) =>
     `/${enc(owner)}/${enc(repo)}/${enc(slug)}`,

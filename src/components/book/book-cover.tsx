@@ -73,7 +73,10 @@ export function BookCoverSpread({ book }: BookCoverProps) {
   const preview = book.skills.slice(0, PREVIEW_CHAPTERS);
 
   const installRows = [
-    { label: "Install command", command: installCommand(repo.owner, repo.repo) },
+    {
+      label: "Install command",
+      command: installCommand(repo.owner, repo.repo),
+    },
     ...(marketplace
       ? [
           {
@@ -95,7 +98,7 @@ export function BookCoverSpread({ book }: BookCoverProps) {
       <div className="book-spread__head">
         <div className="book-spread__headinner">
           <span className={cn(MONO_LABEL, "text-issue-accent shrink-0")}>
-            Issue No.&nbsp;{book.issueNumber}
+            Repo No.&nbsp;{book.issueNumber}
           </span>
           <span className="bg-rule/80 h-px min-w-6 flex-1" aria-hidden />
           <span
@@ -176,7 +179,7 @@ export function BookCoverSpread({ book }: BookCoverProps) {
           <div
             className={cn(
               MONO_LABEL,
-              "cover-muted relative flex justify-between gap-4",
+              "cover-muted relative flex justify-between gap-4"
             )}
           >
             <span>
@@ -191,7 +194,7 @@ export function BookCoverSpread({ book }: BookCoverProps) {
           <div
             className={cn(
               MONO_LABEL,
-              "text-ink-muted border-rule flex items-baseline justify-between gap-4 border-b pb-3.5",
+              "text-ink-muted border-rule flex items-baseline justify-between gap-4 border-b pb-3.5"
             )}
           >
             <span>Inside this issue</span>
@@ -210,7 +213,7 @@ export function BookCoverSpread({ book }: BookCoverProps) {
             <p
               className={cn(
                 MONO_LABEL,
-                "text-ink-muted mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 normal-case",
+                "text-ink-muted mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 normal-case"
               )}
             >
               <span>{licenceLabel(repo.license)}</span>
@@ -284,17 +287,17 @@ export function BookCoverSpread({ book }: BookCoverProps) {
           <div
             className={cn(
               MONO_LABEL,
-              "text-ink-muted/80 border-rule mt-9 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 border-t pt-4",
+              "text-ink-muted/80 border-rule mt-9 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 border-t pt-4"
             )}
           >
             <span>
-              {SITE_NAME} · Issue No.&nbsp;{book.issueNumber}
+              {SITE_NAME} · Repo No.&nbsp;{book.issueNumber}
             </span>
             <a
               href={paths.bookMarkdown(repo.owner, repo.repo)}
               className="hover:text-issue-accent transition-colors"
             >
-              Whole issue as markdown <span aria-hidden>↗</span>
+              Whole repo as markdown <span aria-hidden>↗</span>
             </a>
           </div>
         </div>
@@ -334,7 +337,9 @@ export function BookMasthead({ book }: BookCoverProps) {
           <span className="text-ink-muted"> · {repo.ownerType}</span>
         </MastheadCell>
 
-        <MastheadCell label="Licence">{licenceLabel(repo.license)}</MastheadCell>
+        <MastheadCell label="Licence">
+          {licenceLabel(repo.license)}
+        </MastheadCell>
 
         <MastheadCell label="Last updated">
           {updated ? (
@@ -350,7 +355,8 @@ export function BookMasthead({ book }: BookCoverProps) {
             href={repo.htmlUrl}
           >
             {/* Break at the slashes, never inside a name. */}
-            github.com/<wbr />
+            github.com/
+            <wbr />
             {repo.owner}/<wbr />
             {repo.repo}
           </a>
@@ -368,14 +374,17 @@ export function BookMasthead({ book }: BookCoverProps) {
         {repo.isFork ? (
           <MastheadCell label="Status">
             <span className="text-ink-strong">A fork</span>
-            <span className="text-ink-muted"> — the skills here originate elsewhere</span>
+            <span className="text-ink-muted">
+              {" "}
+              — the skills here originate elsewhere
+            </span>
           </MastheadCell>
         ) : null}
       </dl>
 
       {signal && signal.weeklyInstalls.length > 1 ? (
         /*
-         * "The wire" — the issue's one real data graphic, painted in the
+         * "The wire" — the repo's one real data graphic, painted in the
          * issue's own colours, with the accessible data table that
          * `AccessibleChart` puts under every chart.
          */
@@ -390,7 +399,10 @@ export function BookMasthead({ book }: BookCoverProps) {
       {theme.origin !== "name-hash" ? (
         <p className="book-caption">
           Typeset in this issue&rsquo;s own colours, resolved from{" "}
-          <span className="text-ink-strong">{describeOrigin(theme.origin)}</span>.
+          <span className="text-ink-strong">
+            {describeOrigin(theme.origin)}
+          </span>
+          .
         </p>
       ) : null}
     </section>

@@ -85,7 +85,7 @@ describe("chartSeedsFromTheme", () => {
     const count = seeds.light.length;
     expect(seedAt(seeds, "light", count)).toEqual(seedAt(seeds, "light", 0));
     expect(seedAt(seeds, "light", -1)).toEqual(
-      seedAt(seeds, "light", count - 1),
+      seedAt(seeds, "light", count - 1)
     );
   });
 
@@ -141,7 +141,7 @@ describe("truncateLabel", () => {
     }
   });
 
-  it("keeps the twelve most-installed books distinguishable", () => {
+  it("keeps the twelve most-installed skills distinguishable", () => {
     // A duplicate here is both a misleading axis and a duplicate React key.
     const labels = [
       "mattpocock/skills",

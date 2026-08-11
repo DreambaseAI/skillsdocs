@@ -114,11 +114,11 @@ export function BarCanvas() {
       keys.forEach((key, si) => {
         const t = targetsRef.current[key]
         if (!t) return
-        const seed = s.seedOf(key)
         const variant = s.seriesSpecs[key]?.variant ?? "gradient"
         const emphasis = s.selectedDataKey ?? s.focusDataKey
         const selDim = emphasis !== null && emphasis !== key ? 0.3 : 1
         for (let i = 0; i < s.dataLength; i++) {
+          const seed = s.seedOf(key, i)
           const bp = barProgress(i, s.dataLength, prog)
           const base = t.base[i] ?? rows - 1
           const grown = base + ((t.top[i] ?? base) - base) * bp
@@ -197,7 +197,10 @@ export function BarCanvas() {
 
       // Live tweak repaint (variant, stacking) without replaying the wave.
       const paintSig = `${s.stackType}|${s.configKeys
-        .map((k) => s.seriesSpecs[k]?.variant ?? "")
+        .map(
+          (k) =>
+            `${s.seriesSpecs[k]?.variant ?? ""}:${s.seriesSpecs[k]?.colorKey ?? ""}`
+        )
         .join(",")}`
       if (paintSig !== lastPaintSig) {
         lastPaintSig = paintSig

@@ -232,6 +232,103 @@
     object-fit: cover;
   }
 
+  /*
+   * A spine before it is yours: ink drained, standing in the dark at the back
+   * of the case. Hover or keyboard focus wakes it, which is the invitation —
+   * the star on a ghost spine is live, and starring it is what fills the
+   * shelf. Focus-within must wake it (WCAG 2.4.7): a keyboard user tabbing
+   * onto the star has to be able to see it.
+   */
+  .spine--ghost {
+    opacity: 0.45;
+    filter: grayscale(0.85) brightness(0.85);
+    transition:
+      opacity 200ms var(--ease-out-quint),
+      filter 200ms var(--ease-out-quint);
+  }
+
+  .spine--ghost:hover,
+  .spine--ghost:focus-within {
+    opacity: 1;
+    filter: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spine--ghost {
+      transition: none;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .spine--ghost {
+      opacity: 1;
+      filter: none;
+    }
+  }
+
+  /*
+   * The back of the case: a dark panel with faint vertical joins, so an empty
+   * shelf reads as furniture waiting for books rather than a blank section —
+   * and so a shared bookcase reads as one piece of furniture across rows.
+   */
+  .shelf-case {
+    position: relative;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--rule) 45%, transparent) 0 1px,
+        transparent 1px 9rem
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--ink) 9%, var(--paper)),
+        color-mix(in oklab, var(--ink) 4%, var(--paper))
+      );
+  }
+
+  @media (forced-colors: active) {
+    .shelf-case {
+      background: Canvas;
+      border: 1px solid CanvasText;
+    }
+  }
+
+  /*
+   * The shared bookcase: every book, wrapping into as many shelf rows as the
+   * width demands. A grid with fixed-height rows, so the boards can be
+   * *painted* — one repeating band per row on the case behind the books —
+   * instead of laid out, which is what lets a resize add and remove shelves
+   * without anyone counting them. Spines bottom-align to each row and stand
+   * on the board via their own margin.
+   */
+  .bookcase {
+    --case-row: 22rem; /* tallest spine is ~20.2rem; the rest is headroom */
+    --case-board: 0.8rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    grid-auto-rows: var(--case-row);
+    align-items: end;
+    justify-items: center;
+    row-gap: 0;
+    background: repeating-linear-gradient(
+      180deg,
+      transparent 0 calc(var(--case-row) - var(--case-board)),
+      color-mix(in oklab, var(--ink) 14%, var(--paper))
+        calc(var(--case-row) - var(--case-board)),
+      color-mix(in oklab, var(--ink) 46%, var(--paper)) var(--case-row)
+    );
+  }
+
+  .bookcase > .spine {
+    margin-block-end: var(--case-board);
+  }
+
+  @media (forced-colors: active) {
+    .bookcase {
+      background: none;
+    }
+  }
+
   /* The board the spines stand on. */
   .shelf-board {
     block-size: 0.8rem;

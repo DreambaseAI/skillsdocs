@@ -19,7 +19,7 @@ export function Nameplate() {
   return (
     <div className="flex flex-col items-center gap-6 pt-8 text-center sm:gap-8 sm:pt-12">
       <h1
-        className={`font-display text-ink-strong text-[clamp(3.8rem,13.5vw,10.5rem)] leading-[0.88] tracking-[-0.025em] text-balance ${REVEAL}`}
+        className={`font-display text-ink-strong text-[clamp(3.8rem,13.5vw,10.5rem)] leading-[0.88] tracking-tight text-balance ${REVEAL}`}
       >
         {SITE_NAME}
       </h1>
@@ -68,12 +68,12 @@ function DatelineStrip({
 }) {
   return (
     <div className="border-rule/70 grid grid-cols-2 border-b sm:grid-cols-4">
-      <DatelineCell>{issues} issues</DatelineCell>
+      <DatelineCell>{issues} repos</DatelineCell>
       <DatelineCell className="border-rule/70 border-l">
-        {chapters} chapters
+        {chapters} skills
       </DatelineCell>
       <DatelineCell className="border-rule/70 border-t sm:border-t-0 sm:border-l">
-        Set in seconds
+        Loads any skills
       </DatelineCell>
       <DatelineCell className="border-rule/70 border-t border-l sm:border-t-0">
         No account needed

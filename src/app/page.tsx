@@ -24,20 +24,23 @@ import { Suspense } from "react";
 import { Contents } from "@/components/home/contents";
 import { ContentsSkeleton } from "@/components/home/contents-skeleton";
 import { HeroCover, HeroCoverFallback } from "@/components/home/hero-cover";
-import { IssueAccentRules, ownerAccentStyle } from "@/components/home/issue-accent";
+import {
+  IssueAccentRules,
+  ownerAccentStyle,
+} from "@/components/home/issue-accent";
 import { Masthead } from "@/components/home/masthead";
-import { Dateline, DatelineFallback, Nameplate } from "@/components/home/nameplate";
+import {
+  Dateline,
+  DatelineFallback,
+  Nameplate,
+} from "@/components/home/nameplate";
 import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
 import { SiteFooter } from "@/components/home/site-footer";
 import { ShelfBooks, ShelfFallback } from "@/components/home/spine-shelf";
 import { Typesetter } from "@/components/home/typesetter";
 import { getFeaturedBooks } from "@/lib/featured";
 import { JsonLd, siteJsonLd } from "@/lib/jsonld";
-import {
-  SITE_DESCRIPTION,
-  SITE_NAME,
-  SITE_TAGLINE,
-} from "@/lib/site";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: `${SITE_NAME} — ${SITE_TAGLINE}`,
@@ -61,7 +64,7 @@ export default function HomePage() {
       <IssueAccentRules />
 
       <Masthead
-        strapline="Read skills as a book"
+        strapline="Human readable skills"
         palette={
           <Suspense fallback={<PaletteFallback />}>
             <PaletteSlot />
@@ -87,7 +90,7 @@ export default function HomePage() {
         >
           {/* `minmax(0, …)`: the field's intrinsic width must not steal track
               space from the headline's column. */}
-          <div className="mx-auto grid max-w-6xl grid-cols-1 px-5 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 px-5 sm:px-8 lg:grid-cols-2">
             {/* The house side: headline and the submission line. */}
             <div
               data-issue="skillsdocs"
@@ -98,12 +101,12 @@ export default function HomePage() {
                 className={`text-issue-accent flex items-center gap-3 font-mono text-[0.62rem] font-medium tracking-[0.22em] uppercase max-lg:hidden ${REVEAL}`}
               >
                 <span className="bg-issue-accent h-px w-6" aria-hidden />
-                This week&rsquo;s cover
+                Load skills here
               </p>
 
               <h2
                 id="hero-heading"
-                className={`font-display text-ink-strong text-[clamp(2rem,4.2vw,3.2rem)] leading-[1.05] tracking-[-0.022em] text-pretty ${REVEAL} delay-70`}
+                className={`font-display text-ink-strong text-[clamp(2rem,4.2vw,3rem)] leading-[1.05] tracking-[-0.022em] text-pretty ${REVEAL} delay-70`}
               >
                 Human readable skills
                 <br className="max-sm:hidden" /> for{" "}

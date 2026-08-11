@@ -28,6 +28,8 @@ import { SeriesContext } from "./series-context"
 
 export type BarProps = {
   dataKey: string
+  /** Row field containing a literal Seed when each bar has its own colour. */
+  colorKey?: string
   variant?: AreaVariant
   strokeVariant?: StrokeVariant
   isClickable?: boolean
@@ -42,6 +44,7 @@ export type BarProps = {
  */
 export function Bar({
   dataKey,
+  colorKey,
   variant = "gradient",
   strokeVariant = "solid",
   isClickable = false,
@@ -57,9 +60,16 @@ export function Bar({
   }
 
   useEffect(() => {
-    registerSeries({ dataKey, kind: "bar", variant, strokeVariant })
+    registerSeries({ dataKey, kind: "bar", variant, strokeVariant, colorKey })
     return () => unregisterSeries(dataKey)
-  }, [dataKey, variant, strokeVariant, registerSeries, unregisterSeries])
+  }, [
+    dataKey,
+    colorKey,
+    variant,
+    strokeVariant,
+    registerSeries,
+    unregisterSeries,
+  ])
 
   const band = ctx.bands[dataKey]
   if (!ctx.ready || !band) return null

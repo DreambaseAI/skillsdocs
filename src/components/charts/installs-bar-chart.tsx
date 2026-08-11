@@ -4,17 +4,17 @@
  * Installs across a set of repos — an owner's shelf, or the leaderboard top N.
  * Owner: WS-7.
  *
- * One series, so hue carries no meaning here and the bars all take the issue's
- * first chart tone; the categorical variation is on the x-axis where it
- * belongs. Deliberately no `<Tooltip>`: the pack wires it to pointer events
- * only, so it would be a WCAG 2.1.1 failure dressed up as a feature. The data
- * table is the interaction.
+ * One numeric series, with an optional issue seed on each item for comparisons
+ * across repositories. Items without one use the chart's shared theme. The
+ * hover tooltip is a visual enhancement; the always-present data table remains
+ * the complete, keyboard-accessible representation.
  */
 
 import { useMemo } from "react";
 import { BarChart } from "@/components/dither-kit/bar-chart";
 import { Bar } from "@/components/dither-kit/bar";
 import { Grid } from "@/components/dither-kit/grid";
+import { Tooltip as ChartTooltip } from "@/components/dither-kit/tooltip";
 import { XAxis } from "@/components/dither-kit/x-axis";
 import { YAxis } from "@/components/dither-kit/y-axis";
 import { AccessibleChart } from "./accessible-chart";
@@ -36,6 +36,8 @@ export interface InstallsBarItem {
   /** Repo name, or `owner/repo` on the leaderboard. */
   label: string;
   installs: number;
+  /** Optional issue palette; its selected tone colours only this bar. */
+  seeds?: ChartSeeds;
 }
 
 export interface InstallsBarChartProps {
@@ -67,8 +69,13 @@ export function InstallsBarChart({
   );
 
   const rows = useMemo(
-    () => items.map((item) => ({ label: item.label, installs: item.installs })),
-    [items],
+    () =>
+      items.map((item) => ({
+        label: item.label,
+        installs: item.installs,
+        seed: seedAt(item.seeds ?? seeds, scheme, seriesIndex),
+      })),
+    [items, seeds, scheme, seriesIndex],
   );
   const config = useMemo(
     () => ({
@@ -135,7 +142,11 @@ export function InstallsBarChart({
                 truncateLabel(String(value ?? ""), labelChars)
               }
             />
-            <Bar dataKey="installs" variant="gradient" />
+            <Bar colorKey="seed" dataKey="installs" variant="gradient" />
+            <ChartTooltip
+              labelKey="label"
+              valueFormatter={(value) => exactNumber(value)}
+            />
           </BarChart>
         ) : null}
       </div>

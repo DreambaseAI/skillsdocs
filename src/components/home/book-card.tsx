@@ -157,7 +157,7 @@ export function IndexLeadRow({
       </span>
 
       <span className="text-ink-muted mt-0.5 hidden w-14 shrink-0 text-right text-xs tabular-nums sm:block">
-        {book.skillCount} ch
+        {book.skillCount} skills
       </span>
       <span className="text-ink mt-0.5 w-14 shrink-0 text-right text-xs tabular-nums sm:w-16">
         {compact(book.installs)}

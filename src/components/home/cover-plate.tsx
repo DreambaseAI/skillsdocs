@@ -46,11 +46,11 @@ export function CoverPlate({ book, className }: CoverPlateProps) {
       style={ownerAccentStyle(book.owner)}
       className={cn(
         "cover-face flex aspect-330/500 w-full max-w-84 flex-col justify-between gap-4 rounded-md p-6 pl-8 shadow-[0_40px_80px_-20px_var(--cover-shade-strong)]",
-        className,
+        className
       )}
     >
       <div className={cn("cover-muted flex justify-between gap-3", MONO_LABEL)}>
-        <span>Issue No.&nbsp;{issue}</span>
+        <span>Repo No.&nbsp;{issue}</span>
         <span>{SITE_NAME}</span>
       </div>
 
@@ -71,8 +71,8 @@ export function CoverPlate({ book, className }: CoverPlateProps) {
 
         <h3
           className={cn(
-            "font-display font-normal tracking-[-0.01em] break-words",
-            titleSize(book.repo),
+            "font-display font-normal tracking-[-0.01em] wrap-break-word",
+            titleSize(book.repo)
           )}
         >
           <Link
@@ -97,7 +97,7 @@ export function CoverPlate({ book, className }: CoverPlateProps) {
             className="cover-cta h-10 px-5 text-[0.8rem]"
             data-issue-cta
           >
-            Read the issue
+            View skills
           </Link>
           <FavoriteButton
             owner={book.owner}
@@ -110,7 +110,7 @@ export function CoverPlate({ book, className }: CoverPlateProps) {
 
       <div className={cn("cover-muted flex justify-between gap-3", MONO_LABEL)}>
         <span>
-          {book.skillCount} {book.skillCount === 1 ? "chapter" : "chapters"}
+          {book.skillCount} {book.skillCount === 1 ? "skill" : "skills"}
         </span>
         <span>{compact(book.installs)} installs</span>
       </div>

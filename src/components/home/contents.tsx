@@ -8,7 +8,7 @@
  * promoted.
  *
  * The cover story is an explicit editorial choice. If that book is ever absent
- * from the verified catalogue, the page falls back to the most-installed book
+ * from the verified catalogue, the page falls back to the most-installed skill
  * rather than failing to render.
  *
  * ## The index is banded
@@ -32,19 +32,18 @@ export interface ContentsProps {
 }
 
 /**
- * House colours for the one chart on this page.
+ * House fallback for the one chart on this page.
  *
- * The book pages paint charts in their issue's own accent. The directory has no
- * single issue, so it uses the house identity — the curated `skillsdocs` seed,
- * run through the same `deriveIssueTheme` and therefore under the same contrast
- * guarantees as every other chart in the product.
+ * Each bar carries its repository owner's issue palette. The chart-level
+ * palette remains the curated `skillsdocs` identity as a defensive fallback,
+ * run through the same contrast-checked derivation as every issue.
  *
  * Curated, not hashed: with no manifest this falls through to an FNV hue off
  * the name, so the house colour would change the next time the name did.
  */
 const HOUSE = "skillsdocs";
 const HOUSE_CHART_SEEDS = chartSeedsFromTheme(
-  deriveIssueTheme(HOUSE, curatedManifest(HOUSE)),
+  deriveIssueTheme(HOUSE, curatedManifest(HOUSE))
 );
 
 /** How many books the installs chart compares. Beyond this the bars are noise. */
@@ -82,7 +81,9 @@ const BANDS: Band[] = [
 ];
 
 function bandOf(installs: number): Band {
-  return BANDS.find((band) => installs >= band.floor) ?? BANDS[BANDS.length - 1];
+  return (
+    BANDS.find((band) => installs >= band.floor) ?? BANDS[BANDS.length - 1]
+  );
 }
 
 /**
@@ -106,9 +107,9 @@ function IndexHeader() {
       aria-hidden
     >
       <span className="w-6 shrink-0" />
-      <span>Repository</span>
+      <span>Repo</span>
       <span className="flex-1" />
-      <span className="w-10 shrink-0 text-right">Ch</span>
+      <span className="w-10 shrink-0 text-right">Skills</span>
       <span className="w-12 shrink-0 text-right">Installs</span>
       <span className="w-9 shrink-0 sm:w-8" />
     </div>
@@ -116,7 +117,9 @@ function IndexHeader() {
 }
 
 export function Contents({ books }: ContentsProps) {
-  const rank = new Map(books.map((book, i) => [`${book.owner}/${book.repo}`, i + 1]));
+  const rank = new Map(
+    books.map((book, i) => [`${book.owner}/${book.repo}`, i + 1])
+  );
 
   const chapters = books.reduce((sum, book) => sum + book.skillCount, 0);
   const installs = books.reduce((sum, book) => sum + book.installs, 0);
@@ -138,7 +141,11 @@ export function Contents({ books }: ContentsProps) {
   return (
     <div className="flex flex-col gap-16 sm:gap-20">
       {/* ------------------------------------------------------------ index */}
-      <section id="contents" aria-labelledby="index-heading" className="flex flex-col gap-5">
+      <section
+        id="contents"
+        aria-labelledby="index-heading"
+        className="flex flex-col gap-5"
+      >
         <div className="border-ink-strong/80 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b-2 pb-3">
           <h2
             id="index-heading"
@@ -147,9 +154,17 @@ export function Contents({ books }: ContentsProps) {
             The index
           </h2>
           <p className="text-ink-muted text-sm">
-            <span className="text-ink-strong font-medium tabular-nums">{books.length}</span> books ·{" "}
-            <span className="text-ink-strong font-medium tabular-nums">{chapters}</span> chapters ·{" "}
-            <span className="text-ink-strong font-medium tabular-nums">{compact(installs)}</span>{" "}
+            <span className="text-ink-strong font-medium tabular-nums">
+              {books.length}
+            </span>{" "}
+            repos ·{" "}
+            <span className="text-ink-strong font-medium tabular-nums">
+              {chapters}
+            </span>{" "}
+            skills ·{" "}
+            <span className="text-ink-strong font-medium tabular-nums">
+              {compact(installs)}
+            </span>{" "}
             installs
           </p>
         </div>
@@ -166,9 +181,12 @@ export function Contents({ books }: ContentsProps) {
           items={topInstalled.map((book) => ({
             label: `${book.owner}/${book.repo}`,
             installs: book.installs,
+            seeds: chartSeedsFromTheme(
+              deriveIssueTheme(book.owner, curatedManifest(book.owner))
+            ),
           }))}
           seeds={HOUSE_CHART_SEEDS}
-          subject="the most-installed books on the shelf"
+          subject="the most-installed skills"
         />
 
         {/* --------------------------------------------------- the lead band */}
@@ -177,7 +195,7 @@ export function Contents({ books }: ContentsProps) {
             id="index-lead-heading"
             className="text-ink-muted mb-1 text-[0.66rem] font-semibold tracking-[0.16em] uppercase"
           >
-            The front of the book · {front.length} most installed
+            {front.length} most popular skills
           </h3>
           <ul className="flex flex-col">
             {front.map((book) => (
@@ -199,13 +217,19 @@ export function Contents({ books }: ContentsProps) {
             <IndexHeader />
 
             {grouped.map(({ band, rows }) => (
-              <section key={band.id} aria-labelledby={`band-${band.id}`} className="mt-5">
+              <section
+                key={band.id}
+                aria-labelledby={`band-${band.id}`}
+                className="mt-5"
+              >
                 <h4
                   id={`band-${band.id}`}
                   className="border-rule text-ink-muted flex items-baseline justify-between gap-3 border-b pb-1 text-[0.66rem] font-semibold tracking-[0.16em] uppercase"
                 >
-                  <span>{band.label}</span>
-                  <span className="text-ink-muted tabular-nums">{rows.length}</span>
+                  <span className="pl-8">{band.label}</span>
+                  <span className="text-ink-muted tabular-nums">
+                    {rows.length}
+                  </span>
                 </h4>
                 {/*
                   Two columns, not three. At 1152px three columns leave 384px a
@@ -229,11 +253,14 @@ export function Contents({ books }: ContentsProps) {
         )}
 
         <p className="text-ink-muted mt-2 text-xs">
-          Chapter counts are verified against each repository&rsquo;s tree. Install counts come
-          from skills.sh
-          {live ? " and are live." : " and are the last good snapshot — the live feed is unreachable."}
-          {" "}Arrows are the direction of the last eight weeks: <span aria-hidden>↑</span> up,{" "}
-          <span aria-hidden>↓</span> down, <span aria-hidden>→</span> level within 5%.
+          Skill counts are verified against each repository&rsquo;s tree.
+          Install counts come from skills.sh
+          {live
+            ? " and are live."
+            : " and are the last good snapshot — the live feed is unreachable."}{" "}
+          Arrows are the direction of the last eight weeks:{" "}
+          <span aria-hidden>↑</span> up, <span aria-hidden>↓</span> down,{" "}
+          <span aria-hidden>→</span> level within 5%.
         </p>
       </section>
     </div>

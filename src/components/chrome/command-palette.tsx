@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * ⌘K — search chapters and books without leaving the page.
+ * ⌘K — search skills and repos without leaving the page.
  *
  * Ranking is ours (`lib/search.ts`), so cmdk's own substring filter is turned
  * off: it scores by fuzzy match alone and would put a 40-install chapter above
- * the book a reader typed the name of.
+ * the skill a reader typed the name of.
  *
- * The palette carries a slice of the corpus, not all of it — every book plus
- * the most-installed chapters, about 20 KB. The last row is always "search
- * everything", which lands on `/search`, where the full ~2,200-chapter index
+ * The palette carries a slice of the corpus, not all of it — every skill plus
+ * the most-installed skills, about 20 KB. The last row is always "search
+ * everything", which lands on `/search`, where the full ~2,200-skill index
  * is queried on the server. A palette that quietly searched 22% of the corpus
  * and said nothing would be worse than one that admits its own edge.
  *
@@ -27,7 +27,11 @@
  * `S` dead.
  */
 
-import { ArrowRight02Icon, Book02Icon, Search01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowRight02Icon,
+  Book02Icon,
+  Search01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -53,7 +57,7 @@ import { cn } from "@/lib/utils";
 const RESULT_LIMIT = 12;
 
 export interface CommandPaletteProps {
-  /** Books plus the most-installed chapters, from `getPaletteIndex()`. */
+  /** Skills plus the most-installed repos, from `getPaletteIndex()`. */
   docs: SearchDoc[];
   className?: string;
 }
@@ -84,12 +88,12 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
       announce(`Opening ${label}`);
       router.push(href);
     },
-    [router],
+    [router]
   );
 
   const hits = useMemo(
     () => searchFolded(index, query, { limit: RESULT_LIMIT }),
-    [index, query],
+    [index, query]
   );
 
   // A pasted URL is not a search — it is a destination, and it outranks
@@ -108,7 +112,7 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
   const booksLead = hits.length > 0 && hits[0].doc.kind === "book";
   const suggestions = useMemo(
     () => docs.filter((doc) => doc.kind === "book").slice(0, 6),
-    [docs],
+    [docs]
   );
 
   const chaptersGroup = chapters.length > 0 && (
@@ -133,32 +137,34 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
 
   const booksGroup = (books.length > 0 || query.trim() === "") && (
     <CommandGroup heading={query.trim() === "" ? "Most installed" : "Books"}>
-      {(query.trim() === "" ? suggestions : books.map((h) => h.doc)).map((doc) => (
-        <CommandItem
-          key={doc.href}
-          value={doc.href}
-          onSelect={() => go(doc.href, doc.title)}
-        >
-          {doc.avatar ? (
-            <Image
-              src={doc.avatar}
-              alt=""
-              width={16}
-              height={16}
-              className="size-4 rounded"
-              aria-hidden
-            />
-          ) : (
-            <HugeiconsIcon icon={Book02Icon} aria-hidden />
-          )}
-          <span className="min-w-0 flex-1 truncate">{doc.title}</span>
-          {doc.subtitle && (
-            <span className="text-muted-foreground min-w-0 max-w-[45%] shrink truncate pl-3 text-right text-xs">
-              {doc.subtitle}
-            </span>
-          )}
-        </CommandItem>
-      ))}
+      {(query.trim() === "" ? suggestions : books.map((h) => h.doc)).map(
+        (doc) => (
+          <CommandItem
+            key={doc.href}
+            value={doc.href}
+            onSelect={() => go(doc.href, doc.title)}
+          >
+            {doc.avatar ? (
+              <Image
+                src={doc.avatar}
+                alt=""
+                width={16}
+                height={16}
+                className="size-4 rounded"
+                aria-hidden
+              />
+            ) : (
+              <HugeiconsIcon icon={Book02Icon} aria-hidden />
+            )}
+            <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+            {doc.subtitle && (
+              <span className="text-muted-foreground min-w-0 max-w-[45%] shrink truncate pl-3 text-right text-xs">
+                {doc.subtitle}
+              </span>
+            )}
+          </CommandItem>
+        )
+      )}
     </CommandGroup>
   );
 
@@ -169,10 +175,17 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
         data-shortcut-ready={shortcutReady ? "true" : undefined}
         variant="outline"
         size="sm"
-        className={cn("border-rule text-ink-muted hover:text-ink gap-2", className)}
+        className={cn(
+          "border-rule text-ink-muted hover:text-ink gap-2",
+          className
+        )}
         onClick={() => setOpen(true)}
       >
-        <HugeiconsIcon icon={Search01Icon} data-icon="inline-start" aria-hidden />
+        <HugeiconsIcon
+          icon={Search01Icon}
+          data-icon="inline-start"
+          aria-hidden
+        />
         {/* `sr-only`, not `hidden`: below `sm` the icon is the only visible
             content and it is `aria-hidden`, which left the button with no
             accessible name at all (axe `button-name`, critical). */}
@@ -233,15 +246,18 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
                     onSelect={() =>
                       go(
                         paths.book(pasted.owner, pasted.repo),
-                        `${pasted.owner}/${pasted.repo}`,
+                        `${pasted.owner}/${pasted.repo}`
                       )
                     }
                   >
                     <HugeiconsIcon icon={ArrowRight02Icon} aria-hidden />
                     <span className="truncate">
-                      {pasted.owner}/<span className="font-semibold">{pasted.repo}</span>
+                      {pasted.owner}/
+                      <span className="font-semibold">{pasted.repo}</span>
                     </span>
-                    <span className="text-muted-foreground ml-auto text-xs">Open the book</span>
+                    <span className="text-muted-foreground ml-auto text-xs">
+                      Open the book
+                    </span>
                   </CommandItem>
                 </CommandGroup>
               )}
@@ -254,7 +270,12 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
                 <CommandGroup heading="Everything else">
                   <CommandItem
                     value="search-all"
-                    onSelect={() => go(paths.search(query.trim()), `search for ${query.trim()}`)}
+                    onSelect={() =>
+                      go(
+                        paths.search(query.trim()),
+                        `search for ${query.trim()}`
+                      )
+                    }
                   >
                     <HugeiconsIcon icon={Search01Icon} aria-hidden />
                     Search every chapter for “{query.trim()}”

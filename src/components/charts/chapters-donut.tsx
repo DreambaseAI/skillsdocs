@@ -14,6 +14,7 @@
 import { useMemo } from "react";
 import { Pie } from "@/components/dither-kit/pie";
 import { PieChart } from "@/components/dither-kit/pie-chart";
+import { Tooltip as ChartTooltip } from "@/components/dither-kit/tooltip";
 import { AccessibleChart } from "./accessible-chart";
 import { ChartKey } from "./chart-key";
 import { exactNumber, percentOf } from "./format";
@@ -131,6 +132,7 @@ export function ChaptersDonut({
             nameKey="name"
           >
             <Pie variant="gradient" />
+            <ChartTooltip valueFormatter={(value) => exactNumber(value)} />
           </PieChart>
           <span aria-hidden="true" className="chart-donut-center">
             <span className="chart-donut-total">{total}</span>

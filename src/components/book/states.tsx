@@ -30,7 +30,7 @@ import { external, SITE_NAME } from "@/lib/site";
  * **The eyebrow is `--ink-muted`, not the issue accent.** "NO CHAPTERS" set in
  * a saturated colour codes as a failure, and an empty repository is not one —
  * the copy under it says so explicitly. An accent eyebrow is for a *place*
- * ("Issue No. 80"), not for a verdict.
+ * ("Repo No. 80"), not for a verdict.
  *
  * **The mark is the issue's, not a generic boxed glyph.** The 38px
  * icon-in-a-rounded-square was identical on the empty state and the 404, so
@@ -67,7 +67,13 @@ function StateFrame({
 
           {avatar ? (
             <span className="book-mark mb-6">
-              <Image src={avatar} alt="" width={128} height={128} unoptimized={false} />
+              <Image
+                src={avatar}
+                alt=""
+                width={128}
+                height={128}
+                unoptimized={false}
+              />
             </span>
           ) : owner ? (
             <span className="book-mark mb-6">
@@ -126,8 +132,8 @@ export function EmptyBook({
         <p className="book-caption">
           skills.sh reports {installs.toLocaleString("en-GB")} installs for this
           source. Install count is not evidence of content: skills are
-          frequently published from a branch, a release artefact, or a
-          submodule that the default tree does not carry.
+          frequently published from a branch, a release artefact, or a submodule
+          that the default tree does not carry.
         </p>
       ) : null}
       <div className="mt-2 flex flex-wrap gap-2">
@@ -141,10 +147,18 @@ export function EmptyBook({
             />
           }
         >
-          <HugeiconsIcon icon={ArrowUpRight01Icon} data-icon="inline-start" aria-hidden />
+          <HugeiconsIcon
+            icon={ArrowUpRight01Icon}
+            data-icon="inline-start"
+            aria-hidden
+          />
           Open on GitHub
         </Button>
-        <Button variant="outline" nativeButton={false} render={<Link href="/" />}>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/" />}
+        >
           Browse {SITE_NAME}
         </Button>
       </div>
@@ -204,7 +218,11 @@ export function RateLimited({ owner, repo, resetAt }: RateLimitedProps) {
             />
           }
         >
-          <HugeiconsIcon icon={ArrowUpRight01Icon} data-icon="inline-start" aria-hidden />
+          <HugeiconsIcon
+            icon={ArrowUpRight01Icon}
+            data-icon="inline-start"
+            aria-hidden
+          />
           Read it on GitHub instead
         </Button>
       </div>
@@ -253,7 +271,11 @@ export function UpstreamFailure({
             />
           }
         >
-          <HugeiconsIcon icon={ArrowUpRight01Icon} data-icon="inline-start" aria-hidden />
+          <HugeiconsIcon
+            icon={ArrowUpRight01Icon}
+            data-icon="inline-start"
+            aria-hidden
+          />
           Open on GitHub
         </Button>
       </div>

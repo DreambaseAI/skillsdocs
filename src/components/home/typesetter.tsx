@@ -65,8 +65,7 @@ export function Typesetter({
   const submit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
       const target =
-        parsed ??
-        (typing ? null : { owner: exampleOwner, repo: exampleRepo });
+        parsed ?? (typing ? null : { owner: exampleOwner, repo: exampleRepo });
       if (!target) return; // Let the GET form fall through to /search.
       event.preventDefault();
       capture("repository_opened", {
@@ -75,7 +74,7 @@ export function Typesetter({
       announce(`Opening ${target.owner}/${target.repo}`);
       router.push(paths.book(target.owner, target.repo));
     },
-    [parsed, typing, dirty, exampleOwner, exampleRepo, router],
+    [parsed, typing, dirty, exampleOwner, exampleRepo, router]
   );
 
   return (
@@ -84,7 +83,7 @@ export function Typesetter({
         htmlFor={inputId}
         className="text-ink-muted block font-mono text-[0.62rem] font-medium tracking-[0.2em] uppercase sm:text-[0.66rem]"
       >
-        Submit a repository for typesetting
+        Paste any skills user/repo or org/repo
       </label>
 
       <div className="group/field border-ink focus-within:border-issue-accent mt-4 flex max-w-xl items-baseline border-b-2 pb-2 transition-colors">
@@ -120,7 +119,7 @@ export function Typesetter({
         {/* The resting caret. The real caret takes over on focus. */}
         <span
           aria-hidden
-          className="bg-issue-accent ml-0.5 inline-block h-[1em] w-[3px] shrink-0 text-[clamp(1.4rem,3.4vw,2.125rem)] leading-none group-focus-within/field:hidden motion-safe:animate-[caret-blink_1.1s_steps(1,end)_infinite]"
+          className="bg-issue-accent ml-0.5 inline-block h-[1em] w-0.75 shrink-0 text-[clamp(1.4rem,3.4vw,2.125rem)] leading-none group-focus-within/field:hidden motion-safe:animate-[caret-blink_1.1s_steps(1,end)_infinite]"
         />
       </div>
 
@@ -129,7 +128,7 @@ export function Typesetter({
           type="submit"
           className="bg-issue-accent text-issue-accent-foreground focus-visible:ring-issue-accent/40 inline-flex h-12 shrink-0 cursor-pointer items-center gap-2 rounded-full px-7 text-sm font-medium transition-opacity outline-none hover:opacity-90 focus-visible:ring-3 max-sm:h-13 max-sm:w-full max-sm:justify-center"
         >
-          {typing && !parsed ? "Search" : "Read book"}
+          {typing && !parsed ? "Search" : "Load skills"}
           <HugeiconsIcon
             icon={ArrowRight02Icon}
             data-icon="inline-end"
@@ -140,8 +139,7 @@ export function Typesetter({
           id={hintId}
           className="text-ink-muted/80 font-mono text-[0.66rem] leading-relaxed tracking-[0.08em] uppercase"
         >
-          <span aria-hidden>↵ </span>also accepts npx skills add … · a plugin
-          slug
+          <span aria-hidden>* </span>also accepts npx skills command
         </p>
       </div>
 

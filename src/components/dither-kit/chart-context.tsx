@@ -24,7 +24,7 @@ import type { CommonChart } from "./common-context"
 import type { BloomInput } from "./dither-paint"
 // WS-7: `seedOf` replaces `seedOfColor` so a literal Seed passes through.
 import type { ChartSeed, Seed } from "./palette"
-import { seedOf as resolveSeed } from "./palette"
+import { isSeed, seedOf as resolveSeed } from "./palette"
 import {
   buildBandScale,
   buildXScale,
@@ -63,6 +63,8 @@ export type SeriesSpec = {
   kind: SeriesKind
   variant: AreaVariant
   strokeVariant: StrokeVariant
+  /** Optional row field containing a literal Seed for per-datum bar colours. */
+  colorKey?: string
 }
 
 export type ChartContextValue = {
@@ -122,7 +124,7 @@ export type ChartContextValue = {
   markEntranceDone: () => void // the canvas calls this when its reveal completes
 
   // Helpers.
-  seedOf: (key: string) => Seed
+  seedOf: (key: string, index?: number) => Seed
   common: CommonChart // shared surface for <Legend> / <Tooltip>
 }
 
@@ -262,7 +264,8 @@ export function useChartController({
       return cur &&
         cur.kind === spec.kind &&
         cur.variant === spec.variant &&
-        cur.strokeVariant === spec.strokeVariant
+        cur.strokeVariant === spec.strokeVariant &&
+        cur.colorKey === spec.colorKey
         ? prev
         : { ...prev, [spec.dataKey]: spec }
     })
@@ -368,10 +371,16 @@ export function useChartController({
     [min, max, plotHeight]
   )
 
-  // Stable so `common` and the value stay stable; re-created only on config.
+  // Bars may opt into a literal Seed stored on each row. Other chart families,
+  // legends and callers without an index keep using the configured series seed.
   const seedOf = useCallback(
-    (key: string) => resolveSeed(config[key]?.color),
-    [config]
+    (key: string, index?: number) => {
+      const colorKey = seriesSpecs[key]?.colorKey
+      const rowSeed =
+        colorKey && index !== undefined ? data[index]?.[colorKey] : undefined
+      return isSeed(rowSeed) ? rowSeed : resolveSeed(config[key]?.color)
+    },
+    [config, data, seriesSpecs]
   )
 
   // Memoized: this is the value handed to CommonChartContext (Legend/Tooltip),
@@ -409,7 +418,7 @@ export function useChartController({
           name,
           label: config[name]?.label ?? name,
           value: typeof raw === "number" ? raw : 0,
-          seed: seedOf(name),
+          seed: seedOf(name, i),
           dimmed: (() => {
             const emphasis = selectedDataKey ?? focusDataKey
             return emphasis !== null && emphasis !== name

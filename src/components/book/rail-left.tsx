@@ -90,7 +90,9 @@ export function BookContentsList({
     ? book.skills.find((skill) => skill.slug === currentSlug)
     : undefined;
 
-  const leads = book.parts.map((part) => sharedLead(part.skills.map((s) => s.title)));
+  const leads = book.parts.map((part) =>
+    sharedLead(part.skills.map((s) => s.title))
+  );
 
   return (
     <nav
@@ -111,7 +113,7 @@ export function BookContentsList({
         furniture.
       */}
       <p className="book-rail__title">
-        Issue No.&nbsp;{book.issueNumber}
+        Repo No.&nbsp;{book.issueNumber}
         {current ? <> · {current.title}</> : <> · Cover</>}
       </p>
 
@@ -163,7 +165,9 @@ export function BookContentsList({
                       <span className="min-w-0">
                         {/* The headword is only hidden visually: a screen
                             reader still hears the chapter's whole name. */}
-                        {stripped ? <span className="sr-only">{lead} </span> : null}
+                        {stripped ? (
+                          <span className="sr-only">{lead} </span>
+                        ) : null}
                         {stripped ?? skill.title}
                       </span>
                     </Link>
@@ -255,7 +259,7 @@ function weightOf(row: RailRow): number {
  */
 export function collapseClusters(
   files: Subchapter[],
-  currentFile?: string,
+  currentFile?: string
 ): Array<Subchapter | RailCluster> {
   const out: Array<Subchapter | RailCluster> = [];
 
@@ -292,12 +296,14 @@ export function collapseClusters(
 export function railWindow(
   rows: readonly RailRow[],
   currentFile: string | undefined,
-  max = RAIL_MAX,
+  max = RAIL_MAX
 ): { rows: RailRow[]; hidden: number } {
   if (rows.length <= max) return { rows: [...rows], hidden: 0 };
 
   const currentIndex = currentFile
-    ? rows.findIndex((row) => !isCluster(row) && !isGap(row) && row.relPath === currentFile)
+    ? rows.findIndex(
+        (row) => !isCluster(row) && !isGap(row) && row.relPath === currentFile
+      )
     : -1;
 
   const tally = (dropped: readonly RailRow[]) =>
@@ -369,7 +375,11 @@ function SubchapterBranch({
   if (readable.length === 0) return null;
 
   const named = groups.filter((g) => g.readable.length > 0).length > 1;
-  const appendixHref = `${paths.chapter(owner, repo, skill.slug)}#chapter-appendix-title`;
+  const appendixHref = `${paths.chapter(
+    owner,
+    repo,
+    skill.slug
+  )}#chapter-appendix-title`;
 
   /*
    * Rows are folded per group, then concatenated — never folded across the
@@ -402,7 +412,7 @@ function SubchapterBranch({
     seen.set(row.title, (seen.get(row.title) ?? 0) + 1);
   }
   const ambiguous = new Set(
-    [...seen].filter(([, count]) => count > 1).map(([title]) => title),
+    [...seen].filter(([, count]) => count > 1).map(([title]) => title)
   );
 
   return (

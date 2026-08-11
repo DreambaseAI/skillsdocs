@@ -8,7 +8,11 @@ import { Colophon } from "@/components/book/colophon";
 import { dropCapMode } from "@/components/book/dropcap";
 import { MobileContents } from "@/components/book/mobile-contents";
 import { BookContentsList, RailLeft } from "@/components/book/rail-left";
-import { EmptyBook, RateLimited, UpstreamFailure } from "@/components/book/states";
+import {
+  EmptyBook,
+  RateLimited,
+  UpstreamFailure,
+} from "@/components/book/states";
 import { Markdown } from "@/components/reader/markdown";
 import { showcaseParams } from "@/lib/featured";
 import { bookJsonLd, JsonLd } from "@/lib/jsonld";
@@ -33,7 +37,7 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata(
-  props: PageProps<"/[owner]/[repo]">,
+  props: PageProps<"/[owner]/[repo]">
 ): Promise<Metadata> {
   const { owner, repo } = await props.params;
   const result = await loadBook(owner, repo);
@@ -57,7 +61,9 @@ export async function generateMetadata(
   const count = book.skills.length;
   const description =
     book.repo.description ??
-    `${count} agent ${count === 1 ? "skill" : "skills"} published by ${book.repo.fullName}, typeset for reading.`;
+    `${count} agent ${count === 1 ? "skill" : "skills"} published by ${
+      book.repo.fullName
+    }, typeset for reading.`;
 
   return {
     title: `${book.repo.fullName}`,
@@ -68,7 +74,7 @@ export async function generateMetadata(
     },
     openGraph: {
       type: "book",
-      title: `${book.repo.fullName} — Issue No. ${book.issueNumber}`,
+      title: `${book.repo.fullName} — Repo No. ${book.issueNumber}`,
       description,
       url: canonical,
       siteName: SITE_NAME,
@@ -86,7 +92,9 @@ export default function BookPage(props: PageProps<"/[owner]/[repo]">) {
   );
 }
 
-async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">) {
+async function BookBody({
+  params,
+}: Pick<PageProps<"/[owner]/[repo]">, "params">) {
   const { owner, repo } = await params;
   const result = await loadBook(owner, repo);
 
@@ -190,7 +198,7 @@ async function BookBody({ params }: Pick<PageProps<"/[owner]/[repo]">, "params">
 
       <MobileContents
         title={`${book.repo.fullName}`}
-        subtitle={`Issue No. ${book.issueNumber} · ${book.skills.length} chapters`}
+        subtitle={`Repo No. ${book.issueNumber} · ${book.skills.length} skills`}
       >
         <BookContentsList book={book} inSheet />
       </MobileContents>
