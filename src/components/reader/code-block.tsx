@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 
 import { announce } from "@/components/chrome/live-regions";
+import { capture } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,9 @@ export function CodeBlock({ lang, source, shikiClassName, children }: CodeBlockP
   async function copy() {
     try {
       await navigator.clipboard.writeText(source);
+      capture("code_copied", {
+        language: lang === "text" ? "plain_text" : lang,
+      });
       setCopied(true);
       announce(`Copied ${lang === "text" ? "code" : lang} to the clipboard`);
       clearTimeout(timer.current);

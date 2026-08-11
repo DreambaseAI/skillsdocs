@@ -25,6 +25,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { captureException } from "@/lib/analytics";
 import { paths } from "@/lib/site";
 
 const RATE_LIMITED = /rate.?limit|\b403\b|secondary rate/i;
@@ -39,6 +40,7 @@ export default function GlobalErrorBoundary({
   useEffect(() => {
     // Server-side failures are already logged upstream; this catches the
     // client-side ones, which otherwise vanish.
+    captureException(error);
     console.error("[skillsdocs]", error);
   }, [error]);
 

@@ -40,6 +40,7 @@ import {
 } from "react";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
+import { capture } from "@/lib/analytics";
 import { paths, parseRepoReference } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -288,6 +289,9 @@ export function HeroEquation({ host }: HeroEquationProps) {
       const target = parsed ?? (typing ? null : REPOS[repoIdx]);
       if (!target) return; // Let the GET form fall through to /search.
       event.preventDefault();
+      capture("repository_opened", {
+        entry_point: typing ? "repository_reference" : "hero_example",
+      });
       announce(`Opening ${target.owner}/${target.repo}`);
       router.push(paths.book(target.owner, target.repo));
     },

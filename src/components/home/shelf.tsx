@@ -26,6 +26,7 @@ import { announce } from "@/components/chrome/live-regions";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { Button } from "@/components/ui/button";
 import { useFavorites } from "@/hooks/use-favorites";
+import { capture } from "@/lib/analytics";
 import { external, paths } from "@/lib/site";
 
 export function Shelf() {
@@ -61,7 +62,9 @@ export function Shelf() {
             size="xs"
             className="text-ink-muted hover:text-ink"
             onClick={() => {
+              const itemCount = rows.length;
               clear();
+              capture("shelf_cleared", { item_count: itemCount });
               announce("Shelf cleared");
             }}
           >

@@ -31,6 +31,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
+import { capture } from "@/lib/analytics";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -149,6 +150,7 @@ export function ShareMenu({ url, title, summary = "", className, label }: ShareM
   const copy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(url);
+      capture("link_copied");
       announce("Link copied to clipboard");
       toast.success("Link copied", { description: url });
     } catch {
@@ -163,6 +165,7 @@ export function ShareMenu({ url, title, summary = "", className, label }: ShareM
   const share = useCallback(async () => {
     try {
       await navigator.share({ title, text: summary || undefined, url });
+      capture("link_shared", { method: "native" });
     } catch (error) {
       // The reader dismissing the sheet rejects with AbortError. That is a
       // completed interaction, not a failure, and must stay silent.

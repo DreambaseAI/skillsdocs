@@ -20,6 +20,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
 import { favoriteKey, useFavorites } from "@/hooks/use-favorites";
+import { capture } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 export interface FavoriteButtonProps {
@@ -46,6 +47,7 @@ export function FavoriteButton({ owner, repo, className, size = "icon-sm" }: Fav
       className={cn("text-ink-muted hover:text-issue-accent", starred && "text-issue-accent", className)}
       onClick={() => {
         const next = toggle(key);
+        capture("shelf_item_toggled", { action: next ? "added" : "removed" });
         announce(
           next
             ? `${owner}/${repo} added to your shelf`
