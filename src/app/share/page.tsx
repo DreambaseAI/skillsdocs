@@ -26,49 +26,55 @@ import { SharedOverlap } from "@/components/home/shared-overlap";
 import { Spine, type ShelfRow } from "@/components/home/shelf";
 import { SiteFooter } from "@/components/home/site-footer";
 import { getFeaturedBooks } from "@/lib/featured";
-import {
-  absoluteUrl,
-  isValidOwner,
-  isValidRepo,
-  paths,
-  SITE_NAME,
-} from "@/lib/site";
+import { parseShareRepos } from "@/lib/share";
+import { absoluteUrl, paths, SITE_NAME } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "A shared shelf",
-  description:
-    "A hand-picked shelf of agent-skills books, shared as a single link.",
-  robots: { index: false, follow: true },
-};
+/**
+ * Per-URL metadata: the OG card is the shelf itself, rendered by
+ * `/api/og/share` from the same `repos` value, so the preview a link unfurls
+ * with shows the actual books being shared.
+ */
+export async function generateMetadata(props: {
+  searchParams: Promise<{ repos?: string | string[] }>;
+}): Promise<Metadata> {
+  const { repos } = await props.searchParams;
+  const rows = parseShareRepos(repos);
 
-/** Ceiling on how many books one link may name; beyond it is abuse, not a shelf. */
-const MAX_BOOKS = 60;
+  const title = "A shared shelf";
+  const description =
+    rows.length > 0
+      ? `${rows.length} ${rows.length === 1 ? "book" : "books"} of agent skills, hand-picked and shared as a shelf.`
+      : "A hand-picked shelf of agent-skills books, shared as a single link.";
+
+  return {
+    title,
+    description,
+    robots: { index: false, follow: true },
+    openGraph: {
+      title: `Favorite skills — a shared shelf`,
+      description,
+      siteName: SITE_NAME,
+      ...(rows.length > 0
+        ? {
+            images: [
+              {
+                url: `/api/og/share?repos=${rows
+                  .map((row) => `${row.owner}/${row.repo}`)
+                  .join(",")}`,
+                width: 1200,
+                height: 630,
+                alt: `A shelf of ${rows.length} agent-skills ${rows.length === 1 ? "book" : "books"}`,
+              },
+            ],
+          }
+        : {}),
+    },
+    twitter: { card: rows.length > 0 ? "summary_large_image" : "summary" },
+  };
+}
 
 const MONO_LABEL =
   "font-mono text-[0.62rem] font-medium tracking-[0.18em] uppercase";
-
-/**
- * Parse the `repos` parameter: comma-joined `owner/repo` keys, deduplicated,
- * validated against GitHub's own naming rules, capped.
- */
-function parseShelf(raw: string | string[] | undefined): ShelfRow[] {
-  const joined = Array.isArray(raw) ? raw.join(",") : (raw ?? "");
-  const seen = new Set<string>();
-  const rows: ShelfRow[] = [];
-
-  for (const entry of joined.split(",")) {
-    const [owner, repo, ...rest] = entry.trim().split("/").filter(Boolean);
-    if (!owner || !repo || rest.length > 0) continue;
-    if (!isValidOwner(owner) || !isValidRepo(repo)) continue;
-    const key = `${owner}/${repo}`.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    rows.push({ owner, repo, accent: ownerAccentStyle(owner) });
-    if (rows.length >= MAX_BOOKS) break;
-  }
-
-  return rows;
-}
 
 export default function SharePage(props: {
   searchParams: Promise<{ repos?: string | string[] }>;
@@ -102,7 +108,10 @@ async function SharedShelf({
   searchParams: Promise<{ repos?: string | string[] }>;
 }) {
   const { repos } = await searchParams;
-  const rows = parseShelf(repos);
+  const rows: ShelfRow[] = parseShareRepos(repos).map((row) => ({
+    ...row,
+    accent: ownerAccentStyle(row.owner),
+  }));
 
   if (rows.length === 0) {
     return (
