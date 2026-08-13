@@ -215,6 +215,10 @@ const TREES: Record<string, Array<[string, string]>> = {
     ["libs/code/examples/skills/web-research/SKILL.md", "63424a2c5ea3"],
   ],
   "vercel-labs/next-skills": [
+  ],
+  "facebook/react": [
+    [".claude/skills/flow/SKILL.md", "aa11aa11aa11"],
+    ["compiler/.claude/skills/compiler-review/SKILL.md", "bb22bb22bb22"],
   ],};
 
 function treeFor(full: string): TreeEntry[] {
@@ -413,6 +417,96 @@ describe("assembleBook", () => {
       book.skills.reduce((n, s) => n + s.wordCount, 0),
     );
     expect(book.totalReadingMinutes).toBe(book.skills.length);
+  });
+});
+
+describe("provenance", () => {
+  /** A mixed repo: one published skill, one installed one. */
+  function mixedEntries(): TreeEntry[] {
+    return [
+      { path: "skills/authored-skill/SKILL.md", type: "blob", sha: "a1", size: 100 },
+      { path: ".claude/skills/borrowed-skill/SKILL.md", type: "blob", sha: "b2", size: 100 },
+    ];
+  }
+
+  function mixedBook(signal: Parameters<typeof assembleBook>[0]["signal"] = null) {
+    const entries = mixedEntries();
+    const paths = skillPathsFor(entries, "app");
+    return assembleBook({
+      repo: repoMeta("acme/app"),
+      owner: null,
+      entries,
+      truncated: false,
+      readme: null,
+      sources: paths.map((p) => {
+        const dir = p.slice(0, p.lastIndexOf("/"));
+        return body(dir.slice(dir.lastIndexOf("/") + 1));
+      }),
+      signal,
+      theme: THEME,
+    });
+  }
+
+  it("a publishing repo is authored (anthropics/skills)", () => {
+    expect(bookFrom("anthropics/skills").provenance).toBe("authored");
+  });
+
+  it("a repo that only uses skills is credited (facebook/react)", () => {
+    const book = bookFrom("facebook/react");
+    expect(book.provenance).toBe("credited");
+    expect(book.skills.every((s) => s.origin === "credited")).toBe(true);
+    // No special part: the whole book is the credit.
+    expect(book.parts).toHaveLength(1);
+    expect(book.parts[0].credited).toBeUndefined();
+  });
+
+  it("a dot-only mirror publisher stays authored (pbakaus/impeccable)", () => {
+    expect(bookFrom("pbakaus/impeccable").provenance).toBe("authored");
+  });
+
+  it("a mixed repo shelves credited skills in a closing part, after the authored ones", () => {
+    const book = mixedBook();
+    expect(book.provenance).toBe("mixed");
+    // Discovery order is path-sorted (dot dirs first); the book reorders so
+    // the repo's own work opens it.
+    expect(book.skills.map((s) => s.origin)).toEqual(["authored", "credited"]);
+    expect(book.parts.map((p) => p.title)).toEqual(["Skills", "Credited skills"]);
+    expect(book.parts[1].credited).toBe(true);
+    expect(book.parts[1].skills.map((s) => s.slug)).toEqual(["borrowed-skill"]);
+  });
+
+  it("skills.sh installability promotes a credited skill to authored", () => {
+    const book = mixedBook({
+      installs: 10,
+      weeklyInstalls: [],
+      official: false,
+      featuredSkill: null,
+      perSkillInstalls: { "borrowed-skill": 10 },
+    });
+    expect(book.provenance).toBe("authored");
+  });
+
+  it("an all-credited repo on the skills.sh leaderboard is a publisher", () => {
+    const entries: TreeEntry[] = [
+      { path: ".claude/skills/only-skill/SKILL.md", type: "blob", sha: "c3", size: 100 },
+    ];
+    const book = assembleBook({
+      repo: repoMeta("acme/app"),
+      owner: null,
+      entries,
+      truncated: false,
+      readme: null,
+      sources: [body("only-skill")],
+      signal: {
+        installs: 5,
+        weeklyInstalls: [],
+        official: false,
+        featuredSkill: null,
+        perSkillInstalls: {},
+      },
+      theme: THEME,
+    });
+    expect(book.provenance).toBe("authored");
   });
 });
 

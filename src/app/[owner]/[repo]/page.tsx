@@ -61,9 +61,9 @@ export async function generateMetadata(
   const count = book.skills.length;
   const description =
     book.repo.description ??
-    `${count} agent ${count === 1 ? "skill" : "skills"} published by ${
-      book.repo.fullName
-    }, typeset for reading.`;
+    `${count} agent ${count === 1 ? "skill" : "skills"} ${
+      book.provenance === "credited" ? "in use in" : "published by"
+    } ${book.repo.fullName}, typeset for reading.`;
 
   return {
     title: `${book.repo.fullName}`,

@@ -27,7 +27,13 @@ export function ChapterOpener({ book, skill, index }: ChapterOpenerProps) {
   const part = book.parts.find((p) =>
     p.skills.some((s) => s.slug === skill.slug),
   );
-  const eyebrow = part && part.group ? part.title : "Skills";
+  // A deep link into a credited book must say so without the cover's help.
+  const eyebrow =
+    part && part.group
+      ? part.title
+      : book.provenance === "credited"
+        ? "Credited skills"
+        : "Skills";
 
   return (
     <header className="book-opener book-measure">

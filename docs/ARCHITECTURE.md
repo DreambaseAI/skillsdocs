@@ -361,8 +361,16 @@ export interface Skill {
   license: string | null; compatibility: string | null; allowedTools: string[];
   variants: SkillVariant[];     // byte-identical mirrors collapsed into this chapter
   parentSlug: string | null;
+  origin: SkillOrigin;          // authored here, or installed here and credited
   issues: string[];             // spec violations, surfaced in the colophon — never hidden
 }
+
+// "authored" — published from this repo (visible dirs, providers/, or a
+// multi-agent dot-dir mirror set). "credited" — installed INTO this repo:
+// a single copy under an agent's dot directory (.claude/skills/, nested
+// compiler/.claude/skills/, …), which is where `npx skills add` writes.
+// The repo uses the skill; the book credits it instead of claiming it.
+export type SkillOrigin = "authored" | "credited";
 ```
 
 ## 3.3 `SkillFile` (new) — the resource contract
@@ -383,7 +391,10 @@ export type SkillFile = SkillResource;
 ## 3.4 `Book` and `BookPart` (exists, `src/lib/book.ts`) — extended
 
 ```ts
-export interface BookPart { group: string; title: string; skills: Skill[] }
+export interface BookPart {
+  group: string; title: string; skills: Skill[];
+  credited?: boolean;                 // the back-of-book part holding installed skills
+}
 
 export interface Book {
   repo: RepoMeta;
@@ -399,8 +410,32 @@ export interface Book {
   marketplace: MarketplaceInfo | null;
   theme: IssueTheme;                  // always present; falls back to the name hash
   issueNumber: number;                // stable per repo: 1 + (fnv1a(fullName) % 99)
+  provenance: BookProvenance;         // authored | credited | mixed — see below
 }
+
+// "credited": every skill is installed into the repo (facebook/react) — the
+// book is the repo's working library. It renders with a credit plate on the
+// cover, a "1 — Credits" section instead of "1 — Install", no install command
+// on any surface (HTML, .md, JSON, OG, manifest), and no `author` claim in
+// JSON-LD. "mixed": authored skills form the book proper; credited ones are
+// shelved in a closing "Credited skills" part, ordered after the authored
+// chapters. Assembly promotes a path-credited skill back to authored when
+// skills.sh lists it as installable FROM this repo (`perSkillInstalls`), and
+// promotes wholesale when an all-credited repo is on the leaderboard or ships
+// a marketplace manifest — being installed from is authorship.
+export type BookProvenance = "authored" | "credited" | "mixed";
 ```
+
+**Credit attribution** (`src/lib/attribution.ts`, `src/lib/skills-lock.ts`):
+a credited chapter row links to the skill's *origin* book — avatar, the
+origin's proven accent pair, and a deep link — via `resolveSkillCredit`.
+Tier 1 is the repo's committed `skills-lock.json` (the skills CLI writes it
+at install time; `TanStack/tanstack.com` is a live example). Tier 2 is a
+skills.sh name match that only survives if the candidate's own `getBook`
+holds an authored skill with that name whose description agrees — the guard
+that keeps facebook/react's internal `fix`/`test` from being pinned on
+whichever repo publishes a same-named skill. Unresolvable credits render
+nothing; a wrong attribution is worse than none.
 
 ## 3.5 `IssueTheme` (exists, `src/lib/design/types.ts`) — normative
 

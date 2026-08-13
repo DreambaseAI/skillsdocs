@@ -1,6 +1,11 @@
+import { BookBookmark02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 import { AllChaptersLink } from "@/components/book/all-chapters-link";
+import { ChapterCredit } from "@/components/book/chapter-credit";
+import { CreditedRibbon } from "@/components/book/credited-ribbon";
 import { InlineMarkup } from "@/components/book/deck";
 import {
   editorialDate,
@@ -12,6 +17,13 @@ import {
 } from "@/components/book/format";
 import { InstallCommand } from "@/components/book/install-command";
 import { chartSeedsFromTheme, InstallSparkline } from "@/components/charts";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import { COVER_STAR_CLASS } from "@/components/home/cover-star";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { compact } from "@/components/home/format";
@@ -72,6 +84,15 @@ export function BookCoverSpread({ book }: BookCoverProps) {
   const updated = editorialDate(repo.pushedAt);
   const preview = book.skills.slice(0, PREVIEW_CHAPTERS);
 
+  // A credited edition is the repo's working library: every skill is
+  // installed here, written elsewhere. It gets the credit plate and a credits
+  // section where the install block would be — `npx skills add` against this
+  // repo would republish other people's work under this owner's name.
+  const credited = book.provenance === "credited";
+  const creditedCount = book.skills.filter(
+    (s) => s.origin === "credited"
+  ).length;
+
   const installRows = [
     {
       label: "Install command",
@@ -106,6 +127,7 @@ export function BookCoverSpread({ book }: BookCoverProps) {
           >
             {owner?.name ?? repo.owner}
             {updated ? <> · Updated {updated}</> : null}
+            {credited ? <> · Credited</> : null}
             <span className="max-sm:hidden">
               {" "}
               · {repo.archived ? "Archived" : "In print"}
@@ -145,6 +167,10 @@ export function BookCoverSpread({ book }: BookCoverProps) {
               <span className={cn(MONO_LABEL, "cover-muted truncate")}>
                 {owner?.name ?? repo.owner}
               </span>
+              {/* The credited edition's bookmark ribbon, wrapping in from
+                  the fore-edge on this line. In flow, so a long owner name
+                  truncates instead of running under the cloth. */}
+              {credited ? <CreditedRibbon /> : null}
             </div>
 
             <h1 className="book-spread__title">
@@ -160,8 +186,10 @@ export function BookCoverSpread({ book }: BookCoverProps) {
               </p>
             ) : (
               <p className="cover-muted mt-4 max-w-prose text-[0.95rem] leading-normal text-pretty">
-                {chapters} {plural(chapters, "skill")} published from this
-                repository, read as one issue.
+                {chapters} {plural(chapters, "skill")}{" "}
+                {credited
+                  ? "in use in this repository, read as one issue."
+                  : "published from this repository, read as one issue."}
               </p>
             )}
 
@@ -183,7 +211,17 @@ export function BookCoverSpread({ book }: BookCoverProps) {
             )}
           >
             <span>
-              {chapters} {plural(chapters, "chapter")}
+              {credited ? (
+                <>
+                  {chapters} credited {plural(chapters, "skill")}
+                </>
+              ) : (
+                <>
+                  {chapters - creditedCount}{" "}
+                  {plural(chapters - creditedCount, "chapter")}
+                  {creditedCount > 0 ? <> + {creditedCount} credited</> : null}
+                </>
+              )}
             </span>
             <span>{book.totalWords.toLocaleString("en-GB")} words</span>
           </div>
@@ -201,28 +239,53 @@ export function BookCoverSpread({ book }: BookCoverProps) {
             <span aria-hidden>p. i</span>
           </div>
 
-          {/* 1 — install */}
+          {/* 1 — install; or, on a credited edition, the credit line. An
+              install command here would republish other people's skills under
+              this repo's name, so the credits state the relationship instead. */}
           <section aria-labelledby="masthead-title" className="mt-7">
             <h2
               id="masthead-title"
               className={cn(MONO_LABEL, "text-issue-accent scroll-mt-24")}
             >
-              1 — Install
+              {credited ? "1 — Credits" : "1 — Install"}
             </h2>
-            <InstallCommand rows={installRows} className="mt-3.5" />
-            <p
-              className={cn(
-                MONO_LABEL,
-                "text-ink-muted mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 normal-case"
-              )}
-            >
-              <span>{licenceLabel(repo.license)}</span>
-              <span>{compact(repo.stars)} stars</span>
-              <span className="max-sm:hidden">
-                {book.totalWords.toLocaleString("en-GB")} words
-              </span>
-              {updated ? <span>Updated {updated}</span> : null}
-            </p>
+            {credited ? (
+              <Item variant="outline" size="sm" className="mt-3.5">
+                <ItemMedia variant="icon">
+                  <HugeiconsIcon
+                    icon={BookBookmark02Icon}
+                    className="text-issue-accent"
+                    aria-hidden
+                  />
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>Skills in use, not published</ItemTitle>
+                  <ItemDescription className="line-clamp-none text-pretty">
+                    These skills are installed in {repo.repo}&rsquo;s working
+                    tree, the book you are reading is the repository&rsquo;s
+                    working library. Each skill remains its author&rsquo;s work,
+                    so there is no install command on this page.
+                  </ItemDescription>
+                </ItemContent>
+              </Item>
+            ) : (
+              <>
+                <InstallCommand rows={installRows} className="mt-3.5" />
+                <p
+                  className={cn(
+                    MONO_LABEL,
+                    "text-ink-muted mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 normal-case"
+                  )}
+                >
+                  <span>{licenceLabel(repo.license)}</span>
+                  <span>{compact(repo.stars)} stars</span>
+                  <span className="max-sm:hidden">
+                    {book.totalWords.toLocaleString("en-GB")} words
+                  </span>
+                  {updated ? <span>Updated {updated}</span> : null}
+                </p>
+              </>
+            )}
           </section>
 
           {/* 2 — chapters. Carries `#contents`: this preview is the page's
@@ -242,8 +305,22 @@ export function BookCoverSpread({ book }: BookCoverProps) {
                 2 — Chapters
               </h2>
               <span className={cn(MONO_LABEL, "text-ink-muted")}>
-                {chapters} {plural(chapters, "skill")} ·{" "}
-                {readingTime(book.totalReadingMinutes)}
+                {credited ? (
+                  <>
+                    {chapters} credited {plural(chapters, "skill")}
+                  </>
+                ) : creditedCount > 0 ? (
+                  <>
+                    {chapters - creditedCount}{" "}
+                    {plural(chapters - creditedCount, "skill")} +{" "}
+                    {creditedCount} credited
+                  </>
+                ) : (
+                  <>
+                    {chapters} {plural(chapters, "skill")}
+                  </>
+                )}{" "}
+                · {readingTime(book.totalReadingMinutes)}
               </span>
             </div>
 
@@ -263,6 +340,18 @@ export function BookCoverSpread({ book }: BookCoverProps) {
                     <span className="min-w-0">
                       <span className="font-display text-ink-strong group-hover/ch:text-issue-accent block text-[1.35rem] leading-snug tracking-[-0.012em] text-balance transition-colors">
                         {skill.title}
+                        {/* Marked per row only in a mixed book — on a credited
+                            edition the whole spread already says it. */}
+                        {skill.origin === "credited" && !credited ? (
+                          <span
+                            className={cn(
+                              MONO_LABEL,
+                              "text-ink-muted ml-2.5 align-middle text-[0.56rem]"
+                            )}
+                          >
+                            Credited
+                          </span>
+                        ) : null}
                       </span>
                       {skill.description ? (
                         <span className="text-ink-muted mt-1 block text-sm leading-snug text-pretty">
@@ -274,6 +363,16 @@ export function BookCoverSpread({ book }: BookCoverProps) {
                       {shortReadingTime(skill.readingMinutes)}
                     </span>
                   </Link>
+                  {/* A credited chapter's origin, when it verified: the
+                      origin's mark and accent, deep-linking to this skill in
+                      its own book. A sibling of the row link, never nested
+                      inside it, and streamed so the lookup cannot hold up
+                      the spread. */}
+                  {skill.origin === "credited" ? (
+                    <Suspense fallback={null}>
+                      <ChapterCredit book={book} skill={skill} />
+                    </Suspense>
+                  ) : null}
                 </li>
               ))}
             </ol>
@@ -316,6 +415,9 @@ export function BookCoverSpread({ book }: BookCoverProps) {
 export function BookMasthead({ book }: BookCoverProps) {
   const { repo, signal, theme } = book;
   const updated = editorialDate(repo.pushedAt);
+  const creditedCount = book.skills.filter(
+    (s) => s.origin === "credited"
+  ).length;
 
   return (
     <section
@@ -377,6 +479,29 @@ export function BookMasthead({ book }: BookCoverProps) {
             <span className="text-ink-muted">
               {" "}
               — the skills here originate elsewhere
+            </span>
+          </MastheadCell>
+        ) : null}
+
+        {/* Authorship is provenance in the most literal sense: whether the
+            repo wrote what this book prints, or installed it. */}
+        {book.provenance === "credited" ? (
+          <MastheadCell label="Authorship">
+            <span className="text-ink-strong">Credited</span>
+            <span className="text-ink-muted">
+              {" "}
+              — skills in use here, not published from here
+            </span>
+          </MastheadCell>
+        ) : null}
+
+        {book.provenance === "mixed" ? (
+          <MastheadCell label="Authorship">
+            <span className="text-ink-strong">Mixed</span>
+            <span className="text-ink-muted">
+              {" "}
+              — includes {creditedCount} credited{" "}
+              {plural(creditedCount, "skill")} in use here
             </span>
           </MastheadCell>
         ) : null}

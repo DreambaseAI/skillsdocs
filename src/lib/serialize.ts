@@ -516,6 +516,9 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
     // Relative links inside the inlined README and chapter bodies resolve
     // against this, not against the URL of this document.
     `base: ${base}`,
+    // "authored" | "credited" | "mixed" — credited means the skills are
+    // *installed into* this repository, not published from it.
+    `provenance: ${book.provenance}`,
     `chapters: ${book.skills.length}`,
     `inlined: ${included.length}`,
     `withheld: ${withheld.length}`,
@@ -533,9 +536,16 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
     `Machine manifest: ${absoluteUrl(paths.bookManifest(owner, name))}`,
     `JSON: ${absoluteUrl(paths.bookJson(owner, name))}`,
     // A repository with no SKILL.md has nothing to install; printing the
-    // command anyway told an agent to run something that does nothing.
-    ...(book.skills.length
+    // command anyway told an agent to run something that does nothing. And a
+    // credited book must not print one at all: installing from here would
+    // republish other authors' skills under this repository's name.
+    ...(book.skills.length && book.provenance !== "credited"
       ? [`Install: \`${installCommand(owner, name)}\``]
+      : []),
+    ...(book.provenance === "credited"
+      ? [
+          "Provenance: credited — these skills are installed into this repository and in use here, not published from it, so there is no install command.",
+        ]
       : []),
     `Upstream: ${external.repo(owner, name)} @ \`${ref}\``,
     `Licence: ${licenceLabel(licence)}`,
@@ -613,6 +623,17 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
 
   const stats = bullets([
     { label: "Chapters", value: String(book.skills.length) },
+    ...(book.provenance !== "authored"
+      ? [
+          {
+            label: "Authorship",
+            value:
+              book.provenance === "credited"
+                ? "credited — skills in use in this repository, not published from it"
+                : `mixed — ${book.skills.filter((s) => s.origin === "credited").length} of ${book.skills.length} chapters are credited skills in use here`,
+          },
+        ]
+      : []),
     { label: "Inlined", value: `${included.length} (licence detected)` },
     { label: "Words", value: book.totalWords.toLocaleString("en-US") },
     { label: "Reading time", value: `${book.totalReadingMinutes} min` },
@@ -671,6 +692,15 @@ function chapterSection(
       label: "Markdown",
       value: `${absoluteUrl(paths.chapter(owner, name, skill.slug))}.md`,
     },
+    ...(skill.origin === "credited"
+      ? [
+          {
+            label: "Origin",
+            value:
+              "Credited — installed into this repository, not published from it.",
+          },
+        ]
+      : []),
     {
       label: "Licence",
       value: licence.url
@@ -785,7 +815,9 @@ export function skillToMarkdown(
       "",
       `Book (all chapters, one file): ${absoluteUrl(paths.bookMarkdown(owner, name))}`,
       `Machine manifest: ${absoluteUrl(paths.bookManifest(owner, name))}`,
-      `Install the book: \`${installCommand(owner, name)}\``,
+      skill.origin === "credited"
+        ? "Origin: credited — this skill is installed into this repository and in use here, not published from it, so there is no install command."
+        : `Install the book: \`${installCommand(owner, name)}\``,
       `Upstream: ${external.file(owner, name, ref, skill.skillMdPath)} @ \`${ref}\``,
       `Raw bytes, no header: ${raw}`,
       // Relative paths inside the body — `references/schemas.md`,
@@ -959,6 +991,12 @@ export interface AgentSkillEntry {
    */
   source?: string;
   sourceDigest?: string;
+  /**
+   * Present, and always `"credited"`, when the skill is installed into the
+   * repository rather than published from it — the entry is readable and
+   * verifiable, but this repo is not its author.
+   */
+  origin?: "credited";
 }
 
 export interface AgentSkillsManifest {
@@ -1008,13 +1046,15 @@ export function bookToAgentSkills(
         name: skill.name,
         type: "skill-md" as const,
         description: truncate(
-          skill.description || `${skill.name} — from ${owner}/${name}.`,
+          skill.description ||
+            `${skill.name} — ${skill.origin === "credited" ? "in use in" : "from"} ${owner}/${name}.`,
           1024,
         ),
         url: absoluteUrl(`${paths.chapter(owner, name, skill.slug)}.md`),
         digest: `sha256:${pair.document}`,
         source: rawUrl(owner, name, ref, skill.skillMdPath),
         sourceDigest: `sha256:${pair.source}`,
+        ...(skill.origin === "credited" ? { origin: "credited" as const } : {}),
       };
     });
 

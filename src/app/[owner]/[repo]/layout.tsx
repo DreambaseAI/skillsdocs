@@ -9,7 +9,7 @@ import { SiteHeader } from "@/components/chrome/site-header";
 import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
 import { ReaderControls } from "@/components/reader/controls";
 import { loadBook } from "./loader";
-import { issueThemeCss } from "@/lib/design/theme";
+import { issueScope, issueThemeCss } from "@/lib/design/theme";
 import { external, installCommand, paths } from "@/lib/site";
 import { bookIcons } from "@/lib/site-icons";
 import "./book.css";
@@ -103,10 +103,18 @@ async function IssueTheme({
   // missing accent colour must never cost the reader the page, so this island
   // swallows everything and falls back to the neutral tokens.
   let css = "";
+  let scopeKey = "";
   try {
     const result = await loadBook(owner, repo);
     if (result.kind !== "ok") return null;
-    css = issueThemeCss(result.book.theme, ".book-issue");
+    // Scoped to THIS instance's `.book-issue`, not the class alone: the
+    // router keeps the previous book mounted (display: none) for instant
+    // back-navigation, and a hidden `<style>` still applies document-wide —
+    // class-scoped rules from the hidden book were recolouring the visible
+    // one. See `issueScope`.
+    const scope = issueScope(result.book.repo.fullName);
+    scopeKey = scope.key;
+    css = issueThemeCss(result.book.theme, scope.selector);
   } catch {
     return null;
   }
@@ -114,7 +122,7 @@ async function IssueTheme({
 
   // The string is built by `issueThemeCss` from re-validated tokens only — no
   // value from a third-party design.md reaches this element unsanitised.
-  return <style>{css}</style>;
+  return <style data-issue-scope={scopeKey}>{css}</style>;
 }
 
 /**
@@ -145,7 +153,12 @@ async function BookKeys({
     props = {
       coverHref: paths.book(owner, repo),
       githubUrl: external.repo(owner, repo),
-      installCommand: installCommand(owner, repo),
+      // A credited book has no install command: the shortcut announces why
+      // instead of copying a command that republishes other people's skills.
+      installCommand:
+        result.book.provenance === "credited"
+          ? null
+          : installCommand(owner, repo),
       chapters: result.book.skills.map((skill) => ({
         slug: skill.slug,
         href: paths.chapter(owner, repo, skill.slug),

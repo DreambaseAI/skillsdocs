@@ -408,20 +408,23 @@
    * bind strip the face paints down its spine edge.
    */
   .book-spread__cover {
+    /* The end padding, named: the credited ribbon crosses it (negative end
+       margin) to sit flush with the cover's fore-edge. Keep in step with the
+       `padding` below. */
+    --cover-pad-end: var(--band-gutter);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     gap: clamp(2rem, 6vh, 3.5rem);
     min-block-size: min(78dvh, 34rem);
-    padding: 1.9rem var(--band-gutter) 2rem
-      calc(var(--band-gutter) + 0.9rem);
+    padding: 1.9rem var(--cover-pad-end) 2rem calc(var(--band-gutter) + 0.9rem);
   }
 
   @media (min-width: 64rem) {
     .book-spread__cover {
+      --cover-pad-end: 2.25rem;
       min-block-size: min(calc(100dvh - var(--header-h) - 3.25rem), 46rem);
       padding-block: 2.4rem;
-      padding-inline-end: 2.25rem;
     }
   }
 
@@ -465,6 +468,47 @@
   }
 
   /*
+   * A credited chapter's origin line: "From owner/repo →" with the origin's
+   * own mark. The two accent tones arrive as inline custom properties from
+   * the origin's resolved theme (chapter-credit.tsx); this rule picks the one
+   * proven against the current ground, exactly as `--issue-accent` is picked
+   * in tokens.css — light tone on light paper, dark tone under `.dark`. Rest
+   * state is muted ink; the origin's colour is the hover reward, and it rings
+   * the avatar at all times as the row's identifying tint.
+   */
+  .chapter-credit {
+    --credit-accent: var(--credit-accent-light, var(--issue-accent));
+    color: var(--ink-muted);
+    transition: color 140ms var(--ease-out-quint);
+  }
+
+  .dark .chapter-credit {
+    --credit-accent: var(--credit-accent-dark, var(--issue-accent));
+  }
+
+  .chapter-credit:hover,
+  .chapter-credit:focus-visible {
+    color: var(--credit-accent);
+  }
+
+  .chapter-credit__avatar {
+    border-radius: 0.25rem;
+    border: 1px solid color-mix(in oklab, var(--credit-accent) 60%, transparent);
+    background: color-mix(
+      in oklab,
+      var(--credit-accent) 8%,
+      var(--paper-raised)
+    );
+    object-fit: cover;
+  }
+
+  @media (forced-colors: active) {
+    .chapter-credit__avatar {
+      border-color: CanvasText;
+    }
+  }
+
+  /*
    * The avatar as a letterpress mark rather than a chat bubble: squared to the
    * grid, ruled, desaturated, and multiplied into the paper so the stock shows
    * through the ink. Most dev-org avatars are monochrome marks already; this
@@ -483,7 +527,11 @@
        near-white — `stripe` renders as a pale grey square that vanishes on
        cream — and the tint is also the fourth job the issue accent does on
        the cover. */
-    background: color-mix(in oklab, var(--issue-accent) 8%, var(--paper-raised));
+    background: color-mix(
+      in oklab,
+      var(--issue-accent) 8%,
+      var(--paper-raised)
+    );
     overflow: hidden;
   }
 
@@ -1493,13 +1541,13 @@
   }
 
   :is(
-    .book-rail__sub,
-    .book-rail__more,
-    .book-rail__uplink,
-    .book-rail__jump,
-    .book-rail__sibling,
-    .book-rail__statlink
-  ):focus-visible {
+      .book-rail__sub,
+      .book-rail__more,
+      .book-rail__uplink,
+      .book-rail__jump,
+      .book-rail__sibling,
+      .book-rail__statlink
+    ):focus-visible {
     outline: var(--focus-ring-width) solid var(--issue-accent);
     outline-offset: 1px;
     border-radius: var(--radius-sm);
@@ -1691,7 +1739,6 @@
     background: var(--paper-raised);
   }
 
-
   .book-chapternav__link--next {
     text-align: end;
     align-items: flex-end;
@@ -1723,7 +1770,8 @@
     display: flex;
     justify-content: center;
     pointer-events: none;
-    transition: transform 200ms var(--ease-out-quint), opacity 200ms var(--ease-out-quint);
+    transition: transform 200ms var(--ease-out-quint),
+      opacity 200ms var(--ease-out-quint);
   }
 
   /*

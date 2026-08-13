@@ -19,8 +19,7 @@
     position: relative;
     overflow: hidden;
     color: var(--cover-ink);
-    background:
-      radial-gradient(
+    background: radial-gradient(
         90% 60% at 25% 10%,
         color-mix(in oklab, var(--issue-accent) 52%, transparent),
         transparent 62%
@@ -82,6 +81,91 @@
     color: var(--cover-ink-muted);
   }
 
+  /*
+   * The credited ribbon: a bookmark ribbon wrapping in from the cover's
+   * right edge, on the owner line.
+   *
+   * A physical object, built the way the spine and the cover face are —
+   * accent-dyed cloth (the same colour-mix washes the cover itself uses, so
+   * the cover-ink label sits on a ground the cover already proves), a sheen
+   * along the top that reads as the ribbon's curvature, a shadowed fold
+   * where it bends around the board's fore-edge, and a swallowtail cut on
+   * the free end. The shadow is a `drop-shadow` filter, not `box-shadow`,
+   * because the clip-path that cuts the tail would cut a box shadow with it.
+   *
+   * It is a flex child of the owner row, not an absolute overlay: the
+   * negative end margin (`--cover-pad-end`, set by `.book-spread__cover`)
+   * carries it across the cover's padding to the physical edge, where the
+   * face's `overflow: hidden` trims it flush — the wrap. Being in flow is
+   * also what keeps a long owner name truncating instead of running under
+   * the cloth.
+   *
+   * It is a real `<button>` (the tooltip trigger), so the hover tug and the
+   * inset focus ring are the affordances; an outline would be clipped by the
+   * tail cut, so focus paints inside the cloth instead.
+   */
+  .cover-ribbon {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    flex: none;
+    margin-inline-start: auto;
+    margin-inline-end: calc(-1 * var(--cover-pad-end, 0rem));
+    padding-block: 0.45rem;
+    padding-inline: 1.15rem 0.9rem;
+    border: 0;
+    cursor: help;
+    color: var(--cover-ink);
+    translate: 4px 0;
+    background: linear-gradient(
+        180deg,
+        var(--cover-sheen),
+        transparent 35%,
+        transparent 62%,
+        var(--cover-shade) 100%
+      ),
+      linear-gradient(
+        270deg,
+        color-mix(in oklab, var(--issue-accent) 46%, var(--cover-ground)),
+        color-mix(in oklab, var(--issue-accent) 24%, var(--cover-ground))
+      );
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0.7rem 50%);
+    filter: drop-shadow(0 6px 8px var(--cover-shade));
+    transition: translate 160ms var(--ease-out-quint);
+  }
+
+  /* The fold: the ribbon darkens where it bends around the fore-edge. */
+  .cover-ribbon::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    inline-size: 0.5rem;
+    pointer-events: none;
+    background: linear-gradient(270deg, var(--cover-shade-strong), transparent);
+  }
+
+  /* Tugged out of the book a touch. */
+  .cover-ribbon:hover {
+    translate: 4px 1px;
+  }
+
+  .cover-ribbon:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--cover-ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cover-ribbon {
+      transition: none;
+    }
+
+    .cover-ribbon:hover {
+      translate: none;
+    }
+  }
+
   /* The cover's own call to action: stock ink on stock ground, inverted. */
   .cover-cta {
     display: inline-flex;
@@ -121,12 +205,11 @@
      plus an accent wash rising behind the plate. */
   .newsstand {
     position: relative;
-    background:
-      radial-gradient(
-        120% 100% at 80% 0%,
-        color-mix(in oklab, var(--issue-accent) 14%, transparent),
-        transparent 62%
-      );
+    background: radial-gradient(
+      120% 100% at 80% 0%,
+      color-mix(in oklab, var(--issue-accent) 14%, transparent),
+      transparent 62%
+    );
   }
 
   .newsstand::before {
@@ -168,8 +251,7 @@
     overflow: hidden;
     color: var(--cover-ink);
     box-shadow: 0 18px 34px -14px var(--cover-shade-strong);
-    background:
-      linear-gradient(
+    background: linear-gradient(
         90deg,
         var(--cover-shade-strong) 0 4%,
         var(--cover-sheen) 8%,
@@ -242,8 +324,7 @@
   .spine--ghost {
     opacity: 0.45;
     filter: grayscale(0.85) brightness(0.85);
-    transition:
-      opacity 200ms var(--ease-out-quint),
+    transition: opacity 200ms var(--ease-out-quint),
       filter 200ms var(--ease-out-quint);
   }
 
@@ -273,8 +354,7 @@
    */
   .shelf-case {
     position: relative;
-    background:
-      repeating-linear-gradient(
+    background: repeating-linear-gradient(
         90deg,
         color-mix(in oklab, var(--rule) 45%, transparent) 0 1px,
         transparent 1px 9rem
@@ -362,6 +442,17 @@
 
     .cover-rule {
       background: CanvasText;
+    }
+
+    .cover-ribbon {
+      background: ButtonFace;
+      color: ButtonText;
+      border: 1px solid ButtonText;
+      filter: none;
+    }
+
+    .cover-ribbon::before {
+      display: none;
     }
 
     .cover-muted,

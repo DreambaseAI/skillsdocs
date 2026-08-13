@@ -90,6 +90,8 @@ export async function GET(
       title: skill.title,
       description: skill.description,
       group: skill.group || null,
+      // "authored" — published from this repo; "credited" — installed into it.
+      origin: skill.origin,
       path: skill.skillMdPath,
       links: {
         canonical: chapterUrl,
@@ -139,7 +141,11 @@ export async function GET(
               digest: `sha256:${createHash("sha256").update(source, "utf8").digest("hex")}`,
             }
           : null,
-      install: { all: installCommand(o, r) },
+      // Omitted for a credited skill: installing from here would republish
+      // someone else's work under this repository's name.
+      ...(skill.origin !== "credited"
+        ? { install: { all: installCommand(o, r) } }
+        : {}),
       attribution: {
         notice:
           "Served verbatim from a public GitHub repository and owned by its authors.",

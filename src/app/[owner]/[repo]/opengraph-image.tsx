@@ -85,6 +85,7 @@ interface Cover {
   issueNumber: number;
   accent: string;
   avatar: string | null;
+  credited: boolean;
 }
 
 /**
@@ -114,6 +115,7 @@ async function coverFor(owner: string, repo: string): Promise<Cover | null> {
       issueNumber: book.issueNumber,
       accent: toHex(book.theme.accentDark, FALLBACK_ACCENT),
       avatar,
+      credited: book.provenance === "credited",
     };
   } catch {
     // `getBook` is a `use cache` function, and in production its rejection
@@ -131,6 +133,7 @@ async function coverFor(owner: string, repo: string): Promise<Cover | null> {
       issueNumber: issueNumberFor(`${owner}/${repo}`),
       accent: FALLBACK_ACCENT,
       avatar: null,
+      credited: false,
     };
   }
 }
@@ -156,7 +159,7 @@ export default async function Image({
   }
   const stats = [
     cover.skillCount !== null
-      ? `${cover.skillCount} ${cover.skillCount === 1 ? "skill" : "skills"}`
+      ? `${cover.skillCount} ${cover.credited ? "credited " : ""}${cover.skillCount === 1 ? "skill" : "skills"}`
       : null,
     cover.stars ? `${compact(cover.stars)} stars` : null,
   ].filter((s): s is string => s !== null);
@@ -273,9 +276,13 @@ export default async function Image({
           <div style={{ display: "flex", color: INK, fontWeight: 600 }}>
             {stats.length ? stats.join("  ·  ") : "Agent Skills"}
           </div>
-          {/* Nothing to install when the repository publishes no skills. */}
+          {/* Nothing to install when the repository publishes no skills — and
+              a credited book must not print an install command for skills the
+              repository merely uses. */}
           {cover.skillCount === 0 ? (
             <div style={{ display: "flex" }}>No Agent Skills yet</div>
+          ) : cover.credited ? (
+            <div style={{ display: "flex" }}>Skills in use here, credited</div>
           ) : (
             <div style={{ display: "flex" }}>npx skills add {clamp(`${cover.owner}/${cover.repo}`, 34)}</div>
           )}

@@ -30,6 +30,21 @@ export interface SkillFrontmatter {
   [key: string]: unknown;
 }
 
+/**
+ * The repository's relationship to a skill.
+ *
+ * `authored` — published from this repo: a visible directory (`skills/`,
+ * `plugins/…`, a plain `<name>/SKILL.md`, the repo root, `providers/…`), or a
+ * dot-dir skill mirrored across two or more agent prefixes, which is the
+ * publish-per-agent pattern, not an installation.
+ *
+ * `credited` — *installed into* this repo: it lives only under a single
+ * agent's dot directory (`.claude/skills/…`, `.agents/skills/…`), which is
+ * where `npx skills add` writes. The repo uses the skill; someone else wrote
+ * it, and the book must say so rather than claim authorship.
+ */
+export type SkillOrigin = "authored" | "credited";
+
 export interface SkillHeading {
   depth: number;
   text: string;
@@ -68,6 +83,8 @@ export interface Skill {
   allowedTools: string[];
   variants: SkillVariant[];
   parentSlug: string | null;
+  /** Authored here, or installed here and credited to its authors. */
+  origin: SkillOrigin;
   /** Set when frontmatter is missing or violates the spec. */
   issues: string[];
 }
@@ -88,6 +105,8 @@ export interface SkillStub {
   variants: SkillVariant[];
   /** Slug of the enclosing skill, when skills are nested. */
   parentSlug: string | null;
+  /** Authored here, or installed here and credited to its authors. */
+  origin: SkillOrigin;
 }
 
 /* -------------------------------------------------------------- discovery */
@@ -339,6 +358,68 @@ function skillName(skillMdPath: string): string {
   return basename(dirname(skillMdPath)).toLowerCase();
 }
 
+/** The directories an agent installs skills *into*, inside its dot dir. */
+const INSTALL_CONTAINERS = new Set(["skills", "skill", "plugins", "plugin"]);
+
+/**
+ * Does this path pass through an agent's dot directory?
+ *
+ * Two shapes count: a leading dot directory (`.claude/skills/pdf`), and a
+ * nested one whose immediate child is a skills/plugins container —
+ * `compiler/.claude/skills/x` in the facebook/react monorepo is installed
+ * just as surely as a root-level one. The child guard is what keeps
+ * `skills/.curated/screenshot` (openai/skills, a *published* skill inside a
+ * dot-named section) out.
+ */
+function isInstalledPath(path: string): boolean {
+  const segments = path.split("/");
+  if (segments[0]?.startsWith(".")) return true;
+  return segments.some(
+    (seg, i) =>
+      seg.startsWith(".") &&
+      INSTALL_CONTAINERS.has(segments[i + 1]?.toLowerCase() ?? ""),
+  );
+}
+
+/**
+ * The dot directory an installed path passes through, prefix included —
+ * `.claude` for `.claude/skills/x`, `compiler/.claude` for the nested form.
+ * Null for a visible path.
+ */
+function dotRoot(path: string): string | null {
+  const segments = path.split("/");
+  if (segments[0]?.startsWith(".")) return segments[0];
+  for (let i = 1; i < segments.length; i++) {
+    if (
+      segments[i].startsWith(".") &&
+      INSTALL_CONTAINERS.has(segments[i + 1]?.toLowerCase() ?? "")
+    ) {
+      return segments.slice(0, i + 1).join("/");
+    }
+  }
+  return null;
+}
+
+/**
+ * Authored here, or installed here?
+ *
+ * A visible canonical path is publishing. When every copy hides in a
+ * dot-directory, the tiebreaker is multiplicity: the same skill republished
+ * under two or more agent prefixes is the publish-per-agent pattern
+ * (`pbakaus/impeccable` ships fourteen), while a single dot-dir copy is a
+ * skill someone *installed* — `npx skills add` writes `.agents/skills/` —
+ * and this repo should credit it, not claim it.
+ */
+function originOf(canonicalPath: string, copies: TreeEntry[]): SkillOrigin {
+  if (!isInstalledPath(canonicalPath)) return "authored";
+  const agents = new Set(
+    copies
+      .map((c) => stripMirror(c.path).label)
+      .filter((label): label is string => label !== null),
+  );
+  return agents.size >= 2 ? "authored" : "credited";
+}
+
 /** Minimal disjoint set over paths, so grouping cannot depend on input order. */
 class UnionFind {
   private parent = new Map<string, string>();
@@ -429,12 +510,38 @@ export function discoverSkills(
     );
     return {
       entry: sorted[0],
+      origin: originOf(sorted[0].path, sorted),
       variants: sorted.slice(1).map((e) => ({
         label: stripMirror(e.path).label ?? "Alternate",
         path: e.path,
       })),
     };
   });
+
+  /*
+   * A dot tree the repo also publishes from is a mirror, not an install
+   * target. microsoft/azure-skills mirrors all of `skills/` into
+   * `.github/plugins/azure-skills/skills/`; three newer skills existed only
+   * on the `.github` side and were being credited as borrowed when they are
+   * simply unsynced chapters of the repo's own plugin. If any authored skill
+   * has a copy under the same dot root, dot-only siblings there are authored
+   * too. A repo with no authored skills at all (facebook/react) has no
+   * published roots, so this promotes nothing.
+   */
+  const publishedRoots = new Set<string>();
+  for (const c of chosen) {
+    if (c.origin !== "authored") continue;
+    for (const path of [c.entry.path, ...c.variants.map((v) => v.path)]) {
+      const root = dotRoot(path);
+      if (root) publishedRoots.add(root);
+    }
+  }
+  for (const c of chosen) {
+    const root = dotRoot(c.entry.path);
+    if (c.origin === "credited" && root && publishedRoots.has(root)) {
+      c.origin = "authored";
+    }
+  }
 
   chosen.sort((a, b) => a.entry.path.localeCompare(b.entry.path));
 
@@ -451,7 +558,7 @@ export function discoverSkills(
   const slugger = new GithubSlugger();
   const dirToSlug = new Map<string, string>();
 
-  const stubs: SkillStub[] = chosen.map(({ entry, variants }, index) => {
+  const stubs: SkillStub[] = chosen.map(({ entry, origin, variants }, index) => {
     const dir = dirname(entry.path);
     // A SKILL.md at the repo root describes the repo itself.
     const rawName = dir === "" ? repoName : basename(dir);
@@ -469,7 +576,15 @@ export function discoverSkills(
     let slug = slugger.slug(qualified);
     if (slug === "" || /^-\d+$/.test(slug)) slug = slugger.slug(`chapter-${index + 1}`);
     dirToSlug.set(dir, slug);
-    return { slug, dir, skillMdPath: entry.path, group, variants, parentSlug: null };
+    return {
+      slug,
+      dir,
+      skillMdPath: entry.path,
+      group,
+      variants,
+      parentSlug: null,
+      origin,
+    };
   });
 
   // Link nested skills (e.g. `skills/foundry/SKILL.md` encloses
@@ -719,6 +834,7 @@ export function parseSkill(
       .filter(Boolean),
     variants: stub.variants,
     parentSlug: stub.parentSlug,
+    origin: stub.origin,
     issues,
   };
 }

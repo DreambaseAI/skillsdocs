@@ -439,6 +439,91 @@ describe("extractHeadings", () => {
   });
 });
 
+describe("origin classification", () => {
+  it("credits a lone agent-dot-dir skill (convex-dev/convex uses it, did not publish it)", () => {
+    const found = discoverSkills(tree(".claude/skills/convex/SKILL.md"), "convex");
+    expect(found.map((s) => s.origin)).toEqual(["credited"]);
+  });
+
+  it("credits nested agent dirs in a monorepo (facebook/react)", () => {
+    const found = discoverSkills(
+      tree(".claude/skills/flow/SKILL.md", "compiler/.claude/skills/compiler-review/SKILL.md"),
+      "react",
+    );
+    expect(found.map((s) => s.origin)).toEqual(["credited", "credited"]);
+  });
+
+  it("keeps dot-named sections inside skills/ authored (openai/skills)", () => {
+    const found = discoverSkills(
+      tree("skills/.curated/screenshot/SKILL.md", "skills/.system/plugin-creator/SKILL.md"),
+      "skills",
+    );
+    expect(found.every((s) => s.origin === "authored")).toBe(true);
+  });
+
+  it("treats a multi-agent mirror set as publishing, not installing (pbakaus/impeccable)", () => {
+    const dirs = [".agents", ".claude", ".cursor", ".gemini", ".grok"];
+    const found = discoverSkills(
+      tree(...dirs.map((d, i) => `unique${i} ${d}/skills/impeccable/SKILL.md`)),
+      "impeccable",
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].origin).toBe("authored");
+  });
+
+  it("authors every visible layout: root, plain dir, skills/, plugins/, providers/", () => {
+    const found = discoverSkills(
+      tree(
+        "SKILL.md",
+        "prisma-cli/SKILL.md",
+        "skills/pdf/SKILL.md",
+        "plugins/expo/skills/expo-router/SKILL.md",
+        "providers/claude/plugin/skills/stripe-docs/SKILL.md",
+      ),
+      "repo",
+    );
+    expect(found.every((s) => s.origin === "authored")).toBe(true);
+  });
+
+  it("authors a dot-dir mirror whose canonical twin is visible (microsoft/azure-skills)", () => {
+    const found = discoverSkills(
+      tree("same .github/plugins/azure/skills/aks/SKILL.md", "same skills/aks/SKILL.md"),
+      "azure-skills",
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].origin).toBe("authored");
+  });
+
+  it("authors a dot-only skill whose dot tree the repo publishes from (azure-skills kusto)", () => {
+    // 37 of azure-skills' chapters mirror `skills/` into `.github/plugins/…`;
+    // three newer ones exist only on the `.github` side. They are unsynced
+    // chapters of the repo's own plugin, not borrowed skills.
+    const found = discoverSkills(
+      tree(
+        "same .github/plugins/azure/skills/aks/SKILL.md",
+        "same skills/aks/SKILL.md",
+        "solo .github/plugins/azure/skills/kusto-graph/SKILL.md",
+      ),
+      "azure-skills",
+    );
+    expect(found.map((s) => [s.slug, s.origin]).sort()).toEqual([
+      ["aks", "authored"],
+      ["kusto-graph", "authored"],
+    ]);
+  });
+
+  it("keeps a dot-only skill under a root the repo does not publish from credited", () => {
+    const found = discoverSkills(
+      tree("skills/mine/SKILL.md", ".claude/skills/borrowed/SKILL.md"),
+      "app",
+    );
+    expect(found.map((s) => [s.slug, s.origin]).sort()).toEqual([
+      ["borrowed", "credited"],
+      ["mine", "authored"],
+    ]);
+  });
+});
+
 describe("parseSkill", () => {
   const stub = {
     slug: "pdf",
@@ -447,6 +532,7 @@ describe("parseSkill", () => {
     group: "",
     variants: [],
     parentSlug: null,
+    origin: "authored" as const,
   };
 
   it("reads spec frontmatter", () => {

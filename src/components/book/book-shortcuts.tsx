@@ -42,8 +42,8 @@ export interface BookShortcutsProps {
   coverHref: string;
   /** `https://github.com/owner/repo`. */
   githubUrl: string;
-  /** `npx skills add owner/repo`. */
-  installCommand: string;
+  /** `npx skills add owner/repo`; null on a credited book, which has none. */
+  installCommand: string | null;
   /** Every chapter, in reading order. */
   chapters: BookChapterLink[];
 }
@@ -194,6 +194,12 @@ export function BookShortcuts({
   });
 
   useShortcut("copyInstall", () => {
+    if (installCommand === null) {
+      announce(
+        "No install command — this book's skills are in use here, not published from here",
+      );
+      return;
+    }
     void copyText(installCommand, "install command");
   });
 

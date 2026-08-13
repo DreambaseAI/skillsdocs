@@ -185,7 +185,16 @@ export function bookJsonLd(book: Book): Json {
     dateModified: isoDate(pushedAt),
     license: licenceHref(licence.spdx, licence.url),
     isAccessibleForFree: true,
-    author: { "@id": `${external.owner(owner)}#owner` },
+    // A credited book is the repo's *library* — claiming the owner as its
+    // author in structured data would be a lie search engines repeat.
+    author:
+      book.provenance === "credited"
+        ? undefined
+        : { "@id": `${external.owner(owner)}#owner` },
+    contributor:
+      book.provenance === "credited"
+        ? { "@id": `${external.owner(owner)}#owner` }
+        : undefined,
     publisher: { "@id": `${SITE_URL}/#publisher` },
     image: `${url}/opengraph-image`,
     isBasedOn: { "@id": `${external.repo(owner, repo)}#source` },
@@ -237,7 +246,16 @@ export function chapterJsonLd(book: Book, skill: Skill): Json {
       name: `${owner}/${repo}`,
       url: bookUrl,
     },
-    author: { "@id": `${external.owner(owner)}#owner` },
+    // A credited chapter was installed into this repo, not written by its
+    // owner; the owner appears as contributor, never author.
+    author:
+      skill.origin === "credited"
+        ? undefined
+        : { "@id": `${external.owner(owner)}#owner` },
+    contributor:
+      skill.origin === "credited"
+        ? { "@id": `${external.owner(owner)}#owner` }
+        : undefined,
     publisher: { "@id": `${SITE_URL}/#publisher` },
     image: `${url}/opengraph-image`,
     encoding: {

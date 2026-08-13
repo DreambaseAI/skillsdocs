@@ -15,6 +15,7 @@ import {
   auditIssueTheme,
   BRAND_FONT_SUBSTITUTIONS,
   deriveIssueTheme,
+  issueScope,
   issueSelector,
   issueThemeCss,
   PAPER,
@@ -361,6 +362,28 @@ describe("issueSelector", () => {
   });
 });
 
+describe("issueScope", () => {
+  it("slugifies a full name and pins the selector to its own style element", () => {
+    const scope = issueScope("kylezantos/design-motion-principles");
+    expect(scope.key).toBe("kylezantos-design-motion-principles");
+    expect(scope.selector).toBe(
+      '.book-issue:has(style[data-issue-scope="kylezantos-design-motion-principles"])',
+    );
+  });
+
+  it("neutralises a hostile full name and never emits an empty key", () => {
+    const hostile = issueScope('x"]{}html{display:none}[y="/repo');
+    expect(hostile.key).not.toMatch(/[^a-z0-9-]/);
+    expect(hostile.selector).not.toContain("{");
+    expect(issueScope("///").key).toBe("unknown");
+  });
+
+  it("stays inside issueThemeCss's selector budget", () => {
+    const long = issueScope(`${"a".repeat(60)}/${"b".repeat(60)}`);
+    expect(long.selector.length).toBeLessThanOrEqual(96);
+  });
+});
+
 describe("issueThemeCss", () => {
   const theme = deriveIssueTheme(
     "acme",
@@ -408,6 +431,17 @@ rounded: 8px
     expect(issueThemeCss(theme, "[data-issue=x]{}html{display:none}")).toBe("");
     expect(issueThemeCss(theme, "@media print")).toBe("");
     expect(issueThemeCss(theme, "</style><script>")).toBe("");
+  });
+
+  it("accepts the per-instance :has() scope", () => {
+    const scope = issueScope("TanStack/tanstack.com");
+    const scoped = issueThemeCss(theme, scope.selector);
+    expect(scoped).toContain(
+      '.book-issue:has(style[data-issue-scope="tanstack-tanstack-com"]){',
+    );
+    expect(scoped).toContain(
+      '.dark .book-issue:has(style[data-issue-scope="tanstack-tanstack-com"])',
+    );
   });
 
   it("drops any token value that is not a colour", () => {

@@ -68,14 +68,23 @@ async function probe(full: string) {
   const withIssues = skills.filter((s) => s.issues.length > 0);
   const variants = skills.filter((s) => s.variants.length > 0);
   const nested = skills.filter((s) => s.parentSlug);
+  const credited = skills.filter((s) => s.origin === "credited");
   const groups = [...new Set(skills.map((s) => s.group).filter(Boolean))];
 
   console.log(
     `\n\x1b[1m${full}\x1b[0m  (${meta.default_branch})${tree.truncated ? "  \x1b[33m[TREE TRUNCATED]\x1b[0m" : ""}`,
   );
   console.log(
-    `  skills=${skills.length}  deduped=${variants.length}  nested=${nested.length}  groups=${groups.length ? groups.join(", ") : "—"}`,
+    `  skills=${skills.length}  deduped=${variants.length}  nested=${nested.length}  credited=${credited.length}  groups=${groups.length ? groups.join(", ") : "—"}`,
   );
+  if (credited.length) {
+    console.log(
+      `  \x1b[36mcredited (path-only; skills.sh promotion happens at book assembly):\x1b[0m ${credited
+        .slice(0, 6)
+        .map((s) => s.slug)
+        .join(", ")}${credited.length > 6 ? ", …" : ""}`,
+    );
+  }
   console.log(
     `  words=${skills.reduce((n, s) => n + s.wordCount, 0)}  resources=${skills.reduce((n, s) => n + s.resources.length, 0)}`,
   );

@@ -494,6 +494,12 @@ export function document(): Record<string, unknown> {
             title: { type: "string" },
             description: { type: "string" },
             group: { type: ["string", "null"] },
+            origin: {
+              type: "string",
+              enum: ["authored", "credited"],
+              description:
+                "authored — published from this repository; credited — installed into it, in use here but written elsewhere.",
+            },
             path: { type: "string" },
             html: { type: "string", format: "uri" },
             markdown: { type: "string", format: "uri" },
@@ -543,6 +549,12 @@ export function document(): Record<string, unknown> {
             title: { type: "string" },
             description: { type: ["string", "null"] },
             issueNumber: { type: "integer", minimum: 1, maximum: 99 },
+            provenance: {
+              type: "string",
+              enum: ["authored", "credited", "mixed"],
+              description:
+                "authored — the repository publishes these skills; credited — every skill is installed into the repository (its working library), and `install` is omitted; mixed — both, with credited skills in their own part.",
+            },
             homepage: { type: "string", format: "uri" },
             markdown: { type: "string", format: "uri" },
             agentSkillsIndex: { type: "string", format: "uri" },
@@ -618,6 +630,12 @@ export function document(): Record<string, unknown> {
             title: { type: "string" },
             description: { type: "string" },
             group: { type: ["string", "null"] },
+            origin: {
+              type: "string",
+              enum: ["authored", "credited"],
+              description:
+                "authored — published from this repository; credited — installed into it, in use here but written elsewhere. Credited chapters omit `install`.",
+            },
             path: { type: "string" },
             links: {
               type: "object",

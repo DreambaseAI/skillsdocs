@@ -86,6 +86,9 @@ export async function GET(
         title: skill.title,
         description: skill.description,
         group: skill.group || null,
+        // "authored" — published from this repo; "credited" — installed into
+        // it, in use here but written elsewhere.
+        origin: skill.origin,
         path: skill.skillMdPath,
         html: chapterUrl,
         markdown: `${chapterUrl}.md`,
@@ -132,6 +135,9 @@ export async function GET(
       title: book.owner?.name ? `${book.owner.name} — ${r}` : `${o}/${r}`,
       description: book.repo.description,
       issueNumber: book.issueNumber,
+      // "authored" | "credited" | "mixed". A credited book is the repo's
+      // working library: skills installed into it, not published from it.
+      provenance: book.provenance,
       homepage: absoluteUrl(paths.book(o, r)),
       markdown: absoluteUrl(paths.bookMarkdown(o, r)),
       agentSkillsIndex: absoluteUrl(paths.bookManifest(o, r)),
@@ -182,10 +188,15 @@ export async function GET(
         displayFont: book.theme.displayFont,
         bodyFont: book.theme.bodyFont,
       },
-      install: { all: installCommand(o, r) },
+      // Omitted for a credited book: installing from here would republish
+      // other authors' skills under this repository's name.
+      ...(book.provenance !== "credited"
+        ? { install: { all: installCommand(o, r) } }
+        : {}),
       parts: book.parts.map((p) => ({
         group: p.group,
         title: p.title,
+        credited: p.credited ?? false,
         skills: p.skills.map((s) => s.slug),
       })),
       chapters,

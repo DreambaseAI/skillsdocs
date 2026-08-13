@@ -117,6 +117,37 @@ export function Colophon({
           )}
         </dd>
 
+        {book.provenance !== "authored" ? (
+          <>
+            <dt>Authorship</dt>
+            <dd>
+              {book.provenance === "credited" ? (
+                <>
+                  Every chapter in this issue is a skill{" "}
+                  <em>installed into</em> the repository — found under a single
+                  agent&rsquo;s dot directory, which is where{" "}
+                  <code>skills add</code> writes — rather than published from
+                  it. The issue is the repository&rsquo;s working library, and
+                  each skill remains the work of its own author.
+                </>
+              ) : (
+                <>
+                  {book.skills.filter((s) => s.origin === "credited").length}{" "}
+                  of {book.skills.length}{" "}
+                  {plural(book.skills.length, "chapter")} are skills installed
+                  into the repository rather than published from it. They are
+                  shelved in the closing &ldquo;Credited skills&rdquo; part and
+                  remain the work of their own authors.
+                </>
+              )}{" "}
+              A skill counts as credited when its only copy lives under one
+              agent&rsquo;s dot directory; visible directories, per-agent
+              mirror sets, and skills installable from this repository on
+              skills.sh all count as published.
+            </dd>
+          </>
+        ) : null}
+
         {variants.length > 0 ? (
           <>
             <dt>Duplicates collapsed</dt>

@@ -53,6 +53,11 @@ export function BookRail({ book, sections }: BookRailProps) {
           <Stat label="Reading time">{readingTime(book.totalReadingMinutes)}</Stat>
           <Stat label="Words">{book.totalWords.toLocaleString("en-GB")}</Stat>
           <Stat label="Stars">{compactCount(repo.stars)}</Stat>
+          {book.provenance !== "authored" ? (
+            <Stat label="Authorship">
+              {book.provenance === "credited" ? "Credited" : "Mixed"}
+            </Stat>
+          ) : null}
           {signal && signal.installs > 0 ? (
             <Stat label="Installs">{compactCount(signal.installs)}</Stat>
           ) : null}

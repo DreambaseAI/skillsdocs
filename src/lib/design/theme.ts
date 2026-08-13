@@ -376,10 +376,46 @@ export function issueSelector(owner: string): string {
 /**
  * Selectors that may be handed to `issueThemeCss`.
  *
- * Braces, angle brackets, semicolons, parentheses and `@` are all absent by
- * construction, so no value here can close the rule and open something else.
+ * Braces, angle brackets, semicolons and `@` are all absent by construction,
+ * so no value here can close the rule and open something else. Parentheses
+ * are admitted for `:has()` scoping — they cannot terminate a declaration
+ * block, start an at-rule, or open a tag, so the invariant holds.
  */
-const SAFE_SELECTOR = /^[A-Za-z0-9_\-[\]="':.#>~*\s]{1,96}$/;
+const SAFE_SELECTOR = /^[A-Za-z0-9_\-[\]="':.#>~*()\s]{1,96}$/;
+
+/**
+ * A per-book scope for the streamed theme `<style>`, immune to co-mounted
+ * neighbours.
+ *
+ * The naive scope — the shared `.book-issue` class — has a failure mode the
+ * router made real: Next keeps the previous route's tree mounted under
+ * `display: none` for instant back-navigation, and a `<style>` element keeps
+ * applying document-wide no matter how its container is displayed. Two books
+ * mounted at once meant two rules fighting for the same class, and document
+ * order (the *hidden* book, appended later) won: drill from a credited book
+ * into its origin and the new page wore the old book's colours, then swapped
+ * on the way back.
+ *
+ * `:has(style[data-issue-scope="…"])` pins each rule to the one `.book-issue`
+ * div that contains its own style element — pure CSS, so it is correct in
+ * SSR'd HTML before hydration and inside hidden trees where effects don't
+ * run. The key is slugified exactly like `issueSelector` and the attribute
+ * value is the same string, so neither side can smuggle CSS syntax.
+ */
+export function issueScope(fullName: string): {
+  /** Goes on the `<style>` element as `data-issue-scope`. */
+  key: string;
+  /** Hand this to `issueThemeCss`. */
+  selector: string;
+} {
+  const key =
+    fullName.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) ||
+    "unknown";
+  return {
+    key,
+    selector: `.book-issue:has(style[data-issue-scope="${key}"])`,
+  };
+}
 
 /** Custom-property name/value pairs, both already proven safe. */
 type Decls = Array<[string, string]>;

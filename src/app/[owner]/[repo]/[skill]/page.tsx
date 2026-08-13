@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Appendix } from "@/components/book/appendix";
+import { ChapterCredit } from "@/components/book/chapter-credit";
 import { ChapterNav } from "@/components/book/chapter-nav";
 import { ChapterOpener } from "@/components/book/chapter-opener";
 import { ChapterRail } from "@/components/book/chapter-rail";
@@ -84,7 +85,9 @@ export async function generateMetadata(
 
   const description =
     skill.description ||
-    `The ${skill.title} skill, published by ${owner}/${repo}.`;
+    `The ${skill.title} skill, ${
+      skill.origin === "credited" ? "in use in" : "published by"
+    } ${owner}/${repo}.`;
 
   return {
     title: `${skill.title} · ${owner}/${repo}`,
@@ -200,14 +203,33 @@ async function ChapterBody({
             <Appendix book={book} skill={skill} index={position} />
           </Suspense>
 
-          <div className="book-measure mt-14">
-            <p className="book-eyebrow mb-2">Install this repository</p>
-            <InstallCommand rows={installRows} />
-            <p className="book-caption mt-2">
-              Skills install per repository, not per chapter — the CLI has no
-              documented per-skill form, so we do not print one.
-            </p>
-          </div>
+          {skill.origin === "credited" ? (
+            /* A credited chapter gets no install command: `npx skills add`
+               against this repo would republish someone else's skill under
+               this owner's name. The credit is the apparatus instead. */
+            <div className="book-measure mt-14">
+              <p className="book-eyebrow mb-2">Credited</p>
+              <p className="book-caption">
+                This skill is installed in {owner}/{repo} — in use here rather
+                than published from here — so there is no install command for
+                it on this page.
+              </p>
+              {/* The verified origin, when there is one: a way to this
+                  skill's own book, where the install command lives. */}
+              <Suspense fallback={null}>
+                <ChapterCredit book={book} skill={skill} variant="line" />
+              </Suspense>
+            </div>
+          ) : (
+            <div className="book-measure mt-14">
+              <p className="book-eyebrow mb-2">Install this repository</p>
+              <InstallCommand rows={installRows} />
+              <p className="book-caption mt-2">
+                Skills install per repository, not per chapter — the CLI has no
+                documented per-skill form, so we do not print one.
+              </p>
+            </div>
+          )}
 
           <SkillApparatus book={book} skill={skill} />
 

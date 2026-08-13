@@ -35,6 +35,7 @@ import {
   titleCase,
   type Skill,
 } from "./skills";
+import { mergeSkillsLocks, type LockedSkillSource } from "./skills-lock";
 import { getRepoSignal, type RepoSignal } from "./skills-sh";
 
 export interface BookPart {
@@ -42,7 +43,20 @@ export interface BookPart {
   group: string;
   title: string;
   skills: Skill[];
+  /** True for the back-of-book part that holds installed (credited) skills. */
+  credited?: boolean;
 }
+
+/**
+ * What kind of book this is.
+ *
+ * `authored` — every skill is published from this repo (the normal case).
+ * `credited` — every skill is *installed into* this repo: the book is the
+ * repo's working library, and it credits the skills' authors rather than
+ * claiming them. `mixed` — both, with the credited skills shelved in a
+ * back-of-book part.
+ */
+export type BookProvenance = "authored" | "credited" | "mixed";
 
 export interface Book {
   repo: RepoMeta;
@@ -83,6 +97,13 @@ export interface Book {
   theme: IssueTheme;
   /** Stable masthead issue number, 1–99. See `issueNumberFor`. */
   issueNumber: number;
+  /** Whether the repo wrote these skills, installed them, or both. */
+  provenance: BookProvenance;
+  /**
+   * Committed `skills-lock.json` entries, keyed by lowercased skill name —
+   * exact install provenance for credited skills, when the repo recorded it.
+   */
+  lockSources: Record<string, LockedSkillSource>;
 }
 
 /** How many skill bodies we will pull for one book. */
@@ -159,13 +180,14 @@ export function assembleBook(input: {
   signal?: RepoSignal | null;
   marketplace?: MarketplaceInfo | null;
   theme: IssueTheme;
+  lockSources?: Record<string, LockedSkillSource>;
 }): Book {
   const { repo, entries } = input;
   const all = discoverSkills(entries, repo.repo);
   const stubs = all.slice(0, MAX_SKILLS);
 
   const unreadable: string[] = [];
-  const skills = stubs
+  const parsed = stubs
     .map((stub, i) => {
       const source = input.sources[i];
       if (source === null || source === undefined) {
@@ -175,6 +197,13 @@ export function assembleBook(input: {
       return parseSkill(stub, source, collectResources(entries, stub));
     })
     .filter((s): s is Skill => s !== null);
+
+  const skills = creditSkills(parsed, input.signal ?? null, input.marketplace ?? null);
+  const provenance: Book["provenance"] = skills.every((s) => s.origin === "authored")
+    ? "authored"
+    : skills.every((s) => s.origin === "credited")
+      ? "credited"
+      : "mixed";
 
   return {
     repo,
@@ -193,7 +222,52 @@ export function assembleBook(input: {
     marketplace: input.marketplace ?? null,
     theme: input.theme,
     issueNumber: issueNumberFor(repo.fullName),
+    provenance,
+    lockSources: input.lockSources ?? {},
   };
+}
+
+/**
+ * Finish the authored/credited call with what only the whole book knows.
+ *
+ * Path shape alone misreads one real pattern: a repo that publishes its only
+ * skill under `.claude/skills/` and is *installed from* — skills.sh lists it
+ * as a source, or it ships a plugin marketplace manifest. Being installable
+ * from is authorship, so those skills are promoted:
+ *
+ *   1. Per skill, when skills.sh records installs of that skill *from this
+ *      repo* (`perSkillInstalls`).
+ *   2. Wholesale, when every skill is dot-dir-only but the repo is on the
+ *      skills.sh leaderboard or publishes a marketplace — a book with nothing
+ *      visible to install from is still a publisher if people install it.
+ *
+ * Credited skills then shelve *after* authored ones, so chapter numbering,
+ * the cover preview and the parts all agree that the repo's own work opens
+ * the book and its library closes it.
+ */
+function creditSkills(
+  skills: Skill[],
+  signal: RepoSignal | null,
+  marketplace: MarketplaceInfo | null,
+): Skill[] {
+  const installable = new Set(
+    Object.keys(signal?.perSkillInstalls ?? {}).map((n) => n.toLowerCase()),
+  );
+  let promoted = skills.map((s) =>
+    s.origin === "credited" && installable.has(s.name.toLowerCase())
+      ? { ...s, origin: "authored" as const }
+      : s,
+  );
+
+  const allCredited = promoted.length > 0 && promoted.every((s) => s.origin === "credited");
+  if (allCredited && (signal || marketplace)) {
+    promoted = promoted.map((s) => ({ ...s, origin: "authored" as const }));
+  }
+
+  return [
+    ...promoted.filter((s) => s.origin === "authored"),
+    ...promoted.filter((s) => s.origin === "credited"),
+  ];
 }
 
 /** The SKILL.md paths a book will read, in chapter order. */
@@ -297,16 +371,28 @@ async function buildBook(
     tree.entries.some((e) => e.type === "blob" && e.path === p),
   ).map((p) => `https://raw.githubusercontent.com/${owner}/${name}/${ref}/${p}`);
 
-  const [readme, sources, marketplace, signal, theme] = await Promise.all([
-    readmePath
-      ? fetchRawText(owner, name, ref, readmePath)
-      : Promise.resolve(null),
-    fetchRawTextBatch(owner, name, ref, skillPathsFor(tree.entries, name)),
-    fetchMarketplace(owner, name, ref, tree.entries),
-    // A skills.sh outage must not cost us a book.
-    getRepoSignal(owner, name).catch(() => null),
-    resolveTheme(owner, repo.homepage, ownerMeta?.blog ?? null, repoLocalUrls),
-  ]);
+  // Committed skills-CLI locks: exact provenance for credited skills. Raw
+  // CDN reads, so a monorepo with several costs no quota.
+  const lockPaths = tree.entries
+    .filter(
+      (e) =>
+        e.type === "blob" &&
+        (e.path === "skills-lock.json" || e.path.endsWith("/skills-lock.json")),
+    )
+    .map((e) => e.path);
+
+  const [readme, sources, marketplace, signal, theme, lockTexts] =
+    await Promise.all([
+      readmePath
+        ? fetchRawText(owner, name, ref, readmePath)
+        : Promise.resolve(null),
+      fetchRawTextBatch(owner, name, ref, skillPathsFor(tree.entries, name)),
+      fetchMarketplace(owner, name, ref, tree.entries),
+      // A skills.sh outage must not cost us a book.
+      getRepoSignal(owner, name).catch(() => null),
+      resolveTheme(owner, repo.homepage, ownerMeta?.blog ?? null, repoLocalUrls),
+      fetchRawTextBatch(owner, name, ref, lockPaths),
+    ]);
 
   return assembleBook({
     repo,
@@ -318,6 +404,7 @@ async function buildBook(
     signal,
     marketplace,
     theme,
+    lockSources: mergeSkillsLocks(lockTexts),
   });
 }
 
@@ -359,8 +446,25 @@ async function resolveTheme(
 /**
  * Group skills into parts. Grouping only earns its keep when it actually
  * partitions the set — a single group, or one group per skill, is noise.
+ *
+ * In a mixed book the credited skills form their own closing part — every
+ * book ends with its citations — and only the authored skills are grouped by
+ * path. An all-credited book gets no special part: the whole book is the
+ * credit, and `Book.provenance` carries that fact.
  */
 export function groupSkills(skills: Skill[]): BookPart[] {
+  const authored = skills.filter((s) => s.origin === "authored");
+  const credited = skills.filter((s) => s.origin === "credited");
+  if (authored.length === 0 || credited.length === 0) {
+    return groupByPath(skills);
+  }
+  return [
+    ...groupByPath(authored),
+    { group: "credited", title: "Credited skills", skills: credited, credited: true },
+  ];
+}
+
+function groupByPath(skills: Skill[]): BookPart[] {
   const groups = new Set(skills.map((s) => s.group).filter(Boolean));
   const allGrouped = skills.every((s) => s.group);
 
