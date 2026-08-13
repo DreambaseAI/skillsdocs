@@ -212,9 +212,22 @@ export function isValidRepo(repo: string): boolean {
 }
 
 /**
+ * The `skills add` CLI family the site itself prints — `npx skills add …`,
+ * plus the `pnpm dlx`/`bunx` spellings. Used both to strip the wrapper before
+ * parsing and to let the homepage recognise that a paste *was* the install
+ * command, so it can teach the swap in the command's own terms.
+ */
+const INSTALL_COMMAND_RE = /^(?:npx |pnpm dlx |bunx )?skills add\s+/i;
+
+export function isInstallCommand(input: string): boolean {
+  return INSTALL_COMMAND_RE.test(input.trim());
+}
+
+/**
  * Pull `owner/repo` out of anything a reader might paste: a github.com URL, a
- * raw URL, an `npx skills add` or `/plugin marketplace add` command, or the
- * bare slug. Returns null when the input isn't a plausible repo reference.
+ * raw URL, an `npx skills add` or `/plugin marketplace add` command — with or
+ * without flags (`--skill pdf`, `-g`, `--all`) — or the bare slug. Returns
+ * null when the input isn't a plausible repo reference.
  */
 export function parseRepoReference(
   input: string
@@ -222,9 +235,26 @@ export function parseRepoReference(
   const cleaned = input
     .trim()
     .replace(/^\/?plugin\s+marketplace\s+add\s+/i, "")
-    .replace(/^(?:npx |pnpm dlx |bunx )?skills add\s+/i, "")
-    .replace(/^git\+/, "")
-    .replace(/\.git$/, "");
+    .replace(INSTALL_COMMAND_RE, "");
+
+  /*
+   * Command lines carry flags. Tokenise on whitespace, skip anything
+   * flag-shaped, and take the first token that resolves to a repo. A flag's
+   * value (`--skill remotion-best-practices`) has no slash, so it can never
+   * outrank the repo argument regardless of where the flag sits.
+   */
+  for (const token of cleaned.split(/\s+/)) {
+    if (!token || token.startsWith("-")) continue;
+    const ref = parseSingleReference(token);
+    if (ref) return ref;
+  }
+  return null;
+}
+
+function parseSingleReference(
+  token: string
+): { owner: string; repo: string } | null {
+  const cleaned = token.replace(/^git\+/, "").replace(/\.git$/, "");
 
   /*
    * The scheme is optional on every host pattern.

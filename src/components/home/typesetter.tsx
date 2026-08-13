@@ -11,7 +11,14 @@
  * search. Without JavaScript everything goes to search, which puts a link to
  * the book at the top of the results. Pasted `npx skills add …` and
  * `/plugin marketplace add …` lines parse too — `parseRepoReference` strips
- * every wrapper the caption promises.
+ * every wrapper (and any flags) the caption promises.
+ *
+ * A paste that resolves to a repo is rewritten to the bare `owner/repo` in
+ * place, so the display line always reads as one coherent address instead of
+ * `github.com/https://github.com/…`. When the paste was the install command
+ * itself, the static prefix switches from `github.com/` to `npx skills add`,
+ * teaching the swap in the command's own terms. Paste only — rewriting on
+ * change would yank text out from under a typing reader's caret.
  */
 
 import { ArrowRight02Icon } from "@hugeicons/core-free-icons";
@@ -20,7 +27,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useState } from "react";
 import { announce } from "@/components/chrome/live-regions";
 import { capture } from "@/lib/analytics";
-import { parseRepoReference, paths } from "@/lib/site";
+import { isInstallCommand, parseRepoReference, paths } from "@/lib/site";
 
 export interface TypesetterProps {
   /** The repo the empty field opens, and the ghost text in it. */
@@ -43,8 +50,30 @@ export function Typesetter({
   // event and so the status line stays quiet until they type.
   const [value, setValue] = useState(`${exampleOwner}/${exampleRepo}`);
   const [dirty, setDirty] = useState(false);
+  // True after an `npx skills add …` paste: the static prefix reads
+  // `npx skills add` instead of `github.com/` until the field is cleared.
+  const [installPrefix, setInstallPrefix] = useState(false);
   const parsed = parseRepoReference(value);
   const typing = value.trim().length > 0;
+
+  /**
+   * A paste that resolves to a repo collapses to the bare `owner/repo`, so
+   * `npx skills add https://github.com/remotion-dev/skills --skill x` lands
+   * as `remotion-dev/skills`. Only ever on paste — a change handler doing
+   * this would rewrite half-typed input out from under the caret.
+   */
+  const paste = useCallback(
+    (event: React.ClipboardEvent<HTMLInputElement>) => {
+      const text = event.clipboardData.getData("text");
+      const ref = parseRepoReference(text);
+      if (!ref) return;
+      event.preventDefault();
+      setDirty(true);
+      setInstallPrefix(isInstallCommand(text));
+      setValue(`${ref.owner}/${ref.repo}`);
+    },
+    []
+  );
 
   /**
    * The destination changes on every keystroke, so announcing it live would
@@ -91,7 +120,9 @@ export function Typesetter({
           aria-hidden
           className="font-display text-ink-muted/60 shrink-0 text-[clamp(1.4rem,3.4vw,2.125rem)] leading-none"
         >
-          github.com/
+          {/* Non-breaking space: a trailing normal space collapses against the
+              flex item boundary and the command runs into the slug. */}
+          {installPrefix ? "npx skills add\u00A0" : "github.com/"}
         </span>
         {/* `field-sizing-content` shrink-wraps the input to its text so the
             resting caret sits right after the last glyph; the `size` attribute
@@ -110,7 +141,10 @@ export function Typesetter({
           onChange={(event) => {
             setDirty(true);
             setValue(event.target.value);
+            // An emptied field starts over as an address, not a command.
+            if (event.target.value.trim() === "") setInstallPrefix(false);
           }}
+          onPaste={paste}
           placeholder="org/repo"
           size={Math.max(value.length, 8)}
           aria-describedby={status ? `${hintId} ${statusId}` : hintId}

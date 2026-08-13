@@ -7,7 +7,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { isValidOwner, isValidRepo, parseRepoReference } from "./site";
+import {
+  isInstallCommand,
+  isValidOwner,
+  isValidRepo,
+  parseRepoReference,
+} from "./site";
 
 /** Kept in step with `EXAMPLES` in `components/home/repo-swap-field.tsx`. */
 const HOMEPAGE_EXAMPLES = [
@@ -67,6 +72,23 @@ describe("parseRepoReference", () => {
     }
   });
 
+  it("parses install commands wrapping a full URL, flags and all", () => {
+    // What `skills.sh` puts on the clipboard: the command, a URL, sometimes
+    // flags. The flag's value must never be mistaken for the repo.
+    for (const input of [
+      "npx skills add https://github.com/remotion-dev/skills",
+      "npx skills add https://github.com/remotion-dev/skills --skill remotion-best-practices",
+      "npx skills add remotion-dev/skills -g",
+      "npx skills add --all remotion-dev/skills",
+      "bunx skills add remotion-dev/skills --all --skill foo",
+    ]) {
+      expect(parseRepoReference(input), input).toEqual({
+        owner: "remotion-dev",
+        repo: "skills",
+      });
+    }
+  });
+
   it("refuses things that are not repository references", () => {
     for (const input of ["", "not a repo!!!", "anthropics", "https://example.com/a/b"]) {
       expect(parseRepoReference(input), input).toBeNull();
@@ -77,6 +99,23 @@ describe("parseRepoReference", () => {
     expect(parseRepoReference("github.com")).toBeNull();
     expect(isValidOwner("github.com")).toBe(false);
     expect(isValidRepo("skills.md")).toBe(true);
+  });
+});
+
+describe("isInstallCommand", () => {
+  // The homepage swaps its `github.com/` prefix for `npx skills add` on
+  // paste, keyed off this predicate.
+  it("recognises the skills add family", () => {
+    expect(isInstallCommand("npx skills add remotion-dev/skills")).toBe(true);
+    expect(isInstallCommand("  pnpm dlx skills add a/b --all")).toBe(true);
+    expect(isInstallCommand("bunx skills add a/b")).toBe(true);
+    expect(isInstallCommand("skills add a/b")).toBe(true);
+  });
+
+  it("rejects plain references", () => {
+    expect(isInstallCommand("github.com/anthropics/skills")).toBe(false);
+    expect(isInstallCommand("anthropics/skills")).toBe(false);
+    expect(isInstallCommand("/plugin marketplace add a/b")).toBe(false);
   });
 });
 
