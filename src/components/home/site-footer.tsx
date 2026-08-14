@@ -77,7 +77,7 @@ export function SiteFooter() {
               {SITE_NAME}
             </p>
             <p className="text-ink-muted mt-3 text-sm leading-relaxed">
-              Every chapter is republished verbatim, with its own licence and a link to the
+              Every skill is republished verbatim, with its own licence and a link to the
               upstream repository. We never edit a skill&rsquo;s words.
             </p>
           </div>

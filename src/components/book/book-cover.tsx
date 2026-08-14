@@ -5,11 +5,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AllChaptersLink } from "@/components/book/all-chapters-link";
 import { ChapterCredit } from "@/components/book/chapter-credit";
+import { SkillsPreview } from "@/components/book/skills-preview";
 import { CreditedRibbon } from "@/components/book/credited-ribbon";
 import { InlineMarkup } from "@/components/book/deck";
 import {
   editorialDate,
-  folio,
   licenceLabel,
   plural,
   readingTime,
@@ -218,7 +218,7 @@ export function BookCoverSpread({ book }: BookCoverProps) {
               ) : (
                 <>
                   {chapters - creditedCount}{" "}
-                  {plural(chapters - creditedCount, "chapter")}
+                  {plural(chapters - creditedCount, "skill")}
                   {creditedCount > 0 ? <> + {creditedCount} credited</> : null}
                 </>
               )}
@@ -302,7 +302,7 @@ export function BookCoverSpread({ book }: BookCoverProps) {
                 id="spread-chapters"
                 className={cn(MONO_LABEL, "text-issue-accent")}
               >
-                2 — Chapters
+                2 — Skills
               </h2>
               <span className={cn(MONO_LABEL, "text-ink-muted")}>
                 {credited ? (
@@ -324,58 +324,39 @@ export function BookCoverSpread({ book }: BookCoverProps) {
               </span>
             </div>
 
-            <ol className="mt-1">
-              {preview.map((skill, index) => (
-                <li key={skill.slug} className="border-rule/80 border-b">
-                  <Link
-                    href={paths.chapter(repo.owner, repo.repo, skill.slug)}
-                    className="group/ch hover:bg-paper-raised/60 grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-baseline gap-x-4 py-4 transition-colors"
-                  >
-                    <span
-                      className="text-issue-accent font-mono text-[0.78rem] font-medium"
-                      aria-hidden
-                    >
-                      {folio(index + 1)}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="font-display text-ink-strong group-hover/ch:text-issue-accent block text-[1.35rem] leading-snug tracking-[-0.012em] text-balance transition-colors">
-                        {skill.title}
-                        {/* Marked per row only in a mixed book — on a credited
-                            edition the whole spread already says it. */}
-                        {skill.origin === "credited" && !credited ? (
-                          <span
-                            className={cn(
-                              MONO_LABEL,
-                              "text-ink-muted ml-2.5 align-middle text-[0.56rem]"
-                            )}
-                          >
-                            Credited
-                          </span>
-                        ) : null}
-                      </span>
-                      {skill.description ? (
-                        <span className="text-ink-muted mt-1 block text-sm leading-snug text-pretty">
-                          <InlineMarkup text={dekOf(skill.description, 110)} />
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="text-ink-muted font-mono text-[0.72rem] tabular-nums">
-                      {shortReadingTime(skill.readingMinutes)}
-                    </span>
-                  </Link>
-                  {/* A credited chapter's origin, when it verified: the
-                      origin's mark and accent, deep-linking to this skill in
-                      its own book. A sibling of the row link, never nested
-                      inside it, and streamed so the lookup cannot hold up
-                      the spread. */}
-                  {skill.origin === "credited" ? (
-                    <Suspense fallback={null}>
+            {/* Client list: bookmarked skills claim the preview's slots
+                first, the rest fill from the top of the book. The credit
+                nodes — a streamed server lookup each — are rendered here for
+                the default rows only and handed in by slug. */}
+            <SkillsPreview
+              owner={repo.owner}
+              repo={repo.repo}
+              credited={credited}
+              max={PREVIEW_CHAPTERS}
+              skills={book.skills.map((skill, index) => ({
+                slug: skill.slug,
+                title: skill.title,
+                dek: skill.description ? dekOf(skill.description, 110) : null,
+                minutes: skill.readingMinutes,
+                origin: skill.origin,
+                position: index + 1,
+              }))}
+              credits={Object.fromEntries(
+                preview
+                  .filter((skill) => skill.origin === "credited")
+                  .map((skill) => [
+                    skill.slug,
+                    /* A credited chapter's origin, when it verified: the
+                       origin's mark and accent, deep-linking to this skill in
+                       its own book. A sibling of the row link, never nested
+                       inside it, and streamed so the lookup cannot hold up
+                       the spread. */
+                    <Suspense key={skill.slug} fallback={null}>
                       <ChapterCredit book={book} skill={skill} />
-                    </Suspense>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
+                    </Suspense>,
+                  ])
+              )}
+            />
 
             {chapters > preview.length ? (
               <AllChaptersLink chapters={chapters} />

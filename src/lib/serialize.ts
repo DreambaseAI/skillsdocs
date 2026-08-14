@@ -532,7 +532,7 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
     `**${owner}/${name}** — every Agent Skill in this repository, inlined verbatim.`,
     "",
     `Canonical HTML: ${bookUrl}`,
-    `Per-chapter Markdown: ${absoluteUrl(paths.book(owner, name))}/<skill>.md`,
+    `Per-skill Markdown: ${absoluteUrl(paths.book(owner, name))}/<skill>.md`,
     `Machine manifest: ${absoluteUrl(paths.bookManifest(owner, name))}`,
     `JSON: ${absoluteUrl(paths.bookJson(owner, name))}`,
     // A repository with no SKILL.md has nothing to install; printing the
@@ -610,7 +610,7 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
     ? [
         "## Licence notice",
         "",
-        `${withheld.length} of ${book.skills.length} chapters in this book have no licence that we could detect, at either the repository or the skill level. Their bodies are **not** reproduced here and they are **not** listed in the Agent Skills manifest. Read them upstream:`,
+        `${withheld.length} of ${book.skills.length} skills in this book have no licence that we could detect, at either the repository or the skill level. Their bodies are **not** reproduced here and they are **not** listed in the Agent Skills manifest. Read them upstream:`,
         "",
         withheld
           .map(
@@ -622,7 +622,7 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
     : "";
 
   const stats = bullets([
-    { label: "Chapters", value: String(book.skills.length) },
+    { label: "Skills", value: String(book.skills.length) },
     ...(book.provenance !== "authored"
       ? [
           {
@@ -630,7 +630,7 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
             value:
               book.provenance === "credited"
                 ? "credited — skills in use in this repository, not published from it"
-                : `mixed — ${book.skills.filter((s) => s.origin === "credited").length} of ${book.skills.length} chapters are credited skills in use here`,
+                : `mixed — ${book.skills.filter((s) => s.origin === "credited").length} of ${book.skills.length} are credited — skills in use here, not published from here`,
           },
         ]
       : []),
@@ -642,7 +642,7 @@ export function bookToMarkdown(book: Book, options: SerializeOptions = {}): stri
       ? [
           {
             label: "Warning",
-            value: "GitHub truncated this repository's tree; chapters may be missing.",
+            value: "GitHub truncated this repository's tree; skills may be missing.",
           },
         ]
       : []),
@@ -811,9 +811,9 @@ export function skillToMarkdown(
 
   const head = (redistributable: boolean): string =>
     blockquote([
-      `**${skill.name}** — chapter ${position} of ${book.skills.length} in [${owner}/${name}](${absoluteUrl(paths.book(owner, name))}).`,
+      `**${skill.name}** — skill ${position} of ${book.skills.length} in [${owner}/${name}](${absoluteUrl(paths.book(owner, name))}).`,
       "",
-      `Book (all chapters, one file): ${absoluteUrl(paths.bookMarkdown(owner, name))}`,
+      `Book (all skills, one file): ${absoluteUrl(paths.bookMarkdown(owner, name))}`,
       `Machine manifest: ${absoluteUrl(paths.bookManifest(owner, name))}`,
       skill.origin === "credited"
         ? "Origin: credited — this skill is installed into this repository and in use here, not published from it, so there is no install command."
@@ -828,7 +828,7 @@ export function skillToMarkdown(
       "",
       redistributable
         ? `Content © its authors, served unmodified. Takedown: ${TAKEDOWN_CONTACT}`
-        : `Content © its authors. This chapter's body is not served here; the links above are. Takedown: ${TAKEDOWN_CONTACT}`,
+        : `Content © its authors. This skill's body is not served here; the links above are. Takedown: ${TAKEDOWN_CONTACT}`,
     ]);
 
   if (!licence.redistributable) {
@@ -889,7 +889,7 @@ export function siteLlmsTxt({ featured }: LlmsTxtInput): string {
 > Any GitHub repository containing Agent Skills (\`SKILL.md\` files), rendered as a
 > typeset book at ${SITE_URL}/<owner>/<repo>. Every page is available as clean
 > Markdown by appending \`.md\` to its URL, or by sending \`Accept: text/markdown\`.
-> One repository is one issue; one \`SKILL.md\` is one chapter.
+> One repository is one issue; one \`SKILL.md\` is one skill — a chapter of the book.
 
 Content served here is mirrored from public GitHub repositories and is owned by its
 original authors under the licence declared in each repository. Skill bodies are served
@@ -900,7 +900,7 @@ detectable licence is linked but never inlined. Takedown: ${TAKEDOWN_CONTACT}.
 URL patterns:
 
 - \`/<owner>/<repo>\` — the book: cover, table of contents, colophon
-- \`/<owner>/<repo>/<skill>\` — a chapter: one skill
+- \`/<owner>/<repo>/<skill>\` — one skill
 - Append \`.md\` to either for Markdown; \`/<owner>/<repo>.md\` is that book's full text
 - \`/<owner>/<repo>/.well-known/agent-skills/index.json\` — installable manifest with sha256 digests
 
@@ -924,12 +924,12 @@ ${list([
   {
     name: "Book JSON",
     url: absoluteUrl("/api/v1/books/{owner}/{repo}"),
-    note: "Book manifest: chapters, digests, licence, install commands.",
+    note: "Book manifest: skills, digests, licence, install commands.",
   },
   {
-    name: "Chapter JSON",
+    name: "Skill JSON",
     url: absoluteUrl("/api/v1/books/{owner}/{repo}/skills/{skill}"),
-    note: "One chapter, with its verbatim content and outline.",
+    note: "One skill, with its verbatim content and outline.",
   },
   {
     name: "Search",
@@ -959,7 +959,7 @@ ${list([
   {
     name: "Sitemap",
     url: absoluteUrl("/sitemap.xml"),
-    note: "Every indexed book and chapter.",
+    note: "Every indexed book and skill.",
   },
   {
     name: "Agent Skills specification",
@@ -1079,7 +1079,7 @@ license: MIT
 # ${SITE_NAME}
 
 ${SITE_URL} renders any GitHub repository that contains \`SKILL.md\` files as a book:
-one repository is one issue, one \`SKILL.md\` is one chapter. Every surface has a
+one repository is one issue, one \`SKILL.md\` is one skill — a chapter of the book. Every surface has a
 machine-readable twin, so you never need to clone or scrape HTML.
 
 ## The one rule
@@ -1091,10 +1091,10 @@ prefer content negotiation.
 ## Reading a repository you already know
 
 1. \`GET ${SITE_URL}/<owner>/<repo>.md\` — the whole book: repository README plus every
-   chapter, bodies verbatim with their YAML frontmatter intact, in reading order.
-2. \`GET ${SITE_URL}/<owner>/<repo>/<skill>.md\` — one chapter, when you know the slug.
+   skill, bodies verbatim with their YAML frontmatter intact, in reading order.
+2. \`GET ${SITE_URL}/<owner>/<repo>/<skill>.md\` — one skill, when you know the slug.
 3. \`GET ${SITE_URL}/<owner>/<repo>/.well-known/agent-skills/index.json\` — a discovery
-   manifest with one entry per chapter. Each entry carries \`url\` + \`digest\` (sha256 of
+   manifest with one entry per skill. Each entry carries \`url\` + \`digest\` (sha256 of
    the exact bytes served at \`url\`) and \`source\` + \`sourceDigest\` (sha256 of the raw
    upstream \`SKILL.md\` on raw.githubusercontent). Verify whichever pair you fetch
    before writing a skill to disk; the two digests differ because our \`.md\` twin
@@ -1126,8 +1126,8 @@ Do not invent a per-skill install argument. To install a single skill, fetch its
 ## JSON, if you want structure instead of prose
 
 - \`GET ${SITE_URL}/api/v1/books\` — the whole catalog, paginated (\`limit\`, \`cursor\`).
-- \`GET ${SITE_URL}/api/v1/books/<owner>/<repo>\` — chapters, digests, licence, stats.
-- \`GET ${SITE_URL}/api/v1/books/<owner>/<repo>/skills/<skill>\` — one chapter with its
+- \`GET ${SITE_URL}/api/v1/books/<owner>/<repo>\` — skills, digests, licence, stats.
+- \`GET ${SITE_URL}/api/v1/books/<owner>/<repo>/skills/<skill>\` — one skill with its
   content and heading outline.
 - \`GET ${SITE_URL}/api/v1/openapi.json\` — the full OpenAPI 3.1 description.
 - \`GET ${SITE_URL}/api/v1/health\` — liveness and the upstream GitHub rate-limit budget.
@@ -1138,8 +1138,8 @@ Do not invent a per-skill install argument. To install a single skill, fetch its
 
 Content is mirrored from public repositories and owned by its authors. A skill with no
 detectable licence is linked but never inlined, and it is omitted from the discovery
-manifest — if a chapter's body is missing, that is why, and the upstream URL is in the
-response. Preserve the attribution block when you quote a chapter.
+manifest — if a skill's body is missing, that is why, and the upstream URL is in the
+response. Preserve the attribution block when you quote a skill.
 `;
 
 export function siteAgentSkills(digest: string): AgentSkillsManifest {

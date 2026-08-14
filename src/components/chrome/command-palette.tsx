@@ -116,7 +116,7 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
   );
 
   const chaptersGroup = chapters.length > 0 && (
-    <CommandGroup heading="Chapters">
+    <CommandGroup heading="Skills">
       {chapters.map((hit) => (
         <CommandItem
           key={hit.doc.href}
@@ -216,7 +216,7 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
           <Command
             shouldFilter={false}
             loop
-            label="Search chapters, books, or paste a repo URL"
+            label="Search skills, books, or paste a repo URL"
             className="bg-transparent"
           >
             {/* cmdk renders a visually-hidden <label> and points the input's
@@ -229,7 +229,7 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
               ref={inputRef}
               value={query}
               onValueChange={setQuery}
-              placeholder="Search chapters, books, or paste a repo URL…"
+              placeholder="Search skills, books, or paste a repo URL…"
             />
 
             <CommandList className="max-h-[58vh] px-1 pb-1">
@@ -278,7 +278,7 @@ export function CommandPalette({ docs, className }: CommandPaletteProps) {
                     }
                   >
                     <HugeiconsIcon icon={Search01Icon} aria-hidden />
-                    Search every chapter for “{query.trim()}”
+                    Search every skill for “{query.trim()}”
                   </CommandItem>
                 </CommandGroup>
               )}

@@ -143,7 +143,7 @@ export function ChapterAnnouncer({
   total: number;
 }) {
   useEffect(() => {
-    announce(`Chapter ${index} of ${total}: ${chapter}`);
+    announce(`Skill ${index} of ${total}: ${chapter}`);
   }, [chapter, index, total]);
 
   return null;

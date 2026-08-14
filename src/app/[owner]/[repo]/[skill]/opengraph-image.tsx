@@ -16,7 +16,7 @@ import { findSkill, getBook } from "@/lib/book";
 import { formatHex, parseColor } from "@/lib/color";
 import { SITE_NAME } from "@/lib/site";
 
-export const alt = "Agent Skill chapter";
+export const alt = "Agent Skill";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -101,7 +101,7 @@ async function cardFor(
       book: `${owner}/${repo}`,
       part: null,
       title: slug,
-      description: "An Agent Skill, rendered as a chapter.",
+      description: "An Agent Skill, typeset for reading.",
       position: null,
       total: null,
       minutes: null,
@@ -119,7 +119,7 @@ export default async function Image({
   const { owner, repo, skill } = await params;
   const card = await cardFor(owner, repo, skill);
   if (!card) {
-    return new Response("No such chapter.", {
+    return new Response("No such skill.", {
       status: 404,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
@@ -127,7 +127,7 @@ export default async function Image({
 
   const eyebrow = [card.book, card.part].filter(Boolean).join("  ·  ");
   const footer = [
-    card.position && card.total ? `Chapter ${card.position} of ${card.total}` : null,
+    card.position && card.total ? `Skill ${card.position} of ${card.total}` : null,
     card.minutes ? `${card.minutes} min read` : null,
   ].filter((s): s is string => s !== null);
 

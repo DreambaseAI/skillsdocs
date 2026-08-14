@@ -11,12 +11,12 @@ import { cn } from "@/lib/utils";
 /**
  * The install panel.
  *
- * Only `npx skills add <owner>/<repo>` and, when the repo publishes a plugin
- * manifest, `/plugin marketplace add <owner>/<repo>` are ever offered — those
- * are the two forms observed in the wild. A per-skill install form exists in
- * nobody's documented CLI, so we do not invent one and put it on a copy
- * button where a reader would paste it into a terminal and be told it is not
- * a command.
+ * Three forms are ever offered, all documented: `npx skills add
+ * <owner>/<repo>`, the per-skill `… --skill <name>` variant (the CLI's own
+ * README documents the flag; see `skillInstallCommand` in `src/lib/site.ts`),
+ * and — when the repo publishes a plugin manifest — `/plugin marketplace add
+ * <owner>/<repo>`. Never the bare `owner/repo/<skill>` form: the CLI parses
+ * that as a subpath, not a skill name.
  */
 
 export interface InstallRow {

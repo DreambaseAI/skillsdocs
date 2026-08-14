@@ -56,7 +56,7 @@ export function SubchapterOpener({ loaded, number }: SubchapterOpenerProps) {
           >
             <span aria-hidden="true">↖</span>
             <span className="truncate">
-              Chapter {folio(skill.index)} · {skill.title}
+              Skill {folio(skill.index)} · {skill.title}
             </span>
           </Link>
         </p>
@@ -303,7 +303,7 @@ export function SubchapterNav({ loaded }: { loaded: LoadedResource }) {
           <NeighbourLink neighbour={prev} direction="prev" />
         ) : (
           <span className="book-chapternav__link">
-            <span className="book-eyebrow">First file of the chapter</span>
+            <span className="book-eyebrow">First file of the skill</span>
             <Link
               href={skill.href}
               className="book-chapternav__title hover:text-issue-accent underline-offset-4 hover:underline"
@@ -317,7 +317,7 @@ export function SubchapterNav({ loaded }: { loaded: LoadedResource }) {
           <NeighbourLink neighbour={next} direction="next" />
         ) : (
           <span className="book-chapternav__link book-chapternav__link--next">
-            <span className="book-eyebrow">Last file of the chapter</span>
+            <span className="book-eyebrow">Last file of the skill</span>
             <Link
               href={skill.href}
               className="book-chapternav__title hover:text-issue-accent underline-offset-4 hover:underline"

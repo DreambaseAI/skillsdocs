@@ -49,7 +49,7 @@ One repo = one **issue** of a magazine / one **book**. One `SKILL.md` = one **ch
 
 **DECISION — domain.** `skillsdocs.com`. The a11y research assumed `githubskills.book`; `.book` is an Amazon-controlled brand gTLD not generally registrable. Every `@id`, `metadataBase`, `llms.txt` URL, and OG image reads `SITE_URL` — **never a string literal.** One constant, one change.
 
-**DECISION — install command.** `npx skills add <owner>/<repo>` is the only form **verified in the wild** (observed verbatim in `supabase/agent-skills`, `coinbase/agentic-wallet-skills`, `resend/design-skills` READMEs). The per-skill form `npx skills add <owner>/<repo>/<skill>` is unverified — do **not** ship it in OG images or copy buttons. Chapter pages show the repo-level command plus a "Copy skill path" secondary action.
+**DECISION — install command.** `npx skills add <owner>/<repo>` is the repo form, **verified in the wild** (observed verbatim in `supabase/agent-skills`, `coinbase/agentic-wallet-skills`, `resend/design-skills` READMEs). The per-skill form is `… --skill <name>` — documented in the CLI's own README (`vercel-labs/skills`, "Options"/"Examples"); the name is matched case-insensitively against frontmatter `name` with directory-basename fallback (`Skill.name`, never the URL slug), quoted when it contains spaces (`skillInstallCommand()` in `src/lib/site.ts`). The bare three-segment form `npx skills add <owner>/<repo>/<skill>` is **not** a per-skill install — the CLI parses it as a repo-relative subpath — so never print it. Skill pages show the per-skill command first, then the repo-level command.
 
 ## 1.3 Route map
 
@@ -1282,7 +1282,7 @@ Featured grid from `SEED_REPOS` merged with the live leaderboard; `weeklyInstall
 | 16 | Font loading for 12+ selectable families | **Variable fonts only, exactly 3 preloaded, rest `preload:false` + CSS-variable swap. No `@fontsource` for anything Google Fonts carries.** | 10+ preload tags on every page is 200–400 KB of wasted blocking fetches; fontsource forfeits fallback-metric generation. |
 | 17 | Brand fonts at request time | **Match against a build-time Google Fonts snapshot; swap only to pre-declared families; otherwise substitute and note it in the colophon. Never inject a runtime font `<link>`.** | Avoids a third-party CSP origin and an attacker-controlled string in `<head>`. |
 | 18 | Domain | **`skillsdocs.com`, read from `SITE_URL`.** | `.book` is not generally registrable; one constant means one change. |
-| 19 | Install command | **`npx skills add <owner>/<repo>` only.** | The per-skill form is unverified; only the repo form is observed in the wild. |
+| 19 | Install command | **`npx skills add <owner>/<repo>` for a repo; `… --skill <name>` for one skill (by `Skill.name`, quoted if spaced).** | Both documented in the CLI README; the bare `owner/repo/<skill>` form is a subpath, never a skill install. |
 | 20 | `SkillResource` vs `SkillFile` | **Keep `SkillResource`; add `SkillFile` as an alias; new code uses `SkillFile`.** | The shipped name wins; the alias avoids a pointless rename. |
 | 21 | Bionic Reading | **Deferred to P4, self-implemented, named "Fixation emphasis", default off, CI grep bans the word.** | Patent + trademark + commercial-use prohibition, and weak efficacy evidence. |
 

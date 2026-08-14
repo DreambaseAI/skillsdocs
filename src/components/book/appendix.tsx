@@ -110,13 +110,13 @@ export async function Appendix({ book, skill, index }: AppendixProps) {
           <>
             Everything this skill ships beside its prose.{" "}
             {numbered.length === skill.resources.length ? (
-              <>All of it is set here, as {plural(numbered.length, "a subchapter", "subchapters")} of chapter {index}.</>
+              <>All of it is set here, as {plural(numbered.length, "a subchapter", "subchapters")} of skill {index}.</>
             ) : (
               <>
                 {numbered.length}{" "}
                 {plural(numbered.length, "of them is", "of them are")} set here
                 as {plural(numbered.length, "a subchapter", "subchapters")} of
-                chapter {index}; the other {omitted.length}{" "}
+                skill {index}; the other {omitted.length}{" "}
                 {plural(omitted.length, "is", "are")} described rather than
                 reproduced.
               </>

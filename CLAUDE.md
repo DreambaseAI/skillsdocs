@@ -71,7 +71,8 @@ it — though it is readable at its URL immediately.
 
 ## Data model
 
-One repo = one issue. One `SKILL.md` = one chapter.
+One repo = one issue. One `SKILL.md` = one skill (the UI says "skill", never
+"chapter"; internal identifiers still use the old `chapter` names).
 
 Discovery is deliberately layout-agnostic — `skills/<slug>/SKILL.md` is only 38%
 of real files across the 157 repos surveyed. Any directory containing a

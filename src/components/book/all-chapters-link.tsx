@@ -43,7 +43,7 @@ export function AllChaptersLink({ chapters }: { chapters: number }) {
       }}
       className="text-ink hover:text-issue-accent flex w-full cursor-pointer items-center justify-between gap-4 pt-4 text-sm font-medium transition-colors"
     >
-      All {chapters} chapters
+      All {chapters} skills
       <span aria-hidden>→</span>
     </button>
   );

@@ -23,14 +23,14 @@ export default function BookNotFound() {
         icon={SearchRemoveIcon}
       >
         <p className="book-standfirst">
-          Either GitHub has no public repository at this path, or the chapter
+          Either GitHub has no public repository at this path, or the skill
           you asked for is not in this book.
         </p>
         <p>
-          Chapter addresses come from the skill&rsquo;s own directory name, and
-          they change when a repository is reorganised — an old link can outlive
+          A skill&rsquo;s address comes from its own directory name, and
+          it changes when a repository is reorganised — an old link can outlive
           the file it pointed at. Opening the issue&rsquo;s cover will show
-          every chapter it currently has.
+          every skill it currently has.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <Button nativeButton={false} render={<Link href="/" />}>Browse {SITE_NAME}</Button>

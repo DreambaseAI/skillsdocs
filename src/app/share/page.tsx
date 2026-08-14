@@ -179,7 +179,7 @@ async function SharedShelf({
                 boards it takes is the browser's business, not a fact. */}
             <p className={`${MONO_LABEL} text-ink-muted mt-2.5`}>
               {rows.length} {rows.length === 1 ? "book" : "books"}
-              {chapters > 0 ? <> · {chapters.toLocaleString("en-GB")} chapters</> : null}
+              {chapters > 0 ? <> · {chapters.toLocaleString("en-GB")} skills</> : null}
             </p>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BookmarkMark } from "@/components/book/bookmark";
 import { folio, plural } from "@/components/book/format";
 import {
   clusterFiles,
@@ -96,7 +97,7 @@ export function BookContentsList({
 
   return (
     <nav
-      aria-label="Chapters"
+      aria-label="Skills"
       className={cn(inSheet && "pb-8")}
       id={inSheet ? undefined : "book-rail-contents"}
       // Programmatically focusable: the spread's "All N chapters" control
@@ -170,6 +171,12 @@ export function BookContentsList({
                         ) : null}
                         {stripped ?? skill.title}
                       </span>
+                      <BookmarkMark
+                        owner={owner}
+                        repo={repo}
+                        slug={skill.slug}
+                        className="ms-auto self-center ps-1"
+                      />
                     </Link>
 
                     {/* Only the chapter you are in expands. Every chapter
@@ -194,7 +201,7 @@ export function BookContentsList({
       })}
 
       <p className="book-caption border-rule mt-5 border-t pt-3">
-        {book.skills.length} {plural(book.skills.length, "chapter")} ·{" "}
+        {book.skills.length} {plural(book.skills.length, "skill")} ·{" "}
         {book.totalReadingMinutes} min
       </p>
     </nav>

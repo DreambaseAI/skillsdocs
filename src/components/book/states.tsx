@@ -112,7 +112,7 @@ export function EmptyBook({
 }: EmptyBookProps) {
   return (
     <StateFrame
-      eyebrow="No chapters"
+      eyebrow="No skills"
       title="This repository publishes no skills"
       icon={BookOpen01Icon}
       avatar={avatar}

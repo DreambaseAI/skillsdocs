@@ -1,3 +1,4 @@
+import { BookmarkButton } from "@/components/book/bookmark";
 import { Deck } from "@/components/book/deck";
 import { folio, readingTime } from "@/components/book/format";
 import { EditorNote } from "@/components/book/editor-note";
@@ -37,16 +38,27 @@ export function ChapterOpener({ book, skill, index }: ChapterOpenerProps) {
 
   return (
     <header className="book-opener book-measure">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <p className="book-eyebrow book-eyebrow--accent m-0">{eyebrow}</p>
-        <p className="book-opener__folio m-0">
-          <span aria-hidden="true">
-            {folio(index)} / {folio(book.skills.length)}
-          </span>
-          <span className="sr-only">
-            Chapter {index} of {book.skills.length}
-          </span>
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="book-opener__folio m-0">
+            <span aria-hidden="true">
+              {folio(index)} / {folio(book.skills.length)}
+            </span>
+            <span className="sr-only">
+              Skill {index} of {book.skills.length}
+            </span>
+          </p>
+          {/* The ribbon: bookmarking this skill also stars the book, so the
+              shelf always holds the bookmark's home. */}
+          <BookmarkButton
+            owner={book.repo.owner}
+            repo={book.repo.repo}
+            slug={skill.slug}
+            title={skill.title}
+            className="-my-1.5"
+          />
+        </div>
       </div>
 
       <h1 id="chapter-title" className="book-opener__title mt-3">{skill.title}</h1>

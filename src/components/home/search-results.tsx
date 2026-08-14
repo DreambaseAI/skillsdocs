@@ -139,7 +139,7 @@ export function SearchResults({ hits, query }: { hits: SearchHit[]; query: strin
                     className="border-rule/50 hover:bg-paper-raised/60 group/hit relative border-b py-3.5 pr-2 pl-1 transition-colors last:border-b-0"
                   >
                     <p className="text-ink-muted text-[0.68rem] font-semibold tracking-[0.14em] uppercase">
-                      {doc.kind === "book" ? "Book" : "Chapter"}
+                      {doc.kind === "book" ? "Book" : "Skill"}
                       {doc.installs > 0 && (
                         <span className="text-ink-muted ml-2.5 font-normal tracking-normal normal-case tabular-nums">
                           {compact(doc.installs)} installs

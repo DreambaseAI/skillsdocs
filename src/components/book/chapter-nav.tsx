@@ -31,7 +31,7 @@ export function ChapterNav({ book, prev, next, index }: ChapterNavProps) {
 
   return (
     <nav
-      aria-label="Chapter navigation"
+      aria-label="Skill navigation"
       className="book-measure mt-14"
       data-print="hide"
     >
@@ -48,7 +48,7 @@ export function ChapterNav({ book, prev, next, index }: ChapterNavProps) {
                 className="size-3.5"
                 aria-hidden
               />
-              Chapter {folio(index - 1)}
+              Skill {folio(index - 1)}
             </span>
             <span className="book-chapternav__title">{prev.title}</span>
           </Link>
@@ -71,7 +71,7 @@ export function ChapterNav({ book, prev, next, index }: ChapterNavProps) {
             rel="next"
           >
             <span className="book-eyebrow flex items-center gap-1.5">
-              Chapter {folio(index + 1)}
+              Skill {folio(index + 1)}
               <HugeiconsIcon
                 icon={ArrowRight01Icon}
                 className="size-3.5"

@@ -81,14 +81,14 @@ export function Colophon({
           {repo.license ? (
             <span className="text-ink-muted">
               {" "}
-              — the text of every chapter is reproduced unmodified, frontmatter
+              — the text of every skill is reproduced unmodified, frontmatter
               included, under the upstream licence.
             </span>
           ) : (
             <span className="text-ink-muted">
               {" "}
               — with no detectable licence, this issue links rather than
-              republishes: the chapters are omitted from the agent manifest and
+              republishes: the skills are omitted from the agent manifest and
               from the whole-book markdown.
             </span>
           )}
@@ -96,7 +96,7 @@ export function Colophon({
 
         <dt>Discovery</dt>
         <dd>
-          {book.skills.length} {plural(book.skills.length, "chapter")} found by
+          {book.skills.length} {plural(book.skills.length, "skill")} found by
           walking the repository tree for <code>SKILL.md</code>, not by matching
           a directory convention.{" "}
           {book.layouts.length === 1 ? (
@@ -123,7 +123,7 @@ export function Colophon({
             <dd>
               {book.provenance === "credited" ? (
                 <>
-                  Every chapter in this issue is a skill{" "}
+                  Every skill in this issue is{" "}
                   <em>installed into</em> the repository — found under a single
                   agent&rsquo;s dot directory, which is where{" "}
                   <code>skills add</code> writes — rather than published from
@@ -134,7 +134,7 @@ export function Colophon({
                 <>
                   {book.skills.filter((s) => s.origin === "credited").length}{" "}
                   of {book.skills.length}{" "}
-                  {plural(book.skills.length, "chapter")} are skills installed
+                  {plural(book.skills.length, "skill")} are installed
                   into the repository rather than published from it. They are
                   shelved in the closing &ldquo;Credited skills&rdquo; part and
                   remain the work of their own authors.
@@ -153,7 +153,7 @@ export function Colophon({
             <dt>Duplicates collapsed</dt>
             <dd>
               {variants.length} mirror {plural(variants.length, "copy", "copies")}{" "}
-              folded into their canonical chapter
+              folded into their canonical skill
               {agents.length > 0 ? (
                 <>
                   {" "}
@@ -172,7 +172,7 @@ export function Colophon({
           <>
             <dt>Completeness</dt>
             <dd>
-              GitHub truncated the tree for this repository, so chapters may be
+              GitHub truncated the tree for this repository, so skills may be
               missing from this issue. The count above is a floor, not a total.
             </dd>
           </>
@@ -239,7 +239,7 @@ export function Colophon({
         <dd>
           {flagged.length === 0 ? (
             <>
-              Every chapter satisfies the{" "}
+              Every skill satisfies the{" "}
               <a
                 className="hover:text-issue-accent underline underline-offset-3"
                 href={AGENT_SKILLS_SPEC}
@@ -254,8 +254,8 @@ export function Colophon({
             <>
               {totalIssues} editorial {plural(totalIssues, "note")} across{" "}
               {flagged.length} of {book.skills.length}{" "}
-              {plural(book.skills.length, "chapter")}. They are printed in the
-              margin of each chapter rather than as errors here.
+              {plural(book.skills.length, "skill")}. They are printed in the
+              margin of each skill rather than as errors here.
               <ul className="mt-1 list-disc space-y-0.5 ps-4">
                 {flagged.slice(0, 10).map((skill) => (
                   <li key={skill.slug}>
@@ -284,7 +284,7 @@ export function Colophon({
 
         <dt>Images</dt>
         <dd>
-          Images inside a chapter come from the upstream repository. Where the
+          Images inside a skill come from the upstream repository. Where the
           author gave no alternative text we mark the image decorative rather
           than inventing a description — a plausible caption we made up is worse
           than none for the reader who depends on it.
@@ -339,7 +339,7 @@ export function Colophon({
           >
             <code>{paths.bookMarkdown(repo.owner, repo.repo)}</code>
           </a>
-          , and each chapter at its own <code>.md</code> URL.
+          , and each skill at its own <code>.md</code> URL.
         </dd>
 
         <dt>Publication</dt>
@@ -364,9 +364,9 @@ export function describeRepair(repair: HeadingRepair): string {
   const text = repair.text ? `“${repair.text}”` : "a heading";
   switch (repair.kind) {
     case "stripped-h1":
-      return `Removed ${text}, a leading h1 that duplicated the chapter title.`;
+      return `Removed ${text}, a leading h1 that duplicated the skill title.`;
     case "shifted":
-      return `Shifted ${text} from h${repair.from} to h${repair.to} so the chapter title is the only h1.`;
+      return `Shifted ${text} from h${repair.from} to h${repair.to} so the skill title is the only h1.`;
     default:
       return `Repaired ${text} from h${repair.from} to h${repair.to}, closing a skipped level.`;
   }

@@ -32,7 +32,7 @@ const SKILL_PARAM = {
   name: "skill",
   in: "path",
   required: true,
-  description: "Chapter slug, as listed in the book's `chapters[].slug`.",
+  description: "Skill slug, as listed in the book's `chapters[].slug`.",
   schema: { type: "string" },
 } as const;
 
@@ -112,7 +112,7 @@ export function document(): Record<string, unknown> {
     },
     tags: [
       { name: "markdown", description: "Verbatim skill content as text/markdown." },
-      { name: "books", description: "Structured book and chapter data." },
+      { name: "books", description: "Structured book and skill data." },
       { name: "discovery", description: "Machine-installable manifests." },
       { name: "meta", description: "Search, health, and description documents." },
     ],
@@ -123,7 +123,7 @@ export function document(): Record<string, unknown> {
           operationId: "getBookMarkdown",
           summary: "The whole book as one Markdown document",
           description:
-            "Repository README plus every licensed chapter, bodies verbatim with YAML frontmatter intact, in reading order. This is the book's llms-full.txt. Also reachable by sending `Accept: text/markdown` to `/{owner}/{repo}`.",
+            "Repository README plus every licensed skill, bodies verbatim with YAML frontmatter intact, in reading order. This is the book's llms-full.txt. Also reachable by sending `Accept: text/markdown` to `/{owner}/{repo}`.",
           parameters: [OWNER_PARAM, REPO_PARAM],
           responses: markdownResponse("The book, as Markdown."),
         },
@@ -132,11 +132,11 @@ export function document(): Record<string, unknown> {
         get: {
           tags: ["markdown"],
           operationId: "getChapterMarkdown",
-          summary: "One chapter as Markdown",
+          summary: "One skill as Markdown",
           description:
             "A provenance blockquote followed by the upstream SKILL.md verbatim. The `X-Skill-Raw` response header points at the unheadered bytes on raw.githubusercontent.",
           parameters: [OWNER_PARAM, REPO_PARAM, SKILL_PARAM],
-          responses: markdownResponse("The chapter, as Markdown."),
+          responses: markdownResponse("The skill, as Markdown."),
         },
       },
       "/{owner}/{repo}/.well-known/agent-skills/index.json": {
@@ -145,7 +145,7 @@ export function document(): Record<string, unknown> {
           operationId: "getBookAgentSkills",
           summary: "Agent Skills discovery manifest for one book",
           description:
-            "One entry per licensed chapter, each with a sha256 digest computed over the raw upstream bytes. Verify the digest before writing a skill to disk. Chapters with no detectable licence are omitted; the count is in `X-Skills-Omitted`.",
+            "One entry per licensed skill, each with a sha256 digest computed over the raw upstream bytes. Verify the digest before writing a skill to disk. Skills with no detectable licence are omitted; the count is in `X-Skills-Omitted`.",
           parameters: [OWNER_PARAM, REPO_PARAM],
           responses: {
             "200": {
@@ -197,7 +197,7 @@ export function document(): Record<string, unknown> {
           operationId: "listBooks",
           summary: "Every book in the catalog",
           description:
-            "The answer to \"what do you have?\". Paginated, ordered by install count, one row per repository with its HTML, Markdown, JSON and manifest URLs. Costs no GitHub quota: the figures come from the verified seed catalog merged with skills.sh, and a book's `json` link is where the authoritative, live chapter count lives.",
+            "The answer to \"what do you have?\". Paginated, ordered by install count, one row per repository with its HTML, Markdown, JSON and manifest URLs. Costs no GitHub quota: the figures come from the verified seed catalog merged with skills.sh, and a book's `json` link is where the authoritative, live skill count lives.",
           parameters: [
             {
               name: "limit",
@@ -253,7 +253,7 @@ export function document(): Record<string, unknown> {
           operationId: "getBook",
           summary: "Book manifest",
           description:
-            "Repository metadata, licence resolution, install command, and one entry per chapter with digests and stats. Chapter bodies are not included.",
+            "Repository metadata, licence resolution, install command, and one entry per skill with digests and stats. Skill bodies are not included.",
           parameters: [OWNER_PARAM, REPO_PARAM],
           responses: {
             "200": {
@@ -271,13 +271,13 @@ export function document(): Record<string, unknown> {
         get: {
           tags: ["books"],
           operationId: "getChapter",
-          summary: "One chapter, with its content",
+          summary: "One skill, with its content",
           description:
             "`content.raw` is the verbatim upstream file. It is `null`, with a `licenseNotice`, when no licence could be detected for the skill.",
           parameters: [OWNER_PARAM, REPO_PARAM, SKILL_PARAM],
           responses: {
             "200": {
-              description: "Chapter.",
+              description: "Skill.",
               content: {
                 "application/json": { schema: { $ref: "#/components/schemas/Chapter" } },
               },
@@ -293,7 +293,7 @@ export function document(): Record<string, unknown> {
           operationId: "search",
           summary: "Search books and skills",
           description:
-            "Searches the indexed book catalog and the skills.sh skill index. Supplying both `owner` and `repo` additionally searches that book's chapter names, descriptions, headings and bodies. The `sources` field reports which indexes actually ran.",
+            "Searches the indexed book catalog and the skills.sh skill index. Supplying both `owner` and `repo` additionally searches that book's skill names, descriptions, headings and bodies. The `sources` field reports which indexes actually ran.",
           parameters: [
             {
               name: "q",
@@ -312,7 +312,7 @@ export function document(): Record<string, unknown> {
               name: "repo",
               in: "query",
               description:
-                "Restrict to one repository. With `owner`, enables chapter-body search.",
+                "Restrict to one repository. With `owner`, enables skill-body search.",
               schema: { type: "string" },
             },
             {
@@ -518,7 +518,7 @@ export function document(): Record<string, unknown> {
             headingCount: {
               type: "integer",
               description:
-                "How many headings the chapter has. The headings themselves are `outline` on the chapter endpoint.",
+                "How many headings the skill has. The headings themselves are `outline` on the skill endpoint.",
             },
             resources: {
               type: "object",
@@ -569,7 +569,7 @@ export function document(): Record<string, unknown> {
                 pushedAt: { type: ["string", "null"], format: "date-time" },
                 treeTruncated: {
                   type: "boolean",
-                  description: "True when GitHub capped the tree and chapters may be missing.",
+                  description: "True when GitHub capped the tree and skills may be missing.",
                 },
               },
             },
@@ -634,7 +634,7 @@ export function document(): Record<string, unknown> {
               type: "string",
               enum: ["authored", "credited"],
               description:
-                "authored — published from this repository; credited — installed into it, in use here but written elsewhere. Credited chapters omit `install`.",
+                "authored — published from this repository; credited — installed into it, in use here but written elsewhere. Credited skills omit `install`.",
             },
             path: { type: "string" },
             links: {
@@ -792,7 +792,7 @@ export function document(): Record<string, unknown> {
                     type: "string",
                     enum: ["index", "book"],
                     description:
-                      "`index` — the shared catalog + skills.sh corpus. `book` — a live pass over one repository's chapter bodies, which only runs when both `owner` and `repo` are given.",
+                      "`index` — the shared catalog + skills.sh corpus. `book` — a live pass over one repository's skill bodies, which only runs when both `owner` and `repo` are given.",
                   },
                 },
               },

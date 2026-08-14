@@ -47,11 +47,11 @@ export function ChapterRail({ book, skill, headings, index }: ChapterRailProps) 
       : headings;
 
   return (
-    <aside className="book-rail" aria-label="Chapter details" data-print="hide">
+    <aside className="book-rail" aria-label="Skill details" data-print="hide">
       <OnThisPage headings={railHeadings} id="contents" />
 
       <div className="border-rule mt-7 border-t pt-4">
-        <p className="book-rail__title border-none pb-2">This chapter</p>
+        <p className="book-rail__title border-none pb-2">This skill</p>
         <dl className="book-stats">
           <Stat label="Position">
             {index} of {book.skills.length}
@@ -140,13 +140,13 @@ export function SubchapterRail({
 
   return (
     <aside className="book-rail" aria-label="Subchapter details" data-print="hide">
-      <nav aria-label="Parent chapter" className="book-rail__up">
+      <nav aria-label="Parent skill" className="book-rail__up">
         <Link href={skill.href} className="book-rail__uplink">
           <span className="book-rail__upfolio" aria-hidden="true">
             {skill.index}
           </span>
           <span className="min-w-0">
-            <span className="book-rail__uplabel">Up to chapter {skill.index}</span>
+            <span className="book-rail__uplabel">Up to skill {skill.index}</span>
             <span className="book-rail__uptitle">{skill.title}</span>
           </span>
         </Link>

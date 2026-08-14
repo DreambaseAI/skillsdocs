@@ -25,6 +25,7 @@ import {
   marketplaceCommand,
   paths,
   SITE_NAME,
+  skillInstallCommand,
 } from "@/lib/site";
 import { loadBook } from "../loader";
 import { renderChapter } from "../render";
@@ -143,7 +144,13 @@ async function ChapterBody({
   if (!rendered) notFound();
 
   const installRows = [
-    { label: "Install command", command: installCommand(owner, repo) },
+    // `--skill` filters by the skill's *name* (frontmatter, dir fallback) —
+    // never its URL slug, which diverges when a slug is group-qualified.
+    {
+      label: "Skill install command",
+      command: skillInstallCommand(owner, repo, skill.name),
+    },
+    { label: "Repository install command", command: installCommand(owner, repo) },
     ...(book.marketplace
       ? [
           {
@@ -186,6 +193,21 @@ async function ChapterBody({
 
           <ChapterOpener book={book} skill={skill} index={position} />
 
+          {/* The install panel leads the page: the reader who arrived to get
+              this skill should not have to scroll past its prose to take it.
+              A credited skill has no command — see the credit block after the
+              appendix. */}
+          {skill.origin !== "credited" ? (
+            <div className="book-measure mt-8">
+              <p className="book-eyebrow mb-2">Install</p>
+              <InstallCommand rows={installRows} />
+              <p className="book-caption mt-2">
+                The first command installs just this skill, by the name in its{" "}
+                <code>SKILL.md</code>; the second installs the whole repository.
+              </p>
+            </div>
+          ) : null}
+
           <Markdown
             rendered={rendered}
             dropCap={dropCapMode(rendered.tree)}
@@ -220,16 +242,7 @@ async function ChapterBody({
                 <ChapterCredit book={book} skill={skill} variant="line" />
               </Suspense>
             </div>
-          ) : (
-            <div className="book-measure mt-14">
-              <p className="book-eyebrow mb-2">Install this repository</p>
-              <InstallCommand rows={installRows} />
-              <p className="book-caption mt-2">
-                Skills install per repository, not per chapter — the CLI has no
-                documented per-skill form, so we do not print one.
-              </p>
-            </div>
-          )}
+          ) : null}
 
           <SkillApparatus book={book} skill={skill} />
 
@@ -251,7 +264,7 @@ async function ChapterBody({
             <Colophon
               book={book}
               repairs={rendered.repairs}
-              repairScope="this chapter"
+              repairScope="this skill"
             />
           </details>
         </section>
@@ -266,7 +279,7 @@ async function ChapterBody({
 
       <MobileContents
         title={book.repo.fullName}
-        subtitle={`Chapter ${position} of ${book.skills.length}`}
+        subtitle={`Skill ${position} of ${book.skills.length}`}
       >
         <BookContentsList book={book} currentSlug={slug} inSheet />
       </MobileContents>

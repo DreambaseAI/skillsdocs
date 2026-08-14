@@ -24,7 +24,7 @@ export default function SubchapterNotFound() {
   return (
     <main id="main" tabIndex={-1} className="flex flex-1 flex-col">
       <StateFrame
-        eyebrow="Not in this chapter"
+        eyebrow="Not in this skill"
         title="This skill does not ship that file"
         icon={FileBlockIcon}
       >
@@ -36,7 +36,7 @@ export default function SubchapterNotFound() {
         <p>
           That usually means one of three things: the file lives under a
           different skill, the repository has been reorganised since the link
-          was made, or the path was never real. The chapter&rsquo;s appendix
+          was made, or the path was never real. The skill&rsquo;s appendix
           lists every file it does ship, with the ones that open here numbered
           as subchapters.
         </p>

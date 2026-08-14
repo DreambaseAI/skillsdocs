@@ -67,7 +67,7 @@ export async function GET(
     if (!skill) {
       const known = book.skills.map((s) => s.slug).join(", ") || "none";
       return textError(
-        `No skill "${slug}" in ${book.repo.fullName}. Chapters: ${known}`,
+        `No skill "${slug}" in ${book.repo.fullName}. Skills: ${known}`,
         404,
       );
     }

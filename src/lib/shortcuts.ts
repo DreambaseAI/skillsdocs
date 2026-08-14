@@ -67,12 +67,12 @@ export const CHORD_WINDOW_MS = 1500;
 export const SHORTCUTS: ShortcutDef[] = [
   {
     action: "nextChapter",
-    label: "Next chapter",
+    label: "Next skill",
     group: "navigation",
     keys: ["]"],
     note: "Editor tab muscle memory; avoids Cmd+[",
   },
-  { action: "prevChapter", label: "Previous chapter", group: "navigation", keys: ["["] },
+  { action: "prevChapter", label: "Previous skill", group: "navigation", keys: ["["] },
   { action: "pageDown", label: "Page down", group: "navigation", keys: ["arrowright", "space"] },
   {
     action: "pageUp",
@@ -86,7 +86,7 @@ export const SHORTCUTS: ShortcutDef[] = [
 
   { action: "search", label: "Search", group: "actions", keys: ["/", "mod+k"] },
   { action: "copyInstall", label: "Copy install command", group: "actions", keys: ["c"] },
-  { action: "copyLink", label: "Copy link to chapter", group: "actions", keys: ["shift+c"] },
+  { action: "copyLink", label: "Copy link to skill", group: "actions", keys: ["shift+c"] },
   { action: "help", label: "Keyboard shortcuts", group: "actions", keys: ["?"] },
 
   { action: "controls", label: "Reading controls", group: "display", keys: [","] },

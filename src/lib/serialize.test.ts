@@ -253,8 +253,8 @@ describe("skillToMarkdown", () => {
     );
   });
 
-  it("says which chapter it is", () => {
-    expect(skillToMarkdown(book, alpha, { raw: RAW })).toContain("chapter 1 of 2");
+  it("says which skill it is", () => {
+    expect(skillToMarkdown(book, alpha, { raw: RAW })).toContain("skill 1 of 2");
   });
 
   it("reproduces the upstream bytes exactly, frontmatter included", () => {

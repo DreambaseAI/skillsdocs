@@ -179,13 +179,32 @@ export const external = {
 } as const;
 
 /**
- * The install command for a whole repo.
- *
- * Only the repo form is observed in the wild — `npx skills add <owner>/<repo>`.
- * A per-skill form is not part of the documented CLI, so we never invent one.
+ * The install command for a whole repo — `npx skills add <owner>/<repo>`.
  */
 export function installCommand(owner: string, repo: string): string {
   return `npx skills add ${owner}/${repo}`;
+}
+
+/**
+ * The install command for one skill.
+ *
+ * `--skill <name>` is the CLI's documented per-skill form (vercel-labs/skills
+ * README, "Options" and "Examples"). The name is matched case-insensitively
+ * against the skill's frontmatter `name` with the directory basename as
+ * fallback — which is exactly what `Skill.name` holds — and the README's own
+ * example quotes a name containing spaces (`--skill "Convex Best Practices"`).
+ *
+ * The bare three-segment form `owner/repo/<skill>` is NOT this: the CLI
+ * parses it as a repo-relative subpath, so it must never be printed as a
+ * per-skill install.
+ */
+export function skillInstallCommand(
+  owner: string,
+  repo: string,
+  name: string,
+): string {
+  const quoted = /\s/.test(name) ? `"${name}"` : name;
+  return `${installCommand(owner, repo)} --skill ${quoted}`;
 }
 
 /** Claude Code's plugin-marketplace equivalent, when the repo ships a manifest. */

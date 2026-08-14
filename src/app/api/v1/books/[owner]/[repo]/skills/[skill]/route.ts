@@ -61,7 +61,7 @@ export async function GET(
         404,
         "not_found",
         `No skill "${slug}" in ${book.repo.fullName}.`,
-        `Chapters: ${book.skills.map((s) => s.slug).join(", ") || "none"}.`,
+        `Skills: ${book.skills.map((s) => s.slug).join(", ") || "none"}.`,
       );
     }
 

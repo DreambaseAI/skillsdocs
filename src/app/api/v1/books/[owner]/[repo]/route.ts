@@ -202,7 +202,7 @@ export async function GET(
       chapters,
       attribution: {
         notice:
-          "Content is mirrored from a public GitHub repository and is owned by its authors. Skill bodies are served verbatim. Chapters with no detectable licence are linked but never inlined.",
+          "Content is mirrored from a public GitHub repository and is owned by its authors. Skill bodies are served verbatim. Skills with no detectable licence are linked but never inlined.",
         upstream: external.repo(o, r),
         takedown: TAKEDOWN_CONTACT,
       },

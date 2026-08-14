@@ -176,7 +176,7 @@ export function BookSkeleton() {
           <div className="border-rule mt-7 border-t pt-4">
             <span className="book-rail__title border-none pb-2">At a glance</span>
             <div className="mt-1 flex flex-col gap-2.5">
-              {["Chapters", "Reading time", "Words", "Stars", "Installs"].map((label) => (
+              {["Skills", "Reading time", "Words", "Stars", "Installs"].map((label) => (
                 <div key={label} className="flex items-baseline justify-between gap-3">
                   <span className="book-caption">{label}</span>
                   <Ghost className="h-3 w-10" pulse={false} />
@@ -200,9 +200,9 @@ export function ChapterSkeleton() {
       className="book-frame"
       role="status"
       aria-busy="true"
-      aria-label="Setting the chapter"
+      aria-label="Setting the skill"
     >
-      <span className="sr-only">Setting the chapter. One moment.</span>
+      <span className="sr-only">Setting the skill. One moment.</span>
 
       <div aria-hidden="true" className="book-rail book-rail--left">
         <Ghost className="h-2.5 w-24" />

@@ -34,7 +34,7 @@ const RESULT_LIMIT = 80;
 
 export const metadata: Metadata = {
   title: "Search",
-  description: "Search every chapter and every book in the index.",
+  description: "Search every skill and every book in the index.",
   // A results page is not a canonical document; keep it out of the index.
   robots: { index: false, follow: true },
 };
@@ -53,7 +53,7 @@ function SearchField({ query }: { query: string }) {
       <div className="border-rule bg-paper-raised focus-within:border-issue-accent focus-within:ring-issue-accent/25 flex h-12 min-w-0 flex-1 basis-full items-center gap-2 rounded-2xl border px-4 transition-colors focus-within:ring-3 sm:basis-auto">
         <HugeiconsIcon icon={Search01Icon} className="text-ink-muted size-4 shrink-0" aria-hidden />
         <label htmlFor="search-q" className="sr-only">
-          Search chapters and books
+          Search skills and books
         </label>
         <input
           id="search-q"
@@ -64,7 +64,7 @@ function SearchField({ query }: { query: string }) {
           autoComplete="off"
           spellCheck={false}
           enterKeyHint="search"
-          placeholder="Search chapters, books, or paste a repo URL…"
+          placeholder="Search skills, books, or paste a repo URL…"
           className="text-ink placeholder:text-ink-muted/60 h-full min-w-0 flex-1 bg-transparent text-base outline-none"
         />
       </div>
@@ -96,7 +96,7 @@ async function Results({ searchParams }: Pick<PageProps<"/search">, "searchParam
 
       {query === "" ? (
         <p className="text-ink-muted text-sm">
-          {total.toLocaleString("en-US")} chapters and books are indexed. Try a topic
+          {total.toLocaleString("en-US")} skills and books are indexed. Try a topic
           (&ldquo;pdf&rdquo;, &ldquo;testing&rdquo;), an owner (&ldquo;vercel&rdquo;), or paste a
           repository URL.
         </p>
@@ -137,7 +137,7 @@ async function Results({ searchParams }: Pick<PageProps<"/search">, "searchParam
               <div className="border-rule/70 rounded-2xl border border-dashed p-8">
                 <p className="text-ink">Nothing in the index matches that.</p>
                 <ul className="text-ink-muted mt-4 flex list-disc flex-col gap-1.5 pl-5 text-sm">
-                  <li>Chapter titles come from skills.sh, so a brand-new skill may not be listed yet.</li>
+                  <li>Skill titles come from skills.sh, so a brand-new skill may not be listed yet.</li>
                   <li>
                     Paste the repository instead — <code className="font-mono">owner/repo</code>{" "}
                     opens any book, indexed or not.

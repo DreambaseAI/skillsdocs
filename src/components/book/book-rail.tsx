@@ -47,8 +47,8 @@ export function BookRail({ book, sections }: BookRailProps) {
       <div className="border-rule mt-7 border-t pt-4">
         <p className="book-rail__title border-none pb-2">At a glance</p>
         <dl className="book-stats">
-          <Stat label="Chapters">
-            {book.skills.length} {plural(book.skills.length, "chapter")}
+          <Stat label="Skills">
+            {book.skills.length} {plural(book.skills.length, "skill")}
           </Stat>
           <Stat label="Reading time">{readingTime(book.totalReadingMinutes)}</Stat>
           <Stat label="Words">{book.totalWords.toLocaleString("en-GB")}</Stat>

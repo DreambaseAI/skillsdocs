@@ -154,7 +154,7 @@ export async function GET(request: Request): Promise<Response> {
       400,
       "missing_query",
       "A `q` parameter is required.",
-      "Try /api/v1/search?q=echarts. Add owner and repo to search inside one book's chapter bodies.",
+      "Try /api/v1/search?q=echarts. Add owner and repo to search inside one book's skill bodies.",
     );
   }
   if (q.length > MAX_QUERY) {
@@ -325,7 +325,7 @@ export async function GET(request: Request): Promise<Response> {
       sources,
       note: deep
         ? undefined
-        : "Chapter bodies are searched only when both `owner` and `repo` are given. Without them this ranks book and chapter titles from the shared index.",
+        : "Skill bodies are searched only when both `owner` and `repo` are given. Without them this ranks book and skill titles from the shared index.",
       results: page,
     },
     { headers: JSON_HEADERS },

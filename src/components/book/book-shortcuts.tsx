@@ -140,10 +140,10 @@ export function BookShortcuts({
         // Never silently nothing. An unbounded key that does nothing is
         // indistinguishable from a broken one — which is how this whole class
         // of bug went unnoticed for eleven shortcuts.
-        announce(delta === 1 ? "Last chapter" : "First chapter");
+        announce(delta === 1 ? "Last skill" : "First skill");
         return;
       }
-      announce(`${chapter.title}. Chapter ${target + 1} of ${chapters.length}.`);
+      announce(`${chapter.title}. Skill ${target + 1} of ${chapters.length}.`);
       router.push(chapter.href);
     },
     [chapters, indexNow, router],
