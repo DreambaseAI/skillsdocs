@@ -20,13 +20,53 @@ import { Masthead } from "@/components/home/masthead";
 import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
 import { SiteFooter } from "@/components/home/site-footer";
 import { parseBoardSkills } from "@/lib/board";
+import { SITE_NAME } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Skill board",
-  description:
-    "Bookmarked skills, pinned as pages on a board — stacked by repo, in each repo's own colours.",
-  robots: { index: false, follow: true },
-};
+/**
+ * Per-URL metadata: a shared board's OG card is the board itself, rendered
+ * by `/api/og/board` from the same `skills` value, so the preview a link
+ * unfurls with shows the actual pages being shared. The plain device board
+ * gets no card — its contents live in the visitor's browser, and a crawler
+ * would render an empty cork.
+ */
+export async function generateMetadata(props: {
+  searchParams: Promise<{ skills?: string | string[] }>;
+}): Promise<Metadata> {
+  const { skills } = await props.searchParams;
+  const rows = skills === undefined ? [] : parseBoardSkills(skills);
+
+  const title = "Skill board";
+  const description =
+    rows.length > 0
+      ? `${rows.length} bookmarked ${rows.length === 1 ? "skill" : "skills"}, pinned to a board and shared as a single link.`
+      : "Bookmarked skills, pinned as pages on a board — stacked by repo, in each repo's own colours.";
+
+  return {
+    title,
+    description,
+    robots: { index: false, follow: true },
+    openGraph: {
+      title: "Skill board — bookmarked skills",
+      description,
+      siteName: SITE_NAME,
+      ...(rows.length > 0
+        ? {
+            images: [
+              {
+                url: `/api/og/board?skills=${rows
+                  .map((row) => `${row.owner}/${row.repo}/${row.slug}`)
+                  .join(",")}`,
+                width: 1200,
+                height: 630,
+                alt: `A board of ${rows.length} bookmarked ${rows.length === 1 ? "skill" : "skills"}`,
+              },
+            ],
+          }
+        : {}),
+    },
+    twitter: { card: rows.length > 0 ? "summary_large_image" : "summary" },
+  };
+}
 
 export default function BookmarksPage(props: {
   searchParams: Promise<{ skills?: string | string[] }>;
