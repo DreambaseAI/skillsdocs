@@ -22,8 +22,9 @@ import { ImageResponse } from "next/og";
 import { probeRepoStatus } from "@/lib/upstream";
 import { getBook, issueNumberFor } from "@/lib/book";
 import { formatHex, parseColor } from "@/lib/color";
+import { gistPathLabel } from "@/lib/gist";
 import { fetchImageDataUri } from "@/lib/image-data-uri";
-import { SITE_NAME } from "@/lib/site";
+import { isGistId, SITE_NAME } from "@/lib/site";
 
 export const alt = "Agent Skills book cover";
 export const size = { width: 1200, height: 630 };
@@ -79,6 +80,10 @@ interface Cover {
   owner: string;
   repo: string;
   title: string;
+  /** The big display line — the repo name, or the owner for a gist. */
+  headline: string;
+  /** The small `owner/repo` line — the gist id shortened to a stub. */
+  pathLabel: string;
   description: string;
   skillCount: number | null;
   stars: number | null;
@@ -86,6 +91,7 @@ interface Cover {
   accent: string;
   avatar: string | null;
   credited: boolean;
+  gist: boolean;
 }
 
 /**
@@ -103,12 +109,20 @@ async function coverFor(owner: string, repo: string): Promise<Cover | null> {
     const [avatar] = await Promise.all([
       fetchImageDataUri(`${book.repo.ownerAvatar}${book.repo.ownerAvatar.includes("?") ? "&" : "?"}s=200`),
     ]);
+    // A gist's repo segment is a hex hash — unreadable at display size, so
+    // the owner takes the headline and the gist title stands in for the dek.
+    const gist = isGistId(book.repo.repo);
     return {
       owner: book.repo.owner,
       repo: book.repo.repo,
       title: book.owner?.name || book.repo.owner,
+      headline: gist ? book.repo.owner : book.repo.repo,
+      pathLabel: gist
+        ? gistPathLabel(book.repo.owner, book.repo.repo)
+        : `${book.repo.owner}/${book.repo.repo}`,
       description:
         book.repo.description ??
+        (gist ? book.repo.displayName : null) ??
         `${book.skills.length} Agent Skills, rendered as a book.`,
       skillCount: book.skills.length,
       stars: book.repo.stars,
@@ -116,6 +130,7 @@ async function coverFor(owner: string, repo: string): Promise<Cover | null> {
       accent: toHex(book.theme.accentDark, FALLBACK_ACCENT),
       avatar,
       credited: book.provenance === "credited",
+      gist,
     };
   } catch {
     // `getBook` is a `use cache` function, and in production its rejection
@@ -123,10 +138,13 @@ async function coverFor(owner: string, repo: string): Promise<Cover | null> {
     if ((await probeRepoStatus(owner, repo)).kind === "not-found") return null;
 
     // Unindexed or rate-limited. Still a card.
+    const gist = isGistId(repo);
     return {
       owner,
       repo,
       title: owner,
+      headline: gist ? owner : repo,
+      pathLabel: gist ? gistPathLabel(owner, repo) : `${owner}/${repo}`,
       description: "Agent Skills, rendered as a book.",
       skillCount: null,
       stars: null,
@@ -134,6 +152,7 @@ async function coverFor(owner: string, repo: string): Promise<Cover | null> {
       accent: FALLBACK_ACCENT,
       avatar: null,
       credited: false,
+      gist,
     };
   }
 }
@@ -211,7 +230,7 @@ export default async function Image({
             )}
             <div style={{ display: "flex", flexDirection: "column", marginLeft: 24 }}>
               <div style={{ display: "flex", fontSize: 30, fontWeight: 600, letterSpacing: -0.5 }}>
-                {clamp(`${cover.owner}/${cover.repo}`, 42)}
+                {clamp(cover.pathLabel, 42)}
               </div>
               <div style={{ display: "flex", fontSize: 22, color: MUTED, marginTop: 4 }}>
                 {SITE_NAME}
@@ -242,12 +261,12 @@ export default async function Image({
             style={{
               display: "flex",
               fontFamily: "Literata",
-              fontSize: cover.repo.length > 18 ? 76 : 96,
+              fontSize: cover.headline.length > 18 ? 76 : 96,
               lineHeight: 1.02,
               letterSpacing: -3,
             }}
           >
-            {clamp(cover.repo, 30)}
+            {clamp(cover.headline, 30)}
           </div>
           <div
             style={{
@@ -276,13 +295,16 @@ export default async function Image({
           <div style={{ display: "flex", color: INK, fontWeight: 600 }}>
             {stats.length ? stats.join("  ·  ") : "Agent Skills"}
           </div>
-          {/* Nothing to install when the repository publishes no skills — and
-              a credited book must not print an install command for skills the
-              repository merely uses. */}
+          {/* Nothing to install when the repository publishes no skills — a
+              credited book must not print an install command for skills the
+              repository merely uses, and a gist has no installable form at
+              all (the CLI only takes owner/repo). */}
           {cover.skillCount === 0 ? (
             <div style={{ display: "flex" }}>No Agent Skills yet</div>
           ) : cover.credited ? (
             <div style={{ display: "flex" }}>Skills in use here, credited</div>
+          ) : cover.gist ? (
+            <div style={{ display: "flex" }}>Rendered from a GitHub gist</div>
           ) : (
             <div style={{ display: "flex" }}>npx skills add {clamp(`${cover.owner}/${cover.repo}`, 34)}</div>
           )}

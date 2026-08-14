@@ -14,7 +14,8 @@ import { ImageResponse } from "next/og";
 import { probeRepoStatus } from "@/lib/upstream";
 import { findSkill, getBook } from "@/lib/book";
 import { formatHex, parseColor } from "@/lib/color";
-import { SITE_NAME } from "@/lib/site";
+import { gistPathLabel } from "@/lib/gist";
+import { isGistId, SITE_NAME } from "@/lib/site";
 
 export const alt = "Agent Skill";
 export const size = { width: 1200, height: 630 };
@@ -81,13 +82,20 @@ async function cardFor(
     if (!skill) return null;
     const accent = toHex(book.theme.accentDark, FALLBACK_ACCENT);
     const part = book.parts.find((p) => p.skills.some((s) => s.slug === slug));
+    // A gist's repo segment is a hex hash: shorten it in labels, and let the
+    // gist's title stand in for `fullName` in the description fallback.
+    const gist = isGistId(book.repo.repo);
     return {
-      book: `${book.repo.owner}/${book.repo.repo}`,
+      book: gist
+        ? gistPathLabel(book.repo.owner, book.repo.repo)
+        : `${book.repo.owner}/${book.repo.repo}`,
       // A single unnamed part is the "no grouping" case; showing "Skills"
       // there would be noise dressed as information.
       part: part && part.group ? part.title : null,
       title: skill.name,
-      description: skill.description || `A skill from ${book.repo.fullName}.`,
+      description:
+        skill.description ||
+        `A skill from ${book.repo.displayName ?? book.repo.fullName}.`,
       position: book.skills.findIndex((s) => s.slug === slug) + 1,
       total: book.skills.length,
       minutes: skill.readingMinutes,
@@ -98,7 +106,7 @@ async function cardFor(
     // the only way to tell "missing" from "rate-limited" is to ask again.
     if ((await probeRepoStatus(owner, repo)).kind === "not-found") return null;
     return {
-      book: `${owner}/${repo}`,
+      book: isGistId(repo) ? gistPathLabel(owner, repo) : `${owner}/${repo}`,
       part: null,
       title: slug,
       description: "An Agent Skill, typeset for reading.",

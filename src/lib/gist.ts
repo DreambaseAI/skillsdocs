@@ -36,6 +36,15 @@ export interface GistBookInputs {
 }
 
 /**
+ * `user/d2b3f0aa…` — a gist path with the hash cut to a recognisable stub,
+ * for labels (OG cards, eyebrows) where 32 hex characters are unreadable and
+ * the full id is one click away anyway.
+ */
+export function gistPathLabel(owner: string, id: string): string {
+  return `${owner}/${id.slice(0, 8)}…`;
+}
+
+/**
  * Deep link to one file on the gist page, using GitHub's own anchor scheme
  * (`#file-` + the filename with every non-alphanumeric run collapsed to `-`).
  */
