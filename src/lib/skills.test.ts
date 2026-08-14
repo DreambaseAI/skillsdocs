@@ -559,6 +559,42 @@ Text here.`,
     expect(skill.body.startsWith("# Body")).toBe(true);
   });
 
+  it("keeps comma-separated allowed-tools entries whole, deduped", () => {
+    // The wild form: commas between entries, spaces *inside* specifier
+    // parens. Whitespace-splitting shredded these into fragments, two of
+    // which were the identical chip `*),`.
+    const skill = parseSkill(
+      stub,
+      `---
+description: Create pull requests.
+allowed-tools: Bash(git *), Bash(gh pr *), Bash(git *), Read, Glob
+---
+Body.`,
+      [],
+    );
+    expect(skill.allowedTools).toEqual([
+      "Bash(git *)",
+      "Bash(gh pr *)",
+      "Read",
+      "Glob",
+    ]);
+  });
+
+  it("accepts allowed-tools as a YAML list", () => {
+    const skill = parseSkill(
+      stub,
+      `---
+description: X.
+allowed-tools:
+  - Bash(git *)
+  - Read
+---
+Body.`,
+      [],
+    );
+    expect(skill.allowedTools).toEqual(["Bash(git *)", "Read"]);
+  });
+
   it("flags missing required fields", () => {
     const skill = parseSkill(stub, "no frontmatter at all", []);
     expect(skill.issues).toHaveLength(2);

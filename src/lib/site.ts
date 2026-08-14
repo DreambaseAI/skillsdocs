@@ -233,6 +233,19 @@ export function isValidOwner(owner: string): boolean {
   return OWNER_RE.test(owner);
 }
 
+/**
+ * A gist id: 32 (current) or 20 (older) lowercase hex characters. Used to
+ * route `/<user>/<id>` to the gist renderer instead of the repo pipeline —
+ * with a repo fallback on the other side, since a hex-named repo is legal.
+ * The very oldest gists have short decimal ids; those are indistinguishable
+ * from ordinary repo names and are deliberately not matched.
+ */
+const GIST_ID_RE = /^(?:[0-9a-f]{20}|[0-9a-f]{32})$/;
+
+export function isGistId(value: string): boolean {
+  return GIST_ID_RE.test(value.toLowerCase());
+}
+
 export function isValidRepo(repo: string): boolean {
   return REPO_RE.test(repo) && repo !== "." && repo !== "..";
 }
@@ -296,6 +309,11 @@ function parseSingleReference(
   const withoutHost = cleaned
     .replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//i, "")
     .replace(/^(?:https?:\/\/)?raw\.githubusercontent\.com\//i, "")
+    // Gists: `/<user>/<id>` survives, and `isGistId` routes it to the gist
+    // renderer. The raw host's `/<user>/<id>/raw/…` tail is dropped by the
+    // same two-segment split that drops `/tree/main/…` from repo URLs.
+    .replace(/^(?:https?:\/\/)?gist\.github\.com\//i, "")
+    .replace(/^(?:https?:\/\/)?gist\.githubusercontent\.com\//i, "")
     .replace(/^(?:https?:\/\/)?(?:www\.)?skills\.sh\//i, "")
     // Our own URLs, so a reader who copies one out of the address bar and
     // pastes it back in gets the book rather than a search for the hostname.

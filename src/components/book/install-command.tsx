@@ -32,6 +32,8 @@ export interface InstallCommandProps {
 }
 
 export function InstallCommand({ rows, className }: InstallCommandProps) {
+  // A gist book offers no rows; an empty panel would still paint its frame.
+  if (rows.length === 0) return null;
   return (
     <div className={cn("book-install", className)}>
       {rows.map((row) => (

@@ -32,6 +32,7 @@ import { dekOf } from "@/lib/deck";
 import {
   external,
   installCommand,
+  isGistId,
   marketplaceCommand,
   paths,
   SITE_NAME,
@@ -93,27 +94,35 @@ export function BookCoverSpread({ book }: BookCoverProps) {
     (s) => s.origin === "credited"
   ).length;
 
-  const installRows = [
-    {
-      label: "Install command",
-      command: installCommand(repo.owner, repo.repo),
-    },
-    ...(marketplace
-      ? [
-          {
-            label: "Marketplace command",
-            command: marketplaceCommand(repo.owner, repo.repo),
-            sigil: "»",
-          },
-        ]
-      : []),
-  ];
+  // A gist book's URL identity is a hex hash: the description carries the
+  // title, and there is no install command — `npx skills add` only takes
+  // `owner/repo`, and we never invent an undocumented form.
+  const gist = isGistId(repo.repo);
+  const title = repo.displayName ?? repo.repo;
+
+  const installRows = gist
+    ? []
+    : [
+        {
+          label: "Install command",
+          command: installCommand(repo.owner, repo.repo),
+        },
+        ...(marketplace
+          ? [
+              {
+                label: "Marketplace command",
+                command: marketplaceCommand(repo.owner, repo.repo),
+                sigil: "»",
+              },
+            ]
+          : []),
+      ];
 
   return (
     <header
       id="cover"
       className="book-spread scroll-mt-24"
-      style={{ "--cover-cap": titleCap(repo.repo) } as React.CSSProperties}
+      style={{ "--cover-cap": titleCap(title) } as React.CSSProperties}
     >
       {/* ------------------------------------------------- the issue rule */}
       <div className="book-spread__head">
@@ -175,7 +184,7 @@ export function BookCoverSpread({ book }: BookCoverProps) {
 
             <h1 className="book-spread__title">
               <span className="sr-only">{repo.owner} / </span>
-              {repo.repo}
+              {title}
             </h1>
 
             <hr className="cover-rule mt-5" />
@@ -277,8 +286,14 @@ export function BookCoverSpread({ book }: BookCoverProps) {
                     "text-ink-muted mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 normal-case"
                   )}
                 >
-                  <span>{licenceLabel(repo.license)}</span>
-                  <span>{compact(repo.stars)} stars</span>
+                  {/* A gist has neither a licence field nor stars; printing
+                      "no licence · 0 stars" would read as a defect. */}
+                  {gist ? null : (
+                    <>
+                      <span>{licenceLabel(repo.license)}</span>
+                      <span>{compact(repo.stars)} stars</span>
+                    </>
+                  )}
                   <span className="max-sm:hidden">
                     {book.totalWords.toLocaleString("en-GB")} words
                   </span>

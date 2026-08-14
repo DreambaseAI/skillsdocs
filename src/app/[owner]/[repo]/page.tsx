@@ -65,8 +65,14 @@ export async function generateMetadata(
       book.provenance === "credited" ? "in use in" : "published by"
     } ${book.repo.fullName}, typeset for reading.`;
 
+  // A gist's fullName is `user/<hex id>`; its display name is the readable
+  // identity. Ordinary repos have no displayName and keep the slug form.
+  const title = book.repo.displayName
+    ? `${book.repo.displayName} — ${book.repo.owner}`
+    : book.repo.fullName;
+
   return {
-    title: `${book.repo.fullName}`,
+    title,
     description,
     alternates: {
       canonical,
@@ -74,7 +80,7 @@ export async function generateMetadata(
     },
     openGraph: {
       type: "book",
-      title: `${book.repo.fullName} — Repo No. ${book.issueNumber}`,
+      title: `${title} — Repo No. ${book.issueNumber}`,
       description,
       url: canonical,
       siteName: SITE_NAME,

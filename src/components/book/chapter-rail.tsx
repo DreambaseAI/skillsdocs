@@ -16,7 +16,8 @@ import type {
   ResourceNeighbour,
 } from "@/lib/resource-loader";
 import type { Skill } from "@/lib/skills";
-import { external, paths } from "@/lib/site";
+import { gistFileUrl } from "@/lib/gist";
+import { external, isGistId, paths } from "@/lib/site";
 
 /**
  * The right rail on a chapter: where you are, what this costs to read, and how
@@ -34,6 +35,7 @@ export interface ChapterRailProps {
 
 export function ChapterRail({ book, skill, headings, index }: ChapterRailProps) {
   const { owner, repo, defaultBranch } = book.repo;
+  const gist = isGistId(repo);
   const installs = book.signal?.perSkillInstalls?.[skill.name];
 
   /*
@@ -75,14 +77,24 @@ export function ChapterRail({ book, skill, headings, index }: ChapterRailProps) 
       <div className="border-rule mt-7 border-t pt-4">
         <p className="book-rail__title border-none pb-2">Source</p>
         <ul className="grid gap-1">
+          {/* A gist has no blob URLs: its chapter came from `<stem>.md`, and
+              the only source page is the gist itself, file-anchored. */}
           <RailLink
-            href={external.file(owner, repo, defaultBranch, skill.skillMdPath)}
+            href={
+              gist
+                ? gistFileUrl(book.repo.htmlUrl, `${skill.dir}.md`)
+                : external.file(owner, repo, defaultBranch, skill.skillMdPath)
+            }
             icon={File01Icon}
             external
           >
-            View SKILL.md
+            {gist ? "View source file" : "View SKILL.md"}
           </RailLink>
-          <RailLink href={external.repo(owner, repo)} icon={GithubIcon} external>
+          <RailLink
+            href={book.repo.htmlUrl || external.repo(owner, repo)}
+            icon={GithubIcon}
+            external
+          >
             {owner}/{repo}
           </RailLink>
           <RailLink

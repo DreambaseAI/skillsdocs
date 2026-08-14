@@ -10,7 +10,7 @@ import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
 import { ReaderControls } from "@/components/reader/controls";
 import { loadBook } from "./loader";
 import { issueScope, issueThemeCss } from "@/lib/design/theme";
-import { external, installCommand, paths } from "@/lib/site";
+import { external, installCommand, isGistId, paths } from "@/lib/site";
 import { bookIcons } from "@/lib/site-icons";
 import "./book.css";
 
@@ -38,7 +38,12 @@ export async function generateMetadata(
   props: LayoutProps<"/[owner]/[repo]">,
 ): Promise<Metadata> {
   const { owner, repo } = await props.params;
-  return { icons: bookIcons(owner, repo) };
+  return {
+    icons: bookIcons(owner, repo),
+    // A gist may be secret — link-accessible but unlisted on GitHub itself.
+    // Rendering it must not widen that audience, so no gist book is indexed.
+    ...(isGistId(repo) ? { robots: { index: false, follow: true } } : null),
+  };
 }
 
 export default function BookLayout(props: LayoutProps<"/[owner]/[repo]">) {
@@ -152,11 +157,14 @@ async function BookKeys({
 
     props = {
       coverHref: paths.book(owner, repo),
-      githubUrl: external.repo(owner, repo),
+      // The book's real home — `github.com/<user>/<gist-id>` would 404, and
+      // for ordinary repos `htmlUrl` is the same address this built by hand.
+      githubUrl: result.book.repo.htmlUrl || external.repo(owner, repo),
       // A credited book has no install command: the shortcut announces why
       // instead of copying a command that republishes other people's skills.
+      // A gist has none either — the CLI only takes `owner/repo`.
       installCommand:
-        result.book.provenance === "credited"
+        result.book.provenance === "credited" || isGistId(repo)
           ? null
           : installCommand(owner, repo),
       chapters: result.book.skills.map((skill) => ({
@@ -184,11 +192,15 @@ async function Identity({
   // costs nothing. Fall back to the URL when the repo did not resolve.
   let owner = requested.owner;
   let repo = requested.repo;
+  // What the crumb *says*, distinct from where it links: a gist's repo
+  // segment is a hex hash, so its display name stands in for the text.
+  let repoLabel = requested.repo;
   try {
     const result = await loadBook(requested.owner, requested.repo);
     if (result.kind === "ok") {
       owner = result.book.repo.owner;
       repo = result.book.repo.repo;
+      repoLabel = result.book.repo.displayName ?? repo;
     }
   } catch {
     // The breadcrumb is not worth a blank header.
@@ -214,7 +226,7 @@ async function Identity({
             className="text-foreground hover:text-foreground block truncate font-medium underline-offset-4 hover:underline"
           >
             <span className="text-muted-foreground md:hidden">{owner}/</span>
-            {repo}
+            {repoLabel}
           </Link>
         </li>
       </ol>

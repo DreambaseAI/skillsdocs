@@ -8,6 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  isGistId,
   isInstallCommand,
   isValidOwner,
   isValidRepo,
@@ -99,6 +100,32 @@ describe("parseRepoReference", () => {
     expect(parseRepoReference("github.com")).toBeNull();
     expect(isValidOwner("github.com")).toBe(false);
     expect(isValidRepo("skills.md")).toBe(true);
+  });
+});
+
+describe("gists", () => {
+  const ID = "d2b3f0aa41c59c8b3d42c71794cffc54";
+
+  it("parses gist URLs into user/id", () => {
+    for (const input of [
+      `https://gist.github.com/acme/${ID}`,
+      `gist.github.com/acme/${ID}`,
+      // The raw host, as copied from a gist's Raw button.
+      `https://gist.githubusercontent.com/acme/${ID}/raw/c1f09823/create-pr-skill.md`,
+    ]) {
+      expect(parseRepoReference(input), input).toEqual({
+        owner: "acme",
+        repo: ID,
+      });
+    }
+  });
+
+  it("recognises gist ids and nothing else", () => {
+    expect(isGistId(ID)).toBe(true); // 32 hex — current gists
+    expect(isGistId("aa5507d2b3f0aa41c59c")).toBe(true); // 20 hex — older gists
+    expect(isGistId("skills")).toBe(false);
+    expect(isGistId("d2b3f0aa41c59c8b3d42c71794cffc5")).toBe(false); // 31 hex
+    expect(isGistId("agent-toolkit-for-aws")).toBe(false);
   });
 });
 

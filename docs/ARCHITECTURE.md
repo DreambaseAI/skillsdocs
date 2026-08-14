@@ -67,6 +67,8 @@ Every route below. `use cache` scopes are marked; **anything not marked is dynam
 
 **Rule: the third path segment namespace belongs entirely to skill slugs.** No static sibling routes may be added under `/[owner]/[repo]/`. The colophon, the accessibility report, and the "all chapters" view are **sections of the book page**, not routes. This is non-negotiable — a repo containing a skill named `colophon` must not be shadowed.
 
+**DECISION — gists render as one-off books on the same routes.** A pasted `gist.github.com/<user>/<id>` lands on `/[owner]/[repo]` with the hex id in repo position; `isGistId()` (20 or 32 lowercase hex, `src/lib/site.ts`) routes `buildBook` to the gist path, with a fallback to the repo pipeline on a missing gist so a legitimately hex-named repo still resolves. One `GET /gists/:id` REST call returns metadata *and* every file body inline (`fetchGist`, `src/lib/github.ts`) — cheaper than a repo book. `gistBookInputs` (`src/lib/gist.ts`, pure) projects each markdown file to `<stem>/SKILL.md` so `discoverSkills` and `assembleBook` run unchanged; non-markdown files are dropped because the file routes re-fetch resources from `raw.githubusercontent.com`, which does not serve gists. `RepoMeta.displayName` carries the gist description as the title (the id is the URL identity, never the headline). Gist books have **no install command** (the CLI only takes `owner/repo` — the observed-in-the-wild rule above applies), are **never indexed** (`robots: noindex` in the book layout — secret gists are link-access-only on GitHub itself and rendering must not widen that), have no webhook (TTL-only freshness), and are never seeded, searched, or listed on the home page.
+
 ### Agent (Markdown)
 
 | URL | Serves | How |

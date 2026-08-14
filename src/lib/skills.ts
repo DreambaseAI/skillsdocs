@@ -754,6 +754,25 @@ function asString(v: unknown): string | null {
   return null;
 }
 
+/**
+ * `allowed-tools` in the wild is comma-separated and an entry may contain
+ * spaces inside its specifier parens — `Bash(git *), Bash(gh pr *), Read`.
+ * Splitting on whitespace shredded those into fragments, two of which were
+ * the identical string `*),` — rendered as keyed chips, a React duplicate-key
+ * error. Commas win when present; plain space-separated lists still parse,
+ * and a YAML list value is taken as-is. Deduped because the chips key on the
+ * string.
+ */
+function parseAllowedTools(value: unknown): string[] {
+  const parts = Array.isArray(value)
+    ? value.map((v) => asString(v) ?? "")
+    : (() => {
+        const raw = asString(value) ?? "";
+        return raw.includes(",") ? raw.split(",") : raw.split(/\s+/);
+      })();
+  return [...new Set(parts.map((t) => t.trim()).filter(Boolean))];
+}
+
 /** Validate frontmatter against the Agent Skills spec, returning warnings. */
 function validate(fm: SkillFrontmatter, dirName: string): string[] {
   const issues: string[] = [];
@@ -829,9 +848,7 @@ export function parseSkill(
     resources,
     license: asString(frontmatter.license),
     compatibility: asString(frontmatter.compatibility),
-    allowedTools: (asString(frontmatter["allowed-tools"]) ?? "")
-      .split(/\s+/)
-      .filter(Boolean),
+    allowedTools: parseAllowedTools(frontmatter["allowed-tools"]),
     variants: stub.variants,
     parentSlug: stub.parentSlug,
     origin: stub.origin,

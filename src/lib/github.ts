@@ -126,6 +126,13 @@ export interface RepoMeta {
   owner: string;
   repo: string;
   fullName: string;
+  /**
+   * Editorial title for sources whose URL identifier is unreadable — a gist's
+   * `repo` is its hex id, and this carries the gist description instead.
+   * Display surfaces prefer it; URLs and cache keys never use it. Absent for
+   * ordinary repositories.
+   */
+  displayName?: string;
   defaultBranch: string;
   description: string | null;
   homepage: string | null;
@@ -302,6 +309,98 @@ export async function fetchOwnerMeta(login: string): Promise<OwnerMeta | null> {
     // Owner metadata is decorative — never fail a book over it.
     return null;
   }
+}
+
+/* ------------------------------------------------------------------ gists */
+
+export interface GistFile {
+  name: string;
+  size: number;
+  /** Inline body; null when even the raw-URL fallback failed. */
+  content: string | null;
+}
+
+export interface GistMeta {
+  id: string;
+  /** Login of the gist's owner — always the real one, never the URL's. */
+  owner: string;
+  ownerAvatar: string;
+  ownerUrl: string;
+  ownerType: string;
+  description: string | null;
+  /** False for secret gists, which are link-accessible but unlisted. */
+  isPublic: boolean;
+  htmlUrl: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  files: GistFile[];
+}
+
+interface RawGist {
+  id: string;
+  description: string | null;
+  public: boolean;
+  html_url: string;
+  created_at: string | null;
+  updated_at: string | null;
+  owner?: { login: string; avatar_url: string; html_url: string; type: string };
+  files: Record<
+    string,
+    {
+      filename: string;
+      size: number;
+      truncated?: boolean;
+      content?: string;
+      raw_url: string;
+    }
+  >;
+}
+
+/**
+ * One gist, with every file body inline — the whole book in a single REST
+ * call. `GET /gists/:id` returns file contents up to 1 MB each; the rare
+ * truncated file is completed from its CDN raw URL, which is unmetered.
+ *
+ * A gist id is global, so the API ignores the user segment — but our URLs
+ * don't: serving one gist under every `/<user>/` would mint duplicate books
+ * (and hand anonymous gists an author). Any owner mismatch is a 404.
+ */
+export async function fetchGist(user: string, id: string): Promise<GistMeta> {
+  "use cache";
+  cacheLife("repo");
+  cacheTag(repoTag(user, id));
+
+  const g = await ghJson<RawGist>(`/gists/${encodeURIComponent(id)}`);
+  const login = g.owner?.login;
+  if (!login || login.toLowerCase() !== user.toLowerCase()) {
+    throw new GitHubError(`Not found: gist ${id} under ${user}`, 404, "not-found");
+  }
+
+  const files = await Promise.all(
+    Object.values(g.files).map(async (f): Promise<GistFile> => ({
+      name: f.filename,
+      size: f.size,
+      content: f.truncated
+        ? await fetch(f.raw_url)
+            .then((r) => (r.ok ? r.text() : null))
+            .catch(() => null)
+        : (f.content ?? null),
+    })),
+  );
+
+  return {
+    id: g.id,
+    owner: login,
+    ownerAvatar: g.owner?.avatar_url ?? "",
+    ownerUrl: g.owner?.html_url ?? `https://github.com/${login}`,
+    ownerType: g.owner?.type ?? "User",
+    description: g.description?.trim() || null,
+    isPublic: g.public,
+    htmlUrl: g.html_url,
+    createdAt: g.created_at,
+    updatedAt: g.updated_at,
+    files,
+  };
 }
 
 /* ------------------------------------------------- combined GraphQL fetch */

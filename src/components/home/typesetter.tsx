@@ -27,7 +27,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useState } from "react";
 import { announce } from "@/components/chrome/live-regions";
 import { capture } from "@/lib/analytics";
-import { isInstallCommand, parseRepoReference, paths } from "@/lib/site";
+import {
+  isGistId,
+  isInstallCommand,
+  parseRepoReference,
+  paths,
+} from "@/lib/site";
 
 export interface TypesetterProps {
   /** The repo the empty field opens, and the ghost text in it. */
@@ -50,9 +55,10 @@ export function Typesetter({
   // event and so the status line stays quiet until they type.
   const [value, setValue] = useState(`${exampleOwner}/${exampleRepo}`);
   const [dirty, setDirty] = useState(false);
-  // True after an `npx skills add …` paste: the static prefix reads
-  // `npx skills add` instead of `github.com/` until the field is cleared.
-  const [installPrefix, setInstallPrefix] = useState(false);
+  // Set by a recognised paste: the static prefix restates what was pasted —
+  // `npx skills add` for an install command, `gist.github.com/` for a gist —
+  // until the field is cleared. Everything else keeps `github.com/`.
+  const [prefix, setPrefix] = useState<"url" | "npx" | "gist">("url");
   const parsed = parseRepoReference(value);
   const typing = value.trim().length > 0;
 
@@ -69,7 +75,11 @@ export function Typesetter({
       if (!ref) return;
       event.preventDefault();
       setDirty(true);
-      setInstallPrefix(isInstallCommand(text));
+      // An install command wrapping a gist URL is still shown as the command:
+      // it is what the reader actually pasted.
+      setPrefix(
+        isInstallCommand(text) ? "npx" : isGistId(ref.repo) ? "gist" : "url"
+      );
       setValue(`${ref.owner}/${ref.repo}`);
     },
     []
@@ -122,7 +132,11 @@ export function Typesetter({
         >
           {/* Non-breaking space: a trailing normal space collapses against the
               flex item boundary and the command runs into the slug. */}
-          {installPrefix ? "npx skills add\u00A0" : "github.com/"}
+          {prefix === "npx"
+            ? "npx skills add\u00A0"
+            : prefix === "gist"
+              ? "gist.github.com/"
+              : "github.com/"}
         </span>
         {/* `field-sizing-content` shrink-wraps the input to its text so the
             resting caret sits right after the last glyph; the `size` attribute
@@ -142,7 +156,7 @@ export function Typesetter({
             setDirty(true);
             setValue(event.target.value);
             // An emptied field starts over as an address, not a command.
-            if (event.target.value.trim() === "") setInstallPrefix(false);
+            if (event.target.value.trim() === "") setPrefix("url");
           }}
           onPaste={paste}
           placeholder="org/repo"

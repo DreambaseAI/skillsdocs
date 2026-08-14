@@ -15,6 +15,8 @@ import { getIssueTheme } from "./design/fetch";
 import { deriveIssueTheme } from "./design/theme";
 import type { IssueTheme } from "./design/types";
 import {
+  fetchGist,
+  fetchOwnerMeta,
   fetchRawText,
   fetchRawTextBatch,
   fetchRepoAndOwner,
@@ -24,6 +26,8 @@ import {
   type RepoMeta,
   type TreeEntry,
 } from "./github";
+import { gistBookInputs } from "./gist";
+import { isGistId } from "./site";
 import {
   fetchMarketplace,
   type MarketplaceInfo,
@@ -355,6 +359,19 @@ async function buildBook(
   ownerParam: string,
   repoParam: string,
 ): Promise<Book> {
+  // A hex id in repo position is a gist reference — `gist.github.com/u/id`
+  // pasted into the hero lands here as `/u/id`. A repo legitimately named 32
+  // hex characters still resolves: only a *missing* gist falls through.
+  if (isGistId(repoParam)) {
+    try {
+      return await buildGistBook(ownerParam, repoParam);
+    } catch (error) {
+      if (!(error instanceof GitHubError) || error.kind !== "not-found") {
+        throw error;
+      }
+    }
+  }
+
   // Repo + owner metadata: one GraphQL point when authenticated, two REST
   // calls when not.
   const { repo, owner: ownerMeta } = await fetchRepoAndOwner(
@@ -405,6 +422,31 @@ async function buildBook(
     marketplace,
     theme,
     lockSources: mergeSkillsLocks(lockTexts),
+  });
+}
+
+/**
+ * A gist as a one-off book: one REST call for everything (the gist payload
+ * carries its file bodies inline), one more for owner metadata. No tree, no
+ * GraphQL, no skills.sh signal (gists aren't indexed there), no marketplace.
+ */
+async function buildGistBook(user: string, id: string): Promise<Book> {
+  const gist = await fetchGist(user, id);
+  const { repo, entries, sources } = gistBookInputs(gist);
+
+  const ownerMeta = await fetchOwnerMeta(repo.owner);
+  const theme = await resolveTheme(repo.owner, null, ownerMeta?.blog ?? null, []);
+
+  return assembleBook({
+    repo,
+    owner: ownerMeta,
+    entries,
+    truncated: false,
+    readme: null,
+    sources,
+    signal: null,
+    marketplace: null,
+    theme,
   });
 }
 
@@ -527,6 +569,22 @@ async function getSkillRawCached(
   "use cache";
   cacheLife("repo");
   cacheTag(`repo:${owner}/${repo}`);
+
+  // Mirrors `buildBook`: a gist chapter's bytes are already in the gist
+  // payload, and a missing gist falls through to the repo path.
+  if (isGistId(repo)) {
+    try {
+      const { entries, sources } = gistBookInputs(await fetchGist(owner, repo));
+      const index = discoverSkills(entries, repo).findIndex(
+        (s) => s.slug === slug,
+      );
+      return index >= 0 ? (sources[index] ?? null) : null;
+    } catch (error) {
+      if (!(error instanceof GitHubError) || error.kind !== "not-found") {
+        throw error;
+      }
+    }
+  }
 
   const { repo: meta } = await fetchRepoAndOwner(owner, repo);
   const tree = await fetchRepoTree(meta.owner, meta.repo, meta.defaultBranch);

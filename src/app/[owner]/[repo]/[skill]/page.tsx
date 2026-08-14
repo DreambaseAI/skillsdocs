@@ -22,6 +22,7 @@ import { showcaseParams } from "@/lib/featured";
 import { chapterJsonLd, JsonLd } from "@/lib/jsonld";
 import {
   installCommand,
+  isGistId,
   marketplaceCommand,
   paths,
   SITE_NAME,
@@ -196,8 +197,9 @@ async function ChapterBody({
           {/* The install panel leads the page: the reader who arrived to get
               this skill should not have to scroll past its prose to take it.
               A credited skill has no command — see the credit block after the
-              appendix. */}
-          {skill.origin !== "credited" ? (
+              appendix. A gist has no command either: the CLI only takes
+              `owner/repo`. */}
+          {skill.origin !== "credited" && !isGistId(repo) ? (
             <div className="book-measure mt-8">
               <p className="book-eyebrow mb-2">Install</p>
               <InstallCommand rows={installRows} />
