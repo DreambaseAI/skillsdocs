@@ -132,6 +132,16 @@ function createListStore(storageKey: string, keyRe: RegExp, maxEntries: number) 
     if (next.length !== current.length) write(next);
   }
 
+  /** Replace the whole list — used to persist a reorder. Validated, deduped,
+   * capped, so a bad caller can at worst shrink the list, never corrupt it. */
+  function replace(next: readonly string[]) {
+    const clean = [...new Set(next.filter((k) => keyRe.test(k)))].slice(
+      0,
+      maxEntries,
+    );
+    write(clean);
+  }
+
   function clear() {
     write(EMPTY);
   }
@@ -143,6 +153,7 @@ function createListStore(storageKey: string, keyRe: RegExp, maxEntries: number) 
     add,
     toggle,
     removeWhere,
+    replace,
     clear,
   };
 }
@@ -224,6 +235,8 @@ export interface Bookmarks {
   /** Bookmark or unbookmark; returns the new bookmarked state. Bookmarking a
    * skill auto-stars its book, so the shelf always holds the bookmark's home. */
   toggle: (key: string) => boolean;
+  /** Persist a new order for the whole list — the board's drag writes here. */
+  reorder: (next: readonly string[]) => void;
   /** False during SSR and the hydrating render, when `keys` is always empty. */
   ready: boolean;
 }
@@ -248,5 +261,9 @@ export function useBookmarks(): Bookmarks {
     return bookmarked;
   }, []);
 
-  return { keys, has, toggle, ready };
+  const reorder = useCallback((next: readonly string[]) => {
+    BOOKMARKS.replace(next);
+  }, []);
+
+  return { keys, has, toggle, reorder, ready };
 }

@@ -1,0 +1,343 @@
+/*
+ * The pin board: bookmarked skills as paper sheets pinned to cork.
+ *
+ * Like the covers and spines (cover.css), everything here is a printed
+ * object: light paper stock washed with the owner's accent, constant across
+ * colour schemes. All colour comes from the `--sheet-*` / `--board-*` tokens
+ * and the per-issue accent variables — no literals outside tokens.css.
+ *
+ * Accents are tuned for dark chrome, so on light paper they are always mixed
+ * toward `--sheet-ink` before being used as text; the wash on the stock stays
+ * below 14% so the ruled lines and ink hold contrast on every hue.
+ */
+
+/* ─────────────────────────────────────────────────────────── the board */
+
+.pin-board {
+  position: relative;
+  background-color: var(--board-ground);
+  background-image:
+    radial-gradient(
+      color-mix(in oklab, var(--sheet-ground) 13%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 15px 15px;
+  box-shadow: inset 0 0 90px color-mix(in oklab, var(--cover-shade-strong) 70%, transparent);
+}
+
+/* ─────────────────────────────────────────────────────────── one stack */
+
+.paper-stack {
+  position: relative;
+  rotate: var(--tilt, 0deg);
+  transition: rotate 160ms ease, scale 160ms ease;
+}
+
+/* The sheets behind the top page, when the repo pinned more than one. */
+.paper-stack::before,
+.paper-stack::after {
+  content: "";
+  position: absolute;
+  inset: 0.35rem 0.15rem -0.55rem;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--accent-a) 7%, var(--sheet-ground));
+  box-shadow: 0 8px 18px color-mix(in oklab, var(--cover-shade) 80%, transparent);
+  display: none;
+}
+.paper-stack::before {
+  rotate: -2.1deg;
+  translate: -0.3rem 0;
+}
+.paper-stack::after {
+  rotate: 1.6deg;
+  translate: 0.4rem 0;
+}
+.paper-stack[data-depth="2"]::before {
+  display: block;
+}
+.paper-stack[data-depth="3"]::before,
+.paper-stack[data-depth="3"]::after {
+  display: block;
+}
+
+.paper-stack[data-dragging] {
+  rotate: 0deg;
+  scale: 1.04;
+  z-index: 40;
+  transition: none;
+}
+.paper-stack[data-dragging] .paper-card {
+  box-shadow: 0 22px 44px color-mix(in oklab, var(--cover-shade-strong) 90%, transparent);
+  cursor: grabbing;
+}
+
+/* ──────────────────────────────────────────────────────────── the page */
+
+.paper-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-height: 15.5rem;
+  padding: 1.35rem 1.4rem 1.15rem;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--accent-a) 11%, var(--sheet-ground));
+  color: var(--sheet-ink);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--cover-sheen) 60%, transparent) inset,
+    0 12px 28px color-mix(in oklab, var(--cover-shade) 90%, transparent);
+  text-decoration: none;
+  cursor: grab;
+  /* Vertical page scrolling stays native; horizontal intent is the drag's. */
+  touch-action: pan-y;
+  /* The darkened accent every printed accent on this sheet builds from. */
+  --sheet-accent: color-mix(in oklab, var(--accent-a) 52%, var(--sheet-ink));
+}
+
+/* Ruled paper: hairlines under the prose area only. */
+.paper-card::before {
+  content: "";
+  position: absolute;
+  inset: 4.4rem 0 0.4rem;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 calc(1.55rem - 1px),
+    color-mix(in oklab, var(--sheet-ink) 9%, transparent) calc(1.55rem - 1px) 1.55rem
+  );
+  pointer-events: none;
+}
+
+/* The turned corner, top right: the board shows through the cut. */
+.paper-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1.3rem;
+  height: 1.3rem;
+  background: linear-gradient(
+    225deg,
+    var(--board-ground) 0 49.5%,
+    color-mix(in oklab, var(--sheet-ink) 16%, var(--sheet-ground)) 50%
+  );
+  border-radius: 0 6px 0 6px;
+}
+
+/* ─────────────────────────────────────────────────────────────── parts */
+
+.paper-pin {
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  z-index: 2;
+  width: 1.15rem;
+  height: 1.15rem;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 32% 28%,
+    color-mix(in oklab, var(--sheet-ground) 45%, var(--accent-a)),
+    color-mix(in oklab, var(--sheet-ink) 55%, var(--accent-a)) 48%,
+    color-mix(in oklab, var(--sheet-ink) 88%, var(--accent-a)) 82%
+  );
+  box-shadow:
+    0 3px 5px color-mix(in oklab, var(--cover-shade-strong) 85%, transparent),
+    0 1px 0 color-mix(in oklab, var(--cover-sheen) 80%, transparent) inset;
+}
+
+.paper-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-block-end: 0.55rem;
+  border-block-end: 1px solid color-mix(in oklab, var(--sheet-ink) 22%, transparent);
+}
+
+.paper-avatar {
+  border-radius: 6px;
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--cover-shade) 80%, transparent);
+}
+
+.paper-title {
+  margin-block: 0.15rem 0;
+  color: color-mix(in oklab, var(--sheet-ink) 88%, var(--accent-a));
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.paper-dek {
+  color: color-mix(in oklab, var(--sheet-ink) 78%, var(--sheet-ground));
+  font-size: 0.84rem;
+  line-height: 1.55rem; /* sits on the ruled lines */
+}
+
+.paper-foot {
+  margin-block-start: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.paper-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.45rem;
+  border: 1px solid color-mix(in oklab, var(--sheet-accent) 45%, transparent);
+  background: color-mix(in oklab, var(--accent-a) 16%, var(--sheet-ground));
+}
+.paper-chip::after {
+  content: "";
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 1px;
+  background: var(--sheet-accent);
+}
+
+.paper-more {
+  position: absolute;
+  right: 0.8rem;
+  bottom: -0.7rem;
+  z-index: 2;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sheet-ink) 90%, var(--accent-a));
+  color: var(--sheet-ground);
+  box-shadow: 0 4px 10px color-mix(in oklab, var(--cover-shade-strong) 70%, transparent);
+}
+
+/* Keyboard reorder: invisible until focused, then a real control. */
+.paper-move {
+  position: absolute;
+  top: 0.4rem;
+  z-index: 3;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sheet-ink) 90%, var(--accent-a));
+  color: var(--sheet-ground);
+  opacity: 0;
+  pointer-events: none;
+}
+.paper-move:focus-visible,
+.paper-stack:focus-within .paper-move {
+  opacity: 1;
+  pointer-events: auto;
+}
+.paper-move[data-dir="earlier"] {
+  left: 0.4rem;
+}
+.paper-move[data-dir="later"] {
+  right: 0.4rem;
+}
+
+/* ────────────────────────────────────────────────── typographic voices */
+
+/*
+ * "Different fonts for each stack": the reader faces are already mounted as
+ * variables on <html> and fetch on first glyph, so each voice is a real
+ * typeface, chosen by owner hash in the component.
+ */
+.paper-card[data-voice="literata"] .paper-title {
+  font-family: var(--font-literata), Georgia, serif;
+  font-weight: 600;
+}
+.paper-card[data-voice="fraunces"] .paper-title {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-weight: 600;
+}
+.paper-card[data-voice="instrument"] .paper-title {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.7rem, 2.3vw, 2.05rem);
+}
+.paper-card[data-voice="newsreader"] .paper-title {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+}
+.paper-card[data-voice="garamond"] .paper-title {
+  font-family: var(--font-eb-garamond), Georgia, serif;
+  font-weight: 600;
+}
+.paper-card[data-voice="lora"] .paper-title {
+  font-family: var(--font-lora), Georgia, serif;
+  font-weight: 600;
+}
+.paper-card[data-voice="mono"] .paper-title {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: clamp(1.25rem, 1.8vw, 1.5rem);
+  letter-spacing: -0.02em;
+}
+.paper-card[data-voice="grotesk"] .paper-title {
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* ─────────────────────────────────────────── the homepage strip (mini) */
+
+.paper-strip {
+  display: flex;
+  gap: 1.4rem;
+  overflow-x: auto;
+  padding: 1.1rem 0.4rem 1.3rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.paper-strip .paper-stack {
+  flex: 0 0 12.5rem;
+  scroll-snap-align: start;
+}
+.paper-strip .paper-card {
+  min-height: 10.5rem;
+  padding: 1rem 1.05rem 0.85rem;
+  gap: 0.45rem;
+  /* Nothing drags in the strip: these are plain links to the skill. */
+  cursor: pointer;
+}
+.paper-strip .paper-card::before {
+  inset: 3.3rem 0 0.3rem;
+}
+.paper-strip .paper-title {
+  font-size: 1.05rem !important;
+  line-height: 1.15;
+}
+.paper-strip .paper-dek {
+  display: none;
+}
+
+/* ─────────────────────────────────────────────────────── forced colors */
+
+@media (forced-colors: active) {
+  .paper-card {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+  .pin-board {
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+  .paper-pin,
+  .paper-card::before,
+  .paper-card::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper-stack {
+    transition: none;
+  }
+}

@@ -127,6 +127,13 @@ export const paths = {
    * `/share?repos=anthropics/skills,vercel/ai`.
    */
   share: (keys: readonly string[]) => `/share?repos=${keys.join(",")}`,
+  /**
+   * The skill board: bookmarked skills as `owner/repo/slug` keys,
+   * comma-joined and ordered. Without keys it is the visitor's own board,
+   * read from their device.
+   */
+  board: (keys?: readonly string[]) =>
+    keys && keys.length > 0 ? `/bookmarks?skills=${keys.join(",")}` : "/bookmarks",
   book: (owner: string, repo: string) => `/${enc(owner)}/${enc(repo)}`,
   chapter: (owner: string, repo: string, slug: string) =>
     `/${enc(owner)}/${enc(repo)}/${enc(slug)}`,

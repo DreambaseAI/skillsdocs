@@ -191,6 +191,16 @@
   --cover-shade: oklch(0 0 0 / 0.35);
   --cover-shade-strong: oklch(0 0 0 / 0.6);
   --cover-sheen: oklch(1 0 0 / 0.16);
+
+  /*
+   * The pin board's paper. A pinned sheet is the cover's opposite — ink on
+   * *light* stock — and, like the cover, a printed object that keeps its own
+   * colours in both schemes. The cork ground sits a step warmer and darker
+   * than the cover plate so the sheets read as lit paper on felt.
+   */
+  --sheet-ground: oklch(0.963 0.011 92);
+  --sheet-ink: oklch(0.27 0.014 60);
+  --board-ground: oklch(0.175 0.014 62);
 }
 
 /* ═════════════════════════════════════════ D. Reader typography inputs */

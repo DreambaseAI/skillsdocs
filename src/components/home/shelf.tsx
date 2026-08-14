@@ -26,6 +26,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { BoardStrip } from "@/components/home/board-strip";
 import { announce } from "@/components/chrome/live-regions";
 import { COVER_STAR_CLASS } from "@/components/home/cover-star";
 import { FavoriteButton } from "@/components/home/favorite-button";
@@ -261,6 +262,10 @@ export function SpineRail({ rows, total }: SpineRailProps) {
           Browse all {total} <span aria-hidden>→</span>
         </a>
       </div>
+
+      {/* The board's preview: bookmarked skills as small paper stacks.
+          Renders nothing until something is bookmarked. */}
+      <BoardStrip />
     </section>
   );
 }
