@@ -4,6 +4,7 @@ import { Home01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AccountButton } from "@/components/chrome/account-button";
 import { ThemeToggleButton } from "@/components/chrome/theme-toggle";
 import { useHideOnScroll } from "@/hooks/use-hide-on-scroll";
 import { SITE_NAME } from "@/lib/site";
@@ -74,6 +75,7 @@ export function SiteHeader({ children, actions, pinned = false }: SiteHeaderProp
         <div className="flex shrink-0 items-center gap-1">
           {actions}
           <ThemeToggleButton />
+          <AccountButton />
         </div>
       </div>
     </header>
