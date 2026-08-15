@@ -28,7 +28,13 @@ const pool = new Pool({
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
   database: process.env.POSTGRES_DATABASE,
-  ssl: process.env.POSTGRES_SSL === "true" ? true : undefined,
+  // Same TLS ladder as src/lib/db.ts: a custom CA (ClickHouse Cloud), plain
+  // verified TLS, or none (local Docker).
+  ssl: process.env.POSTGRES_CA
+    ? { ca: process.env.POSTGRES_CA }
+    : process.env.POSTGRES_SSL === "true"
+      ? true
+      : undefined,
 });
 
 const sql = readFileSync("db/schema.sql", "utf8");

@@ -18,7 +18,14 @@ export const db = new Pool({
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
   database: process.env.POSTGRES_DATABASE,
-  // ClickHouse Cloud Postgres requires TLS; the local Docker instance
-  // doesn't speak it. Set POSTGRES_SSL=true in production.
-  ssl: process.env.POSTGRES_SSL === "true" ? true : undefined,
+  // ClickHouse Cloud Postgres requires TLS and presents a per-service CA
+  // (fetch with `clickhousectl cloud postgres certs get <id>`), so production
+  // sets POSTGRES_CA to that PEM bundle. POSTGRES_SSL=true alone covers a
+  // server with a publicly-chained cert. The local Docker instance speaks no
+  // TLS and sets neither.
+  ssl: process.env.POSTGRES_CA
+    ? { ca: process.env.POSTGRES_CA }
+    : process.env.POSTGRES_SSL === "true"
+      ? true
+      : undefined,
 });
