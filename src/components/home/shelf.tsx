@@ -31,6 +31,7 @@ import { announce } from "@/components/chrome/live-regions";
 import { COVER_STAR_CLASS } from "@/components/home/cover-star";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { ownerAccentStyle } from "@/components/home/issue-accent";
+import { SaveCollectionButton } from "@/components/home/save-collection-button";
 import { ShareMenu } from "@/components/home/share-menu";
 import { Button } from "@/components/ui/button";
 import { favoriteKey, useFavorites } from "@/hooks/use-favorites";
@@ -102,7 +103,10 @@ export function Spine({
     : row.repo;
   const fontSize = Math.max(
     10,
-    Math.min(voice.max, (height - SPINE_FURNITURE) / (label.length * voice.glyph)),
+    Math.min(
+      voice.max,
+      (height - SPINE_FURNITURE) / (label.length * voice.glyph)
+    )
   );
 
   return (
@@ -157,7 +161,7 @@ export function SpineRail({ rows, total }: SpineRailProps) {
   // has on its book page and on `/share` — a starred book losing its colours
   // because it fell outside the front page's top rows read as a bug, and was.
   const featured = new Map(
-    rows.map((row) => [favoriteKey(row.owner, row.repo), row]),
+    rows.map((row) => [favoriteKey(row.owner, row.repo), row])
   );
   const spines = keys
     .map((key) => {
@@ -183,13 +187,22 @@ export function SpineRail({ rows, total }: SpineRailProps) {
             {ready && keys.length > 0 ? "Your favorite skills" : "Your shelf"}
           </h2>
           {ready && keys.length > 0 && (
-            <ShareMenu
-              url={absoluteUrl(paths.share(keys))}
-              title={`Favorite skills — a shared shelf on ${SITE_NAME}`}
-              summary={`${keys.length} ${keys.length === 1 ? "book" : "books"} of agent skills, shared as a shelf.`}
-              label="Share"
-              className="border-rule text-ink hover:text-issue-accent -translate-y-0.5 rounded-full border"
-            />
+            <div className="flex items-center gap-2">
+              <ShareMenu
+                url={absoluteUrl(paths.share(keys))}
+                title={`Favorite skills — a shared shelf on ${SITE_NAME}`}
+                summary={`${keys.length} ${
+                  keys.length === 1 ? "book" : "books"
+                } of agent skills, shared as a shelf.`}
+                label="Share"
+                className="border-rule text-ink hover:text-issue-accent rounded-full border"
+              />
+              <SaveCollectionButton
+                kind="shelf"
+                keys={keys}
+                className="border-rule text-ink hover:text-issue-accent rounded-full border"
+              />
+            </div>
           )}
         </span>
         <p className="text-ink-muted font-mono text-[0.62rem] tracking-[0.18em] uppercase">

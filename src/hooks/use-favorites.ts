@@ -15,8 +15,10 @@
  * change, not in the data shape: bookmarking auto-stars the book, unstarring a
  * book drops its bookmarks, clearing the shelf clears both.
  *
- * There is no account system and there is not going to be one, so the library
- * is device-local by design. Three constraints shape the implementation:
+ * The library is device-local: `localStorage` is the source of truth even now
+ * that sign-in exists (Better Auth) — server persistence, when it lands, will
+ * sync these lists rather than replace them. Three constraints shape the
+ * implementation:
  *
  * 1. **Several components read it at once** — a star on a card, a star in the
  *    shelf, a bookmark in the rail — and they must never disagree. One

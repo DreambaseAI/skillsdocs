@@ -26,7 +26,6 @@ import {
   Share08Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { useCallback, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { announce } from "@/components/chrome/live-regions";
@@ -38,42 +37,10 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuLinkItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
-
-/**
- * A menu row that is genuinely a link.
- *
- * `DropdownMenuItem` wraps `Menu.Item`, which asserts native button semantics;
- * handing it `render={<a/>}` makes Base UI warn, and rightly so. `Menu.LinkItem`
- * is the primitive for this, but `components/ui/dropdown-menu.tsx` does not
- * export a wrapper for it and belongs to another workstream — so the styling is
- * mirrored here, keyed to the same `data-slot` the popup's descendant selectors
- * target.
- *
- * TODO(integrator): worth promoting to `ui/dropdown-menu.tsx` as
- * `DropdownMenuLinkItem`.
- */
-function MenuLink({
-  className,
-  ...props
-}: MenuPrimitive.LinkItem.Props) {
-  return (
-    <MenuPrimitive.LinkItem
-      data-slot="dropdown-menu-item"
-      closeOnClick
-      className={cn(
-        "relative flex cursor-default items-center gap-2.5 rounded-2xl px-3 py-2 text-sm font-medium outline-hidden select-none",
-        "focus:bg-accent focus:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
-        "[&_svg:not([class*='size-'])]:size-4",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
 
 const NEVER = () => () => {};
 
@@ -211,7 +178,7 @@ export function ShareMenu({ url, title, summary = "", className, label }: ShareM
           <DropdownMenuSeparator />
 
           {destinations(url, title, summary).map((destination) => (
-            <MenuLink
+            <DropdownMenuLinkItem
               key={destination.id}
               href={destination.href}
               target="_blank"
@@ -219,7 +186,7 @@ export function ShareMenu({ url, title, summary = "", className, label }: ShareM
             >
               <HugeiconsIcon icon={destination.icon} aria-hidden />
               {destination.label}
-            </MenuLink>
+            </DropdownMenuLinkItem>
           ))}
         </DropdownMenuGroup>
       </DropdownMenuContent>

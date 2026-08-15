@@ -15,6 +15,7 @@ import { Github01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AccountButton } from "@/components/chrome/account-button";
 import { ThemeToggleButton } from "@/components/chrome/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { SITE_NAME, SOURCE_URL, paths } from "@/lib/site";
@@ -87,6 +88,7 @@ export function Masthead({ palette, strapline }: MastheadProps) {
               aria-hidden
             />
           </Button>
+          <AccountButton className="text-ink-muted hover:text-ink" />
         </div>
       </div>
     </header>

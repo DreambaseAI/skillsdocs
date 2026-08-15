@@ -56,15 +56,17 @@ const BOOK_DISCOVERY_LINK = DISCOVERY_RELATIONS;
  * hyphens). Repo and skill segments allow dots, which is exactly why the `.md`
  * check has to run against the *stripped* path rather than a negative lookahead.
  *
- * `api/` and `search/` are excluded because they are ours, not owners'.
- * Without that, `/api/v1/health` matched as owner `api`, repo `v1`, chapter
- * `health` — so the health endpoint advertised `</api/v1/health.md>` and
- * `</api/v1/.well-known/agent-skills/index.json>`, and an `Accept:
- * text/markdown` request to it would have been rewritten to
- * `/api/md/api/v1/health`.
+ * `api/`, `search/`, `share/` and `bookmarks/` are excluded because they are
+ * ours, not owners'. Without that, `/api/v1/health` matched as owner `api`,
+ * repo `v1`, chapter `health` — so the health endpoint advertised
+ * `</api/v1/health.md>` and `</api/v1/.well-known/agent-skills/index.json>`,
+ * and an `Accept: text/markdown` request to it would have been rewritten to
+ * `/api/md/api/v1/health`. Likewise `/share/<handle>` (a saved shelf) is not
+ * owner `share`, repo `<handle>`. The trailing slash keeps the exclusion
+ * segment-anchored: a real owner named `sharepoint` still matches.
  */
 const READER_ROUTE =
-  /^\/(?!api\/|search\/)[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}(?:\/[A-Za-z0-9._-]{1,100})?$/;
+  /^\/(?!api\/|search\/|share\/|bookmarks\/)[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}(?:\/[A-Za-z0-9._-]{1,100})?$/;
 
 /** `/{owner}/{repo}/.well-known/agent-skills/index.json` */
 const BOOK_MANIFEST =

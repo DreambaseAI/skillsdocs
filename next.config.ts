@@ -65,7 +65,11 @@ const nextConfig: NextConfig = {
    * reserved first segments that are not owners.
    */
   async headers() {
-    const NOT_OWNER = "api|_next|search|llms\\.txt|sitemap\\.xml|robots\\.txt";
+    // Segment-anchored: the alternative must be followed by `/` or the end of
+    // the path, so a real owner merely *starting* with a reserved word
+    // (`sharepoint`, `searchkit`) still gets its Vary header.
+    const NOT_OWNER =
+      "(?:api|_next|search|share|bookmarks|library|llms\\.txt|sitemap\\.xml|robots\\.txt)(?:/|$)";
     const vary = [{ key: "Vary", value: "Accept" }];
     return [
       {

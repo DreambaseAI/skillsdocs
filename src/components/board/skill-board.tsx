@@ -4,7 +4,7 @@
  * The skill board: bookmarked skills as paper stacks pinned to a cork board,
  * one stack per repo, order = the order of the keys.
  *
- * Two modes, one component:
+ * Three modes, one component:
  *
  * - **Shared** (`initialKeys` given): the board is the URL. Dragging writes
  *   the new order back with `history.replaceState` — shallow, no server
@@ -12,6 +12,9 @@
  *   at, ready to copy.
  * - **Device** (`initialKeys === null`): the board is the visitor's own
  *   bookmarks list; dragging persists the new order to `localStorage`.
+ * - **Saved** (`saved` given, with `initialKeys`): a named collection from
+ *   the database. The owner's drags persist through the `replaceItems`
+ *   action; a visitor's drags rearrange only their own view.
  *
  * Dragging is pointer-events by hand rather than HTML5 drag-and-drop: DnD
  * cannot do touch, and the mockup's mobile gesture is long-press. A stack is
@@ -25,8 +28,10 @@ import { PaperStack } from "@/components/board/paper-stack";
 import { keysOf, stacksOf, type Stack } from "@/components/board/stacks";
 import { useBoardBooks } from "@/components/board/use-board-books";
 import { announce } from "@/components/chrome/live-regions";
+import { SaveCollectionButton } from "@/components/home/save-collection-button";
 import { ShareMenu } from "@/components/home/share-menu";
 import { useBookmarks } from "@/hooks/use-favorites";
+import { replaceItemsAction } from "@/app/library/actions";
 import { capture } from "@/lib/analytics";
 import { absoluteUrl, paths, SITE_NAME } from "@/lib/site";
 import Link from "next/link";
@@ -39,12 +44,23 @@ const DRAG_SLOP = 7;
 /** Touch: how long a press must hold before it becomes a drag, in ms. */
 const HOLD_MS = 320;
 
+export interface SkillBoardSaved {
+  id: string;
+  name: string;
+  slug: string;
+  /** True only for the signed-in owner — their drags persist to the server. */
+  canEdit: boolean;
+}
+
 export interface SkillBoardProps {
   /** The `?skills=` keys, or null for the visitor's own device board. */
   initialKeys: readonly string[] | null;
+  /** Present when the board is a saved collection; `initialKeys` holds its
+   * items. */
+  saved?: SkillBoardSaved;
 }
 
-export function SkillBoard({ initialKeys }: SkillBoardProps) {
+export function SkillBoard({ initialKeys, saved }: SkillBoardProps) {
   const bookmarks = useBookmarks();
   const shared = initialKeys !== null;
   const [paramKeys, setParamKeys] = useState<readonly string[]>(
@@ -58,7 +74,21 @@ export function SkillBoard({ initialKeys }: SkillBoardProps) {
   const commit = useCallback(
     (next: Stack[]) => {
       const nextKeys = keysOf(next);
-      if (shared) {
+      if (saved) {
+        // The view reorders immediately either way; only the owner's order
+        // reaches the server. A failed write is announced, not silently lost.
+        setParamKeys(nextKeys);
+        if (saved.canEdit) {
+          void replaceItemsAction({ id: saved.id, items: nextKeys }).then(
+            (result) => {
+              if (!result.ok) {
+                announce("Could not save the new order.", "assertive");
+              }
+            },
+            () => announce("Could not save the new order.", "assertive"),
+          );
+        }
+      } else if (shared) {
         setParamKeys(nextKeys);
         window.history.replaceState(null, "", paths.board(nextKeys));
       } else {
@@ -66,7 +96,7 @@ export function SkillBoard({ initialKeys }: SkillBoardProps) {
       }
       capture("board_rearranged");
     },
-    [shared, bookmarks],
+    [shared, saved, bookmarks],
   );
 
   const moveStack = useCallback(
@@ -304,10 +334,19 @@ export function SkillBoard({ initialKeys }: SkillBoardProps) {
       }, 0)
     : null;
 
-  const shareUrl = absoluteUrl(paths.board(keys));
+  const shareUrl = saved
+    ? absoluteUrl(paths.sharedBoard(saved.slug))
+    : absoluteUrl(paths.board(keys));
 
   /* ------------------------------------------------------ empty states */
 
+  if (saved && keys.length === 0) {
+    return (
+      <EmptyBoard>
+        This board is empty — its owner has not pinned any skills to it yet.
+      </EmptyBoard>
+    );
+  }
   if (shared && keys.length === 0) {
     return (
       <EmptyBoard>
@@ -334,9 +373,11 @@ export function SkillBoard({ initialKeys }: SkillBoardProps) {
       {/* ------------------------------------------------------------ head */}
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
         <div className="min-w-0">
-          <p className={`${MONO_LABEL} text-issue-accent`}>Bookmarks</p>
+          <p className={`${MONO_LABEL} text-issue-accent`}>
+            {saved ? "A saved board" : "Bookmarks"}
+          </p>
           <h1 className="font-display text-ink-strong mt-1 text-[clamp(2rem,6vw,3.2rem)] leading-none tracking-[-0.02em]">
-            Skill board
+            {saved ? saved.name : "Skill board"}
           </h1>
           <p className={`${MONO_LABEL} text-ink-muted mt-2.5`}>
             {keys.length} {keys.length === 1 ? "skill" : "skills"} · from{" "}
@@ -344,13 +385,24 @@ export function SkillBoard({ initialKeys }: SkillBoardProps) {
             {minutes ? <> · {minutes} min of reading</> : null}
           </p>
         </div>
-        <ShareMenu
-          url={shareUrl}
-          title={`Skill board — bookmarked skills on ${SITE_NAME}`}
-          summary={`${keys.length} bookmarked ${keys.length === 1 ? "skill" : "skills"}, pinned to a board.`}
-          label="Share board"
-          className="border-rule text-ink hover:text-issue-accent rounded-full border"
-        />
+        <span className="flex items-center gap-2">
+          {/* Saving belongs to the device board only: a saved board already
+              has its address, and a `?skills=` board is someone else's. */}
+          {!shared && (
+            <SaveCollectionButton
+              kind="board"
+              keys={keys}
+              className="border-rule text-ink hover:text-issue-accent rounded-full border"
+            />
+          )}
+          <ShareMenu
+            url={shareUrl}
+            title={`${saved ? saved.name : "Skill board"} — bookmarked skills on ${SITE_NAME}`}
+            summary={`${keys.length} bookmarked ${keys.length === 1 ? "skill" : "skills"}, pinned to a board.`}
+            label="Share board"
+            className="border-rule text-ink hover:text-issue-accent rounded-full border"
+          />
+        </span>
       </div>
 
       {/* ----------------------------------------------------- the board */}
@@ -417,9 +469,13 @@ export function SkillBoard({ initialKeys }: SkillBoardProps) {
       <div className="text-ink-muted mt-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 font-mono text-[0.62rem] tracking-[0.14em] uppercase">
         <span>Drag a page to rearrange · click to read</span>
         <span>
-          {shared
-            ? "This board lives in the link — rearranging rewrites it"
-            : "Boards stay on this device until you share one"}
+          {saved
+            ? saved.canEdit
+              ? "Your board — rearranging saves the new order"
+              : "A saved board — rearranging here changes only your view"
+            : shared
+              ? "This board lives in the link — rearranging rewrites it"
+              : "Boards stay on this device until you share one"}
         </span>
       </div>
     </div>

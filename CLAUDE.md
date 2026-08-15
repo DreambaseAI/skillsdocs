@@ -18,7 +18,20 @@ pnpm tsc --noEmit        # typecheck
 pnpm verify:contrast     # WCAG audit of every token pair + a 1,440-point hue sweep
 pnpm probe [owner/repo]  # run skill discovery against live repos
 pnpm probe:design [org]  # resolve design.md and audit the derived theme
+pnpm db:push             # apply db/schema.sql to the Postgres named by POSTGRES_*
 ```
+
+## Database
+
+Postgres backs only the account layer (Better Auth sign-in + saved
+collections); the whole site runs without it. `docs/DATABASE.md` is the
+runbook — local dev is a clickhousectl-managed Docker Postgres named
+`githubskills`, production is ClickHouse Cloud managed Postgres (per-service
+CA → `POSTGRES_CA`). Two schema owners, never mixed: Better Auth's tables via
+`npx @better-auth/cli migrate`, app tables via idempotent DDL in
+`db/schema.sql` + `pnpm db:push`. Adding a top-level route? `src/proxy.ts`
+`READER_ROUTE` and `next.config.ts` `NOT_OWNER` must both exclude it, or
+`/newroute/x` is treated as a book.
 
 ## Stack
 

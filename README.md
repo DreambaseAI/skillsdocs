@@ -43,6 +43,15 @@ name. Theming never fails and never produces an unreadable accent.
 **Reads well on a phone, a tablet, and a wide screen** — three genuinely
 different treatments, not one layout with breakpoints bolted on.
 
+**Keeps your library on your device — and, if you sign in, at a URL.** Starring
+books and bookmarking skills needs no account: the library lives in
+`localStorage`, and any shelf or board can be shared as a stateless URL that
+encodes the whole thing. Signing in (GitHub or Google) adds named snapshots on
+top — a shelf saved at `/share/weekend-reading`, a board at
+`/bookmarks/design-toolkit` — each with an editable slug, a uuid that survives
+renames, and a `/library` page to manage them. The device library stays the
+working copy either way.
+
 **Is built for agents too.** Append `.md` to any URL for clean markdown, or send
 `Accept: text/markdown`. There is an `llms.txt`, a JSON API, and a per-book
 agent-skills discovery manifest with content digests.
@@ -88,12 +97,45 @@ export GITHUB_TOKEN=$(gh auth token)   # 60 req/hr → 5,000 req/hr
 Not required, but recommended — it unlocks the GraphQL path (repo + owner
 metadata in one point) and lifts the REST budget that pays for tree listings.
 
+### Optional: accounts and saved collections
+
+Everything above runs with **no database at all**. The reading experience, the
+device library, and URL-form sharing never touch one; without a database only
+the account features (sign-in, `/library`, saved-collection URLs) are off, and
+those pages degrade to an error boundary rather than taking anything else down.
+
+To enable them, point the app at any Postgres and configure
+[Better Auth](https://better-auth.com):
+
+```bash
+POSTGRES_HOST=…           # plus PORT, USER, PASSWORD, DATABASE
+BETTER_AUTH_SECRET=$(openssl rand -base64 32)
+BETTER_AUTH_URL=http://localhost:3000
+GITHUB_CLIENT_ID=…        # OAuth apps; the callback URL is
+GITHUB_CLIENT_SECRET=…    #   <origin>/api/auth/callback/github
+GOOGLE_CLIENT_ID=…        #   <origin>/api/auth/callback/google
+GOOGLE_CLIENT_SECRET=…
+```
+
+Then create the schema — auth tables first, the app's own after:
+
+```bash
+npx @better-auth/cli migrate   # user / session / account / verification
+pnpm db:push                   # collection (db/schema.sql, idempotent)
+```
+
+For a TLS-only server set `POSTGRES_SSL=true`; for one with its own CA (managed
+services often have one) put the PEM bundle in `POSTGRES_CA`. In production we
+run ClickHouse Cloud's managed Postgres, but nothing in the code knows that —
+it is plain `pg` throughout.
+
 ### Scripts
 
 | Command | What it does |
 |---|---|
 | `pnpm dev` / `pnpm build` | Dev server / production build |
 | `pnpm test` | Unit tests |
+| `pnpm db:push` | Apply `db/schema.sql` to the Postgres named by `POSTGRES_*` |
 | `pnpm verify:contrast` | WCAG audit of every token pair + a 1,440-point hue sweep |
 | `pnpm probe [owner/repo …]` | Run skill discovery against live repositories |
 | `pnpm probe:design [owner …]` | Resolve `design.md` and audit the derived theme |
@@ -105,7 +147,8 @@ metadata in one point) and lifts the REST budget that pays for tree listings.
 [Next.js 16.3](https://nextjs.org) · [React 19](https://react.dev) ·
 [Tailwind CSS v4](https://tailwindcss.com) ·
 [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) ·
-[HugeIcons](https://hugeicons.com) · [Shiki](https://shiki.style) ·
+[Better Auth](https://better-auth.com) · [HugeIcons](https://hugeicons.com) ·
+[Shiki](https://shiki.style) ·
 [unified](https://unifiedjs.com) · [dither-kit](https://tripwire.sh/dither-kit)
 
 Typeset in [Literata](https://fonts.google.com/specimen/Literata), with fourteen
