@@ -137,4 +137,34 @@ describe("reserved first segments are not books", () => {
       "/search/foo.md",
     );
   });
+
+  /**
+   * `/share/<handle>` is a saved shelf and `/bookmarks/<handle>` a saved
+   * board — not owner `share` repo `<handle>`. Before the exclusion,
+   * `Accept: text/markdown` on a saved shelf rewrote to
+   * `/api/md/share/<handle>`, a 404 wearing the wrong content type.
+   */
+  it("leaves saved shelves and boards alone", () => {
+    expect(proxy(req("/share/my-shelf")).headers.get("link")).not.toContain(
+      "/share/my-shelf.md",
+    );
+    expect(
+      proxy(req("/share/my-shelf", "text/markdown")).headers.get(
+        "x-middleware-rewrite",
+      ),
+    ).toBeNull();
+    expect(
+      proxy(req("/bookmarks/my-board", "text/markdown")).headers.get(
+        "x-middleware-rewrite",
+      ),
+    ).toBeNull();
+  });
+
+  it("still treats owners that merely start with a reserved word as books", () => {
+    expect(
+      proxy(req("/sharepoint/skills", "text/markdown")).headers.get(
+        "x-middleware-rewrite",
+      ),
+    ).toContain("/api/md/sharepoint/skills");
+  });
 });

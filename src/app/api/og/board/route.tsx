@@ -24,6 +24,11 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { curatedManifest } from "@/components/home/issue-accent";
 import { parseBoardSkills } from "@/lib/board";
+import {
+  getCollectionByHandle,
+  isUuidHandle,
+  isValidSlug,
+} from "@/lib/collections";
 import { formatHex, mix, parseColor, type Oklch } from "@/lib/color";
 import { deriveIssueTheme } from "@/lib/design/theme";
 import { fetchImageDataUri } from "@/lib/image-data-uri";
@@ -157,7 +162,30 @@ export async function GET(request: Request) {
 async function renderCard(request: Request) {
   const [literata, geist, geistSemibold] = await FONTS;
   const url = new URL(request.url);
-  const rows = parseBoardSkills(url.searchParams.get("skills") ?? undefined);
+
+  // `?handle=` is a saved board; `?skills=` is the stateless URL form. The
+  // handle is shape-validated before the database sees it — this endpoint is
+  // unauthenticated and must not turn junk params into queries.
+  const handle = url.searchParams.get("handle");
+  let rows: ReturnType<typeof parseBoardSkills>;
+  let title = "Skill board";
+  if (handle !== null) {
+    const lower = handle.toLowerCase();
+    const board =
+      isUuidHandle(lower) || isValidSlug(lower)
+        ? await getCollectionByHandle("board", lower)
+        : null;
+    if (!board) {
+      return new Response("No such board.", {
+        status: 404,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      });
+    }
+    rows = parseBoardSkills(board.items.join(","));
+    title = board.name;
+  } else {
+    rows = parseBoardSkills(url.searchParams.get("skills") ?? undefined);
+  }
 
   if (rows.length === 0) {
     return new Response("Nothing pinned to this board.", {
@@ -228,7 +256,7 @@ async function renderCard(request: Request) {
                 marginTop: 6,
               }}
             >
-              Skill board
+              {title}
             </div>
           </div>
           <div

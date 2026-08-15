@@ -37,7 +37,9 @@ One repo = one **issue** of a magazine / one **book**. One `SKILL.md` = one **ch
 2. **An agent.** It wants `/{owner}/{repo}.md` and `/{owner}/{repo}/.well-known/agent-skills/index.json`, and it wants to install without cloning.
 3. **The repo owner.** They want their skills to look like *their* brand, and they want to link to it.
 
-**Non-goals for v1:** authoring/editing skills, user accounts, comments, private repos, an MCP server, non-GitHub sources.
+**Non-goals for v1:** authoring/editing skills, comments, private repos, an MCP server, non-GitHub sources.
+
+**Accounts (added post-v1):** social-only sign-in (GitHub + Google) via Better Auth, backed by Postgres (`src/lib/auth.ts`, pool in `src/lib/db.ts` — locally a clickhousectl-managed Docker instance, in production ClickHouse Cloud managed Postgres). Signed-in readers can save named **collections** — shelves of `owner/repo` keys and boards of `owner/repo/skill-slug` keys — in the `collection` table (`db/schema.sql`, applied by `pnpm db:push`). Each is served at `/share/<slug|uuid>` or `/bookmarks/<slug|uuid>` and managed at `/library` (`src/lib/collections.ts`, server actions in `src/app/library/actions.ts`). The device library in `localStorage` stays the working copy; collections are named snapshots of it.
 
 ## 1.2 Canonical identity
 

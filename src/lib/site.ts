@@ -134,6 +134,14 @@ export const paths = {
    */
   board: (keys?: readonly string[]) =>
     keys && keys.length > 0 ? `/bookmarks?skills=${keys.join(",")}` : "/bookmarks",
+  /**
+   * A saved collection's page. The handle is its slug or its uuid — the slug
+   * is the pretty, editable form; the uuid survives any rename.
+   */
+  sharedShelf: (handle: string) => `/share/${enc(handle)}`,
+  sharedBoard: (handle: string) => `/bookmarks/${enc(handle)}`,
+  /** The signed-in reader's saved shelves and boards. */
+  library: () => "/library",
   book: (owner: string, repo: string) => `/${enc(owner)}/${enc(repo)}`,
   chapter: (owner: string, repo: string, slug: string) =>
     `/${enc(owner)}/${enc(repo)}/${enc(slug)}`,
