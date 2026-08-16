@@ -38,6 +38,8 @@ export interface EditCollectionButtonProps {
   id: string;
   name: string;
   slug: string;
+  /** The owner's username — the collection's address lives under it. */
+  username: string;
   className?: string;
 }
 
@@ -46,6 +48,7 @@ export function EditCollectionButton({
   id,
   name,
   slug,
+  username,
   className,
 }: EditCollectionButtonProps) {
   const router = useRouter();
@@ -91,8 +94,8 @@ export function EditCollectionButton({
         // The old address is already gone; move to the new one.
         router.replace(
           kind === "shelf"
-            ? paths.sharedShelf(nextSlug)
-            : paths.sharedBoard(nextSlug),
+            ? paths.userShelf(username, nextSlug)
+            : paths.userBoard(username, nextSlug),
         );
       } else {
         // The name in the hero is server-rendered.
@@ -101,7 +104,7 @@ export function EditCollectionButton({
     } finally {
       setBusy(false);
     }
-  }, [busy, nameDraft, name, slugDraft, slug, id, kind, router]);
+  }, [busy, nameDraft, name, slugDraft, slug, id, kind, username, router]);
 
   const remove = useCallback(async () => {
     if (!confirming) {
@@ -168,7 +171,7 @@ export function EditCollectionButton({
             <span className="text-sm font-medium">Link</span>
             <span className="flex items-center gap-1.5">
               <span className="text-muted-foreground shrink-0 font-mono text-xs">
-                {kind === "shelf" ? "/share/" : "/bookmarks/"}
+                /{username}/{kind === "shelf" ? "repos" : "skills"}/
               </span>
               <Input
                 value={slugDraft}

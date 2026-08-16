@@ -1,11 +1,12 @@
 /**
  * A shared shelf, the stateless form.
  *
- * `/share?repos=anthropics/skills,vercel/ai` renders the named books as a
- * bookcase — one shelf per twelve spines, in each owner's own colours. The
+ * `/share/repos?repos=anthropics/skills,vercel/ai` renders the named repos as
+ * a bookcase — one shelf per twelve spines, in each owner's own colours. The
  * whole shelf lives in the URL: no account, no database, nothing stored.
  * Starring any spine copies it onto the visitor's own device shelf, which is
- * the entire "import" story. Saved, named shelves live at `/share/[handle]`.
+ * the entire "import" story. Saved, named shelves live at
+ * `/username/repos/<slug>`.
  *
  * Cache Components: the page reads `searchParams`, so everything derived from
  * it sits inside a `<Suspense>` boundary; the chrome prerenders as the shell.
@@ -21,7 +22,10 @@ import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
 import { SiteFooter } from "@/components/home/site-footer";
 import { parseShareRepos } from "@/lib/share";
 import { absoluteUrl, paths, SITE_NAME } from "@/lib/site";
-import { BookcaseFallback, ShelfView } from "./shelf-view";
+import {
+  BookcaseFallback,
+  ShelfView,
+} from "@/components/collections/shelf-view";
 
 /**
  * Per-URL metadata: the OG card is the shelf itself, rendered by
@@ -114,7 +118,7 @@ async function SharedShelf({
           This link names no repos — it may have been trimmed in transit. A
           shared shelf looks like{" "}
           <code className="text-ink font-mono text-[0.85em]">
-            /share?repos=anthropics/skills,vercel/ai
+            /share/repos?repos=anthropics/skills,vercel/ai
           </code>
           .
         </>

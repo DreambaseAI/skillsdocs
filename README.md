@@ -44,13 +44,15 @@ name. Theming never fails and never produces an unreadable accent.
 different treatments, not one layout with breakpoints bolted on.
 
 **Keeps your library on your device — and, if you sign in, at a URL.** Starring
-books and bookmarking skills needs no account: the library lives in
+repos and bookmarking skills needs no account: the library lives in
 `localStorage`, and any shelf or board can be shared as a stateless URL that
-encodes the whole thing. Signing in (GitHub or Google) adds named snapshots on
-top — a shelf saved at `/share/weekend-reading`, a board at
-`/bookmarks/design-toolkit` — each with an editable slug, a uuid that survives
-renames, and a `/library` page to manage them. The device library stays the
-working copy either way.
+encodes the whole thing (`/share/repos?repos=…`, `/share/skills?skills=…`).
+Signing in (GitHub or Google) adds a username and named snapshots on top —
+`/you` is your page, a shelf lives at `/you/repos/weekend-reading`, a board at
+`/you/skills/design-toolkit` — each with an editable slug, a uuid that
+survives renames, and a `/library` page to manage them. Usernames may only
+match an existing GitHub login when it is *your own* linked account, so a
+reader's pages can never shadow a real repository's book.
 
 **Is built for agents too.** Append `.md` to any URL for clean markdown, or send
 `Accept: text/markdown`. There is an `llms.txt`, a JSON API, and a per-book

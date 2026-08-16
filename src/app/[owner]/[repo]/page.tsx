@@ -13,6 +13,11 @@ import {
   RateLimited,
   UpstreamFailure,
 } from "@/components/book/states";
+import {
+  KindIndexBody,
+  resolveUser,
+} from "@/components/collections/user-pages";
+import { ownerAccentStyle } from "@/components/home/issue-accent";
 import { Markdown } from "@/components/reader/markdown";
 import { showcaseParams } from "@/lib/featured";
 import { bookJsonLd, JsonLd } from "@/lib/jsonld";
@@ -41,6 +46,22 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { owner, repo } = await props.params;
   const result = await loadBook(owner, repo);
+
+  // `/username/repos` and `/username/skills` share this route's shape. The
+  // book always wins; a registered username claims those two segments only
+  // where no book resolves — which the claim rule makes the normal case, and
+  // which keeps the showcase prerender free of database reads.
+  if ((repo === "repos" || repo === "skills") && result.kind !== "ok") {
+    const user = await resolveUser(owner.toLowerCase());
+    if (user) {
+      const plural = repo === "repos" ? "Shelves" : "Boards";
+      return {
+        title: `${plural} — ${user.displayUsername}`,
+        description: `Saved ${plural.toLowerCase()} by ${user.displayUsername}.`,
+        robots: { index: false, follow: true },
+      };
+    }
+  }
   const canonical = paths.book(owner, repo);
   const markdown = paths.bookMarkdown(owner, repo);
 
@@ -103,6 +124,28 @@ async function BookBody({
 }: Pick<PageProps<"/[owner]/[repo]">, "params">) {
   const { owner, repo } = await params;
   const result = await loadBook(owner, repo);
+
+  // See generateMetadata: the book always wins; a registered username claims
+  // /u/repos and /u/skills only where no book resolves.
+  if ((repo === "repos" || repo === "skills") && result.kind !== "ok") {
+    const user = await resolveUser(owner.toLowerCase());
+    if (user) {
+      return (
+        <div className="bg-paper text-ink flex-1">
+          <div
+            data-issue="skillsdocs"
+            style={ownerAccentStyle("skillsdocs")}
+            className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-14"
+          >
+            <KindIndexBody
+              username={owner}
+              kind={repo === "repos" ? "shelf" : "board"}
+            />
+          </div>
+        </div>
+      );
+    }
+  }
 
   if (result.kind === "not-found") notFound();
   if (result.kind === "rate-limited") {

@@ -52,7 +52,10 @@ Two owners, two mechanisms — do not mix them:
 **Better Auth tables** are generated from the config in `src/lib/auth.ts`.
 Re-run the CLI after changing that config (adding a plugin, adding
 `additionalFields`) — it diffs and applies. These tables are never described
-in `db/schema.sql`.
+in `db/schema.sql`, with one deliberate exception: the `username` /
+`displayUsername` columns on `user` are declared as `additionalFields` in the
+auth config but applied by `db/schema.sql`, so a deploy needs no second
+migration tool.
 
 **App tables** live in `db/schema.sql`, applied by `pnpm db:push`
 (`scripts/db-push.mts`), which reads `POSTGRES_*` from the environment first
@@ -104,8 +107,13 @@ npx @better-auth/cli migrate    # if the auth config changed
 pnpm db:push                    # if db/schema.sql changed
 ```
 
-Deploys don't run migrations — schema changes are applied by hand, before or
-with the deploy, and idempotency makes re-running harmless.
+**Deploys apply `db/schema.sql` automatically**: the `vercel-build` script
+runs `tsx scripts/db-push.mts` before `next build`, against whatever
+`POSTGRES_*` the build environment carries — production and previews alike,
+which is safe because every statement is re-run-proof. A schema change ships
+by being committed; merging deploys it. Better Auth's own migrations (a new
+plugin's tables) remain manual: run the CLI against prod before merging code
+that needs them.
 
 **Vercel env** (production; preview/development mirror them): the six
 `POSTGRES_*` vars (`HOST`, `PORT`, `USER`, `PASSWORD`, `DATABASE`, `CA`),

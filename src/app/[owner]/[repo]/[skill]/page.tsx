@@ -16,6 +16,13 @@ import { BookContentsList, RailLeft } from "@/components/book/rail-left";
 import { ChapterAnnouncer, RunningHead } from "@/components/book/running-head";
 import { SkillApparatus } from "@/components/book/skill-meta";
 import { RateLimited, UpstreamFailure } from "@/components/book/states";
+import {
+  resolveUser,
+  resolveUserCollection,
+  SavedBoardBody,
+  SavedShelfBody,
+} from "@/components/collections/user-pages";
+import { ownerAccentStyle } from "@/components/home/issue-accent";
 import { Markdown } from "@/components/reader/markdown";
 import { chapterNav, findSkill, getBook } from "@/lib/book";
 import { showcaseParams } from "@/lib/featured";
@@ -75,6 +82,51 @@ export async function generateMetadata(
   const result = await loadBook(owner, repo);
   const skill = result.kind === "ok" ? findSkill(result.book, slug) : undefined;
 
+  // `/username/repos/<x>` and `/username/skills/<x>` share this route's
+  // shape. The chapter always wins; a saved collection claims the URL only
+  // where no chapter resolves — which keeps the showcase prerender free of
+  // database reads.
+  if (!skill && (repo === "repos" || repo === "skills")) {
+    const kind = repo === "repos" ? ("shelf" as const) : ("board" as const);
+    const collection = await resolveUserCollection(
+      owner.toLowerCase(),
+      kind,
+      slug,
+    );
+    if (collection?.username) {
+      const count = collection.items.length;
+      const unit = kind === "shelf" ? "repo" : "skill";
+      const path =
+        kind === "shelf"
+          ? paths.userShelf(collection.username, collection.slug)
+          : paths.userBoard(collection.username, collection.slug);
+      return {
+        title: collection.name,
+        description: `${count} ${count === 1 ? unit : `${unit}s`} of agent skills, saved and shared by ${collection.username}.`,
+        robots: { index: false, follow: true },
+        alternates: { canonical: path },
+        openGraph: {
+          title: `${collection.name} — ${kind === "shelf" ? "a shared shelf" : "a skill board"}`,
+          siteName: SITE_NAME,
+          ...(count > 0
+            ? {
+                images: [
+                  {
+                    url: `/api/og/${kind === "shelf" ? "share" : "board"}?id=${collection.id}`,
+                    width: 1200,
+                    height: 630,
+                  },
+                ],
+              }
+            : {}),
+        },
+        twitter: { card: count > 0 ? "summary_large_image" : "summary" },
+      };
+    }
+    const user = await resolveUser(owner.toLowerCase());
+    if (user) return { robots: { index: false } };
+  }
+
   if (!skill) {
     // See the note on the book route: a `notFound()` raised inside the
     // Suspense boundary cannot change an already-streamed 200.
@@ -126,6 +178,35 @@ async function ChapterBody({
   const { owner, repo, skill: slug } = await params;
   const result = await loadBook(owner, repo);
 
+  // See generateMetadata: the chapter always wins; a registered username's
+  // saved shelf or board claims these segments only where no chapter
+  // resolves. Checked before the failure states too, so a rate-limited
+  // GitHub never takes a saved collection down with it.
+  const userView = async () => {
+    if (repo !== "repos" && repo !== "skills") return null;
+    const user = await resolveUser(owner.toLowerCase());
+    if (!user) return null;
+    return (
+      <div className="bg-paper text-ink flex-1">
+        <div
+          data-issue="skillsdocs"
+          style={ownerAccentStyle("skillsdocs")}
+          className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-14"
+        >
+          {repo === "repos" ? (
+            <SavedShelfBody username={owner} handle={slug} />
+          ) : (
+            <SavedBoardBody username={owner} handle={slug} />
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  if (result.kind !== "ok") {
+    const view = await userView();
+    if (view) return view;
+  }
   if (result.kind === "not-found") notFound();
   if (result.kind === "rate-limited") {
     return <RateLimited owner={owner} repo={repo} resetAt={result.resetAt} />;
@@ -136,7 +217,11 @@ async function ChapterBody({
 
   const { book } = result;
   const skill = findSkill(book, slug);
-  if (!skill) notFound();
+  if (!skill) {
+    const view = await userView();
+    if (view) return view;
+    notFound();
+  }
 
   const { index, prev, next } = chapterNav(book, slug);
   const position = index + 1;

@@ -49,6 +49,8 @@ export interface SkillBoardSaved {
   id: string;
   name: string;
   slug: string;
+  /** The owner's username — the board's address lives under it. */
+  username: string;
   /** True only for the signed-in owner — their drags persist to the server. */
   canEdit: boolean;
 }
@@ -336,7 +338,7 @@ export function SkillBoard({ initialKeys, saved }: SkillBoardProps) {
     : null;
 
   const shareUrl = saved
-    ? absoluteUrl(paths.sharedBoard(saved.slug))
+    ? absoluteUrl(paths.userBoard(saved.username, saved.slug))
     : absoluteUrl(paths.board(keys));
 
   /* ------------------------------------------------------ empty states */
@@ -410,6 +412,7 @@ export function SkillBoard({ initialKeys, saved }: SkillBoardProps) {
               id={saved.id}
               name={saved.name}
               slug={saved.slug}
+              username={saved.username}
               className="border-rule text-ink hover:text-issue-accent rounded-full border"
             />
           )}

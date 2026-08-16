@@ -19,6 +19,7 @@ import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
 import { SiteFooter } from "@/components/home/site-footer";
 import { auth } from "@/lib/auth";
 import { listCollections, summarize } from "@/lib/collections";
+import { getUsername } from "@/lib/users";
 import { LibraryManager } from "./manager";
 
 export const metadata: Metadata = {
@@ -60,10 +61,14 @@ async function LibraryGate() {
   // Signed out the page still stands: the Browser Storage tab is the
   // visitor's own data, and the Cloud Storage tab makes the case to sign in.
   const collections = session ? await listCollections(session.user.id) : [];
+  // From the database, not the session: the session's cookie cache can hold
+  // a username edit stale for minutes, and this page is where it's edited.
+  const username = session ? await getUsername(session.user.id) : null;
   return (
     <LibraryManager
       initial={collections.map(summarize)}
       signedIn={session !== null}
+      username={username}
     />
   );
 }

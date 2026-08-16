@@ -25,11 +25,7 @@ import { curatedManifest } from "@/components/home/issue-accent";
 import { formatHex, mix, parseColor, type Oklch } from "@/lib/color";
 import { deriveIssueTheme } from "@/lib/design/theme";
 import { fetchImageDataUri } from "@/lib/image-data-uri";
-import {
-  getCollectionByHandle,
-  isUuidHandle,
-  isValidSlug,
-} from "@/lib/collections";
+import { getCollectionById, isUuidHandle } from "@/lib/collections";
 import { parseShareRepos } from "@/lib/share";
 import { external, SITE_NAME } from "@/lib/site";
 
@@ -146,21 +142,16 @@ async function renderCard(request: Request) {
   const [literata, geist, geistSemibold] = await FONTS;
   const url = new URL(request.url);
 
-  // `?handle=` is a saved shelf; `?repos=` is the stateless URL form. The
-  // handle is shape-validated before the database sees it — this endpoint is
+  // `?id=` is a saved shelf's uuid; `?repos=` is the stateless URL form. The
+  // id is shape-validated before the database sees it — this endpoint is
   // unauthenticated and must not turn junk params into queries.
-  const handle = url.searchParams.get("handle");
+  const id = url.searchParams.get("id");
   let rows: ReturnType<typeof parseShareRepos>;
   let title = "Favorite skills";
-  if (handle !== null) {
-    const lower = handle.toLowerCase();
-    if (!isUuidHandle(lower) && !isValidSlug(lower)) {
-      return new Response("No such shelf.", {
-        status: 404,
-        headers: { "content-type": "text/plain; charset=utf-8" },
-      });
-    }
-    const shelf = await getCollectionByHandle("shelf", lower);
+  if (id !== null) {
+    const shelf = isUuidHandle(id)
+      ? await getCollectionById("shelf", id)
+      : null;
     if (!shelf) {
       return new Response("No such shelf.", {
         status: 404,
