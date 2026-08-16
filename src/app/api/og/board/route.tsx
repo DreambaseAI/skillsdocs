@@ -48,7 +48,12 @@ const FONTS = Promise.all([
  * cards use, and deliberately not a colour string: these restate the
  * printed-object tokens from tokens.css for a renderer no stylesheet can
  * reach, not new brand decisions. */
-const stock = (l: number, c: number, h: number): Oklch => ({ l, c, h, alpha: 1 });
+const stock = (l: number, c: number, h: number): Oklch => ({
+  l,
+  c,
+  h,
+  alpha: 1,
+});
 
 /** `--board-ground` / `--sheet-ground` / `--sheet-ink`: the pin board's stock. */
 const CORK = stock(0.175, 0.014, 62);
@@ -64,7 +69,9 @@ const DOT = formatHex(mix(CORK, SHEET, 0.13));
 
 /** The house accent, for the title block. */
 const HOUSE = deriveIssueTheme("skillsdocs", curatedManifest("skillsdocs"));
-const HOUSE_ACCENT = formatHex(parseColor(HOUSE.accentDark) ?? stock(0.7, 0.12, 60));
+const HOUSE_ACCENT = formatHex(
+  parseColor(HOUSE.accentDark) ?? stock(0.7, 0.12, 60)
+);
 
 /** How many stacks fit one card with room to read their pages. */
 const CARD_STACKS = 4;
@@ -112,7 +119,7 @@ async function stackFor(
   owner: string,
   repo: string,
   slug: string,
-  count: number,
+  count: number
 ): Promise<CardStack> {
   const theme = deriveIssueTheme(owner, curatedManifest(owner));
   const accent = parseColor(theme.accentDark) ?? stock(0.7, 0.12, 60);
@@ -166,7 +173,9 @@ async function renderCard(request: Request) {
   let rows: ReturnType<typeof parseBoardSkills>;
   let title = "Skill board";
   if (id !== null) {
-    const board = isUuidHandle(id) ? await getCollectionById("board", id) : null;
+    const board = isUuidHandle(id)
+      ? await getCollectionById("board", id)
+      : null;
     if (!board) {
       return new Response("No such board.", {
         status: 404,
@@ -187,7 +196,10 @@ async function renderCard(request: Request) {
   }
 
   // Group into stacks: one per repo, first-seen order — the page's own rule.
-  const byRepo = new Map<string, { owner: string; repo: string; slugs: string[] }>();
+  const byRepo = new Map<
+    string,
+    { owner: string; repo: string; slugs: string[] }
+  >();
   for (const row of rows) {
     const key = `${row.owner}/${row.repo}`.toLowerCase();
     let stack = byRepo.get(key);
@@ -200,9 +212,8 @@ async function renderCard(request: Request) {
   const allStacks = [...byRepo.values()];
   const shown = allStacks.slice(0, CARD_STACKS);
   const stacks = await Promise.all(
-    shown.map((s) => stackFor(s.owner, s.repo, s.slugs[0], s.slugs.length)),
+    shown.map((s) => stackFor(s.owner, s.repo, s.slugs[0], s.slugs.length))
   );
-  const beyond = allStacks.length - shown.length;
 
   return new ImageResponse(
     (
@@ -263,7 +274,6 @@ async function renderCard(request: Request) {
             {rows.length} {rows.length === 1 ? "skill" : "skills"}
             {"  ·  "}
             {allStacks.length} {allStacks.length === 1 ? "repo" : "repos"}
-            {beyond > 0 ? `  ·  ${beyond} beyond the card` : ""}
             {"  ·  "}
             {SITE_NAME}
           </div>
@@ -338,7 +348,9 @@ async function renderCard(request: Request) {
                     alignItems: "center",
                     gap: 9,
                     paddingBottom: 12,
-                    borderBottom: `1px solid ${formatHex(mix(SHEET, SHEET_INK, 0.3))}`,
+                    borderBottom: `1px solid ${formatHex(
+                      mix(SHEET, SHEET_INK, 0.3)
+                    )}`,
                   }}
                 >
                   {stack.avatar ? (
@@ -418,7 +430,7 @@ async function renderCard(request: Request) {
                         ? `${stack.owner}/${stack.repo}`
                         : stack.repo
                       ).toUpperCase(),
-                      22,
+                      22
                     )}
                   </div>
                   {stack.more > 0 ? (
@@ -430,7 +442,9 @@ async function renderCard(request: Request) {
                         letterSpacing: 1.5,
                         padding: "4px 10px",
                         borderRadius: 999,
-                        background: formatHex(mix(SHEET_INK, stock(0.7, 0.12, 60), 0.1)),
+                        background: formatHex(
+                          mix(SHEET_INK, stock(0.7, 0.12, 60), 0.1)
+                        ),
                         color: formatHex(SHEET),
                       }}
                     >
@@ -467,8 +481,9 @@ async function renderCard(request: Request) {
       ],
       headers: {
         // The board is fully described by the URL, so the card can cache hard.
-        "cache-control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+        "cache-control":
+          "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
       },
-    },
+    }
   );
 }

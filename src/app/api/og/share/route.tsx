@@ -47,7 +47,12 @@ const FONTS = Promise.all([
  * uses, and deliberately not a colour string: these are the printed-object
  * stock tokens from tokens.css restated for a renderer no stylesheet can
  * reach, not new brand decisions. */
-const stock = (l: number, c: number, h: number): Oklch => ({ l, c, h, alpha: 1 });
+const stock = (l: number, c: number, h: number): Oklch => ({
+  l,
+  c,
+  h,
+  alpha: 1,
+});
 
 /** `--cover-ground` / `--cover-ink`: the printed-object stock. */
 const GROUND = stock(0.165, 0.008, 55);
@@ -62,7 +67,9 @@ const BOARD_BOTTOM = formatHex(mix(stock(0.895, 0.004, 80), GROUND, 0.85));
 
 /** The house accent, for the title block. */
 const HOUSE = deriveIssueTheme("skillsdocs", curatedManifest("skillsdocs"));
-const HOUSE_ACCENT = formatHex(parseColor(HOUSE.accentDark) ?? stock(0.7, 0.12, 60));
+const HOUSE_ACCENT = formatHex(
+  parseColor(HOUSE.accentDark) ?? stock(0.7, 0.12, 60)
+);
 
 /** How many spines fit one card shelf with room to read their titles. */
 const CARD_SPINES = 9;
@@ -121,7 +128,7 @@ function titleSize(spine: CardSpine): number {
   const glyph = spine.serif ? 0.6 : 0.85;
   return Math.max(
     13,
-    Math.min(spine.serif ? 26 : 17, room / (spine.label.length * glyph)),
+    Math.min(spine.serif ? 26 : 17, room / (spine.label.length * glyph))
   );
 }
 
@@ -173,9 +180,8 @@ async function renderCard(request: Request) {
 
   const shown = rows.slice(0, CARD_SPINES);
   const spines = await Promise.all(
-    shown.map((row) => spineFor(row.owner, row.repo)),
+    shown.map((row) => spineFor(row.owner, row.repo))
   );
-  const more = rows.length - shown.length;
 
   return new ImageResponse(
     (
@@ -234,7 +240,6 @@ async function renderCard(request: Request) {
             }}
           >
             {rows.length} {rows.length === 1 ? "repo" : "repos"}
-            {more > 0 ? `  ·  ${more} beyond the card` : ""}
             {"  ·  "}
             {SITE_NAME}
           </div>
@@ -364,8 +369,9 @@ async function renderCard(request: Request) {
       ],
       headers: {
         // The shelf is fully described by the URL, so the card can cache hard.
-        "cache-control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+        "cache-control":
+          "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
       },
-    },
+    }
   );
 }
