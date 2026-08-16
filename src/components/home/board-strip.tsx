@@ -7,11 +7,11 @@
  * a second empty state under it would be furniture.
  */
 
-import Link from "next/link";
 import { useMemo } from "react";
 import { PaperStack } from "@/components/board/paper-stack";
 import { stacksOf } from "@/components/board/stacks";
 import { useBoardBooks } from "@/components/board/use-board-books";
+import { FavoritesShare } from "@/components/home/favorites-share";
 import { useBookmarks } from "@/hooks/use-favorites";
 import { paths } from "@/lib/site";
 
@@ -27,16 +27,11 @@ export function BoardStrip() {
 
   return (
     <section aria-labelledby="board-strip-heading" className="mt-10">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <h3 id="board-strip-heading" className={`${MONO_LABEL} text-ink-muted`}>
           Bookmarked skills
         </h3>
-        <Link
-          href={paths.board()}
-          className={`${MONO_LABEL} text-issue-accent no-underline hover:underline`}
-        >
-          View your board →
-        </Link>
+        <FavoritesShare kind="board" keys={keys} />
       </div>
       <ul aria-label="Bookmarked skills, stacked by repo" className="paper-strip">
         {stacks.map((stack) => {

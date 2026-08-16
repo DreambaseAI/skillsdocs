@@ -26,7 +26,7 @@ import {
   Share08Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,11 @@ export interface ShareMenuProps {
   className?: string;
   /** Show a text label next to the icon. */
   label?: string;
+  /** The menu group's accessible name and visible heading. */
+  menuLabel?: string;
+  /** Extra menu items rendered after the destinations, behind a separator —
+   * the homepage puts its "Save to your library" action here. */
+  footer?: ReactNode;
 }
 
 interface Destination {
@@ -111,7 +116,15 @@ function destinations(url: string, title: string, summary: string): Destination[
   ];
 }
 
-export function ShareMenu({ url, title, summary = "", className, label }: ShareMenuProps) {
+export function ShareMenu({
+  url,
+  title,
+  summary = "",
+  className,
+  label,
+  menuLabel = "Share this book",
+  footer,
+}: ShareMenuProps) {
   const native = useNativeShare();
 
   const copy = useCallback(async () => {
@@ -161,7 +174,7 @@ export function ShareMenu({ url, title, summary = "", className, label }: ShareM
         {/* `Menu.GroupLabel` throws outside a `Menu.Group`; it is not decorative
             markup, it is the group's accessible name. */}
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Share this book</DropdownMenuLabel>
+          <DropdownMenuLabel>{menuLabel}</DropdownMenuLabel>
 
           {native && (
             <DropdownMenuItem onClick={share}>
@@ -188,6 +201,13 @@ export function ShareMenu({ url, title, summary = "", className, label }: ShareM
               {destination.label}
             </DropdownMenuLinkItem>
           ))}
+
+          {footer && (
+            <>
+              <DropdownMenuSeparator />
+              {footer}
+            </>
+          )}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

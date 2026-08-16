@@ -1,13 +1,15 @@
 "use client";
 
 /**
- * "Save shelf…" / "Save board…" — the door from the device library into a
- * saved, named collection.
+ * Saving the device library as a named collection, in two wrappers around one
+ * form: `SaveCollectionButton` (a popover trigger, used on the device board)
+ * and `SaveCollectionDialog` (a controlled dialog, opened from the homepage
+ * share menus — a dialog rather than a popover because its opener is a menu
+ * item, and the menu unmounts the moment it is chosen).
  *
- * Renders nothing for signed-out readers: the device library works without an
- * account and this button must not nag. Signed in, it opens a one-field
- * popover (the name), snapshots the current device keys through the create
- * action, and answers with the new link.
+ * Both snapshot the current device keys through the create action and answer
+ * with the new link; `onSaved` hands the created collection back so the
+ * caller's share URLs can switch to it immediately.
  */
 
 import { useCallback, useState } from "react";
@@ -15,6 +17,12 @@ import { toast } from "sonner";
 import { createCollectionAction } from "@/app/library/actions";
 import { announce } from "@/components/chrome/live-regions";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -23,23 +31,24 @@ import {
 } from "@/components/ui/popover";
 import { capture } from "@/lib/analytics";
 import { useSession } from "@/lib/auth-client";
-import type { CollectionKind } from "@/lib/collections";
+import type { CollectionKind, CollectionSummary } from "@/lib/collections";
 import { absoluteUrl, paths } from "@/lib/site";
 
-export interface SaveCollectionButtonProps {
+interface SaveCollectionFormProps {
   kind: CollectionKind;
-  /** The device keys the new collection snapshots. */
   keys: readonly string[];
-  className?: string;
+  /** Called with the created collection after a successful save. */
+  onSaved?: (saved: CollectionSummary) => void;
+  /** Close whatever surface hosts the form. */
+  onClose: () => void;
 }
 
-export function SaveCollectionButton({
+function SaveCollectionForm({
   kind,
   keys,
-  className,
-}: SaveCollectionButtonProps) {
-  const { data: session } = useSession();
-  const [open, setOpen] = useState(false);
+  onSaved,
+  onClose,
+}: SaveCollectionFormProps) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -64,14 +73,77 @@ export function SaveCollectionButton({
           ? paths.sharedShelf(result.slug)
           : paths.sharedBoard(result.slug)
       );
-      setOpen(false);
+      onClose();
       setName("");
       announce(`Saved as ${result.slug}`);
       toast.success("Saved to your library", { description: url });
+      onSaved?.({
+        id: result.id,
+        kind,
+        name: trimmed,
+        slug: result.slug,
+        itemCount: keys.length,
+        updatedAt: new Date().toISOString(),
+      });
     } finally {
       setBusy(false);
     }
-  }, [name, busy, kind, keys]);
+  }, [name, busy, kind, keys, onSaved, onClose]);
+
+  return (
+    <form
+      className="flex flex-col gap-2.5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void create();
+      }}
+    >
+      <label htmlFor={`save-${kind}-name`} className="text-sm font-medium">
+        Name this {kind}
+      </label>
+      <Input
+        id={`save-${kind}-name`}
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        placeholder={kind === "shelf" ? "Weekend reading" : "Deploy toolkit"}
+        maxLength={80}
+      />
+      <p className="text-muted-foreground text-xs">
+        Saves the {keys.length}{" "}
+        {kind === "shelf"
+          ? keys.length === 1
+            ? "book"
+            : "books"
+          : keys.length === 1
+            ? "skill"
+            : "skills"}{" "}
+        currently on this device, at a link you can edit later.
+      </p>
+      <Button type="submit" size="sm" disabled={busy || !name.trim()}>
+        Save
+      </Button>
+    </form>
+  );
+}
+
+/* ---------------------------------------------------------------- popover */
+
+export interface SaveCollectionButtonProps {
+  kind: CollectionKind;
+  /** The device keys the new collection snapshots. */
+  keys: readonly string[];
+  className?: string;
+  onSaved?: (saved: CollectionSummary) => void;
+}
+
+export function SaveCollectionButton({
+  kind,
+  keys,
+  className,
+  onSaved,
+}: SaveCollectionButtonProps) {
+  const { data: session } = useSession();
+  const [open, setOpen] = useState(false);
 
   if (!session || keys.length === 0) return null;
 
@@ -83,41 +155,47 @@ export function SaveCollectionButton({
         Save {kind}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72">
-        <form
-          className="flex flex-col gap-2.5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void create();
-          }}
-        >
-          <label htmlFor={`save-${kind}-name`} className="text-sm font-medium">
-            Name this {kind}
-          </label>
-          <Input
-            id={`save-${kind}-name`}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={
-              kind === "shelf" ? "Weekend reading" : "Deploy toolkit"
-            }
-            maxLength={80}
-          />
-          <p className="text-muted-foreground text-xs">
-            Saves the {keys.length}{" "}
-            {kind === "shelf"
-              ? keys.length === 1
-                ? "book"
-                : "books"
-              : keys.length === 1
-              ? "skill"
-              : "skills"}{" "}
-            currently on this device, at a link you can edit later.
-          </p>
-          <Button type="submit" size="sm" disabled={busy || !name.trim()}>
-            Save
-          </Button>
-        </form>
+        <SaveCollectionForm
+          kind={kind}
+          keys={keys}
+          onSaved={onSaved}
+          onClose={() => setOpen(false)}
+        />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/* ----------------------------------------------------------------- dialog */
+
+export interface SaveCollectionDialogProps {
+  kind: CollectionKind;
+  keys: readonly string[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved?: (saved: CollectionSummary) => void;
+}
+
+export function SaveCollectionDialog({
+  kind,
+  keys,
+  open,
+  onOpenChange,
+  onSaved,
+}: SaveCollectionDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Save to your library</DialogTitle>
+        </DialogHeader>
+        <SaveCollectionForm
+          kind={kind}
+          keys={keys}
+          onSaved={onSaved}
+          onClose={() => onOpenChange(false)}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

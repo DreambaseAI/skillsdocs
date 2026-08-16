@@ -30,14 +30,16 @@ import { BoardStrip } from "@/components/home/board-strip";
 import { announce } from "@/components/chrome/live-regions";
 import { COVER_STAR_CLASS } from "@/components/home/cover-star";
 import { FavoriteButton } from "@/components/home/favorite-button";
+import { FavoritesShare } from "@/components/home/favorites-share";
 import { ownerAccentStyle } from "@/components/home/issue-accent";
-import { SaveCollectionButton } from "@/components/home/save-collection-button";
-import { ShareMenu } from "@/components/home/share-menu";
 import { Button } from "@/components/ui/button";
 import { favoriteKey, useFavorites } from "@/hooks/use-favorites";
 import { capture } from "@/lib/analytics";
-import { absoluteUrl, external, paths, SITE_NAME } from "@/lib/site";
+import { external, paths } from "@/lib/site";
 import { cn } from "@/lib/utils";
+
+const MONO_LABEL =
+  "font-mono text-[0.62rem] font-medium tracking-[0.18em] uppercase";
 
 export interface ShelfRow {
   owner: string;
@@ -141,15 +143,13 @@ export function Spine({
 
 export interface SpineRailProps {
   rows: ShelfRow[];
-  /** Size of the whole catalogue, for the "browse all" line. */
-  total: number;
 }
 
 /** How many ghost spines rack the empty case. Fewer than the full rail: they
  * are set dressing behind the plate, not a listing. */
 const GHOST_COUNT = 8;
 
-export function SpineRail({ rows, total }: SpineRailProps) {
+export function SpineRail({ rows }: SpineRailProps) {
   const { keys, clear, ready } = useFavorites();
 
   // The filled shelf holds the starred books and nothing else — the featured
@@ -178,38 +178,35 @@ export function SpineRail({ rows, total }: SpineRailProps) {
 
   return (
     <section aria-labelledby="shelf-heading" className="flex flex-col">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <span className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-          <h2
-            id="shelf-heading"
-            className="font-display text-ink-strong text-3xl tracking-[-0.02em]"
-          >
-            {ready && keys.length > 0 ? "Your favorite skills" : "Your shelf"}
-          </h2>
-          {ready && keys.length > 0 && (
-            <div className="flex items-center gap-2">
-              <ShareMenu
-                url={absoluteUrl(paths.share(keys))}
-                title={`Favorite skills — a shared shelf on ${SITE_NAME}`}
-                summary={`${keys.length} ${
-                  keys.length === 1 ? "book" : "books"
-                } of agent skills, shared as a shelf.`}
-                label="Share"
-                className="border-rule text-ink hover:text-issue-accent rounded-full border"
-              />
-              <SaveCollectionButton
-                kind="shelf"
-                keys={keys}
-                className="border-rule text-ink hover:text-issue-accent rounded-full border"
-              />
-            </div>
-          )}
-        </span>
-        <p className="text-ink-muted font-mono text-[0.62rem] tracking-[0.18em] uppercase">
-          {ready ? `${keys.length} starred · ` : ""}on this device · tap ☆ on a
-          spine
-        </p>
-      </div>
+      <h2
+        id="shelf-heading"
+        className="font-display text-ink-strong text-3xl tracking-[-0.02em]"
+      >
+        Your favorites
+      </h2>
+
+      {ready && keys.length > 0 && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <h3 className={`${MONO_LABEL} text-ink-muted`}>Favorite repos</h3>
+          <span className="flex items-center gap-3">
+            <FavoritesShare kind="shelf" keys={keys} />
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="text-ink-muted hover:text-ink h-6 font-mono text-[0.62rem] tracking-[0.14em] uppercase"
+              onClick={() => {
+                const itemCount = keys.length;
+                clear();
+                capture("shelf_cleared", { item_count: itemCount });
+                announce("Shelf cleared");
+              }}
+            >
+              Clear
+            </Button>
+          </span>
+        </div>
+      )}
 
       {empty ? (
         /* The open case: ghost spines behind the plate. The overlay ignores
@@ -237,7 +234,7 @@ export function SpineRail({ rows, total }: SpineRailProps) {
       ) : (
         <ul
           aria-label="Books on the shelf"
-          className="mt-8 flex items-end gap-3.5 overflow-x-auto overscroll-x-contain px-1 pt-2"
+          className="mt-4 flex items-end gap-3.5 overflow-x-auto overscroll-x-contain px-1 pt-2"
         >
           {spines.map((row) => (
             <Spine key={`${row.owner}/${row.repo}`} row={row} />
@@ -246,35 +243,11 @@ export function SpineRail({ rows, total }: SpineRailProps) {
       )}
       <div className="shelf-board" aria-hidden />
 
-      <div className="text-ink-muted mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 font-mono text-[0.62rem] tracking-[0.14em] uppercase">
-        <span className="flex items-center gap-3">
-          {empty
-            ? "Star some skills to add to your shelf and share"
-            : "Starred books stay on this device — no account, no sync"}
-          {ready && keys.length > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className="text-ink-muted hover:text-ink h-6 font-mono text-[0.62rem] tracking-[0.14em] uppercase"
-              onClick={() => {
-                const itemCount = keys.length;
-                clear();
-                capture("shelf_cleared", { item_count: itemCount });
-                announce("Shelf cleared");
-              }}
-            >
-              Clear
-            </Button>
-          )}
-        </span>
-        <a
-          href="#contents"
-          className="hover:text-issue-accent transition-colors"
-        >
-          Browse all {total} <span aria-hidden>→</span>
-        </a>
-      </div>
+      {empty && (
+        <p className="text-ink-muted mt-4 font-mono text-[0.62rem] tracking-[0.14em] uppercase">
+          Star some skills — tap ☆ on a spine — to add to your favorites
+        </p>
+      )}
 
       {/* The board's preview: bookmarked skills as small paper stacks.
           Renders nothing until something is bookmarked. */}

@@ -20,21 +20,16 @@ export async function ShelfBooks() {
     accent: ownerAccentStyle(book.owner),
   }));
 
-  return <SpineRail rows={rows} total={books.length} />;
+  return <SpineRail rows={rows} />;
 }
 
 /** The shelf before the catalogue resolves: heading, empty board. */
 export function ShelfFallback() {
   return (
     <section aria-hidden className="flex flex-col">
-      <div className="flex items-baseline justify-between gap-6">
-        <h2 className="font-display text-ink-strong text-3xl tracking-[-0.02em]">
-          Your shelf
-        </h2>
-        <p className="text-ink-muted font-mono text-[0.62rem] tracking-[0.18em] uppercase">
-          on this device
-        </p>
-      </div>
+      <h2 className="font-display text-ink-strong text-3xl tracking-[-0.02em]">
+        Your favorites
+      </h2>
       <div className="mt-8 flex items-end gap-3.5 px-1 pt-2">
         {[268, 300, 244, 316, 256, 288].map((height, i) => (
           <span
