@@ -71,7 +71,7 @@ export function LibraryManager({ initial }: { initial: CollectionSummary[] }) {
       <Section
         kind="shelf"
         heading="Shelves"
-        unit="books"
+        unit="repos"
         collections={collections.filter((c) => c.kind === "shelf")}
         deviceKeys={deviceKeys.shelf}
         deviceReady={favorites.ready}
@@ -224,7 +224,7 @@ function CreateRow({
       {deviceReady && deviceKeys.length === 0 && (
         <span className="text-ink-muted text-xs">
           {kind === "shelf"
-            ? "Star some books first — the shelf saves what you starred."
+            ? "Star some repos first — the shelf saves what you starred."
             : "Bookmark some skills first — the board saves what you pinned."}
         </span>
       )}

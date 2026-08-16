@@ -28,6 +28,7 @@ import { PaperStack } from "@/components/board/paper-stack";
 import { keysOf, stacksOf, type Stack } from "@/components/board/stacks";
 import { useBoardBooks } from "@/components/board/use-board-books";
 import { announce } from "@/components/chrome/live-regions";
+import { EditCollectionButton } from "@/components/home/edit-collection-button";
 import { SaveCollectionButton } from "@/components/home/save-collection-button";
 import { ShareMenu } from "@/components/home/share-menu";
 import { useBookmarks } from "@/hooks/use-favorites";
@@ -400,8 +401,18 @@ export function SkillBoard({ initialKeys, saved }: SkillBoardProps) {
             title={`${saved ? saved.name : "Skill board"} — bookmarked skills on ${SITE_NAME}`}
             summary={`${keys.length} bookmarked ${keys.length === 1 ? "skill" : "skills"}, pinned to a board.`}
             label="Share board"
+            menuLabel="Share this board"
             className="border-rule text-ink hover:text-issue-accent rounded-full border"
           />
+          {saved?.canEdit && (
+            <EditCollectionButton
+              kind="board"
+              id={saved.id}
+              name={saved.name}
+              slug={saved.slug}
+              className="border-rule text-ink hover:text-issue-accent rounded-full border"
+            />
+          )}
         </span>
       </div>
 

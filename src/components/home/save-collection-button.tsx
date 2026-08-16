@@ -112,8 +112,8 @@ function SaveCollectionForm({
         Saves the {keys.length}{" "}
         {kind === "shelf"
           ? keys.length === 1
-            ? "book"
-            : "books"
+            ? "repo"
+            : "repos"
           : keys.length === 1
             ? "skill"
             : "skills"}{" "}

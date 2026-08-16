@@ -13,6 +13,7 @@ import { StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { EditCollectionButton } from "@/components/home/edit-collection-button";
 import { ownerAccentStyle } from "@/components/home/issue-accent";
 import { ShareMenu } from "@/components/home/share-menu";
 import { SharedOverlap } from "@/components/home/shared-overlap";
@@ -34,6 +35,9 @@ export interface ShelfViewProps {
   shareUrl: string;
   /** Body of the empty state, under the "An empty shelf" heading. */
   empty: ReactNode;
+  /** Present only for the signed-in owner of a saved shelf: the edit popover
+   * (rename, re-slug, delete). */
+  edit?: { id: string; name: string; slug: string };
 }
 
 export async function ShelfView({
@@ -42,6 +46,7 @@ export async function ShelfView({
   title,
   shareUrl,
   empty,
+  edit,
 }: ShelfViewProps) {
   if (bare.length === 0) {
     return (
@@ -102,19 +107,31 @@ export async function ShelfView({
             {/* No shelf count: the case reflows with the window, so how many
                 boards it takes is the browser's business, not a fact. */}
             <p className={`${MONO_LABEL} text-ink-muted mt-2.5`}>
-              {rows.length} {rows.length === 1 ? "book" : "books"}
+              {rows.length} {rows.length === 1 ? "repo" : "repos"}
               {chapters > 0 ? <> · {chapters.toLocaleString("en-GB")} skills</> : null}
             </p>
           </div>
         </div>
 
-        <ShareMenu
-          url={shareUrl}
-          title={`${title} — a shared shelf on ${SITE_NAME}`}
-          summary={`${rows.length} ${rows.length === 1 ? "book" : "books"} of agent skills, shared as a shelf.`}
-          label="Share"
-          className="border-rule text-ink hover:text-issue-accent rounded-full border"
-        />
+        <span className="flex items-center gap-2">
+          <ShareMenu
+            url={shareUrl}
+            title={`${title} — a shared shelf on ${SITE_NAME}`}
+            summary={`${rows.length} ${rows.length === 1 ? "repo" : "repos"} of agent skills, shared as a shelf.`}
+            label="Share"
+            menuLabel="Share this shelf"
+            className="border-rule text-ink hover:text-issue-accent rounded-full border"
+          />
+          {edit && (
+            <EditCollectionButton
+              kind="shelf"
+              id={edit.id}
+              name={edit.name}
+              slug={edit.slug}
+              className="border-rule text-ink hover:text-issue-accent rounded-full border"
+            />
+          )}
+        </span>
       </div>
 
       {/* ------------------------------------------------------- the case */}
@@ -122,7 +139,7 @@ export async function ShelfView({
           wrapped row stands on a painted board — narrower case, more shelves,
           for free. */}
       <div className="shelf-case border-rule mt-8 overflow-hidden rounded-lg border sm:mt-10">
-        <ul aria-label="Books on this shelf" className="bookcase px-4 sm:px-6">
+        <ul aria-label="Repos on this shelf" className="bookcase px-4 sm:px-6">
           {rows.map((row) => (
             <Spine key={`${row.owner}/${row.repo}`} row={row} />
           ))}

@@ -37,8 +37,8 @@ export async function generateMetadata(props: {
   const title = "A shared shelf";
   const description =
     rows.length > 0
-      ? `${rows.length} ${rows.length === 1 ? "book" : "books"} of agent skills, hand-picked and shared as a shelf.`
-      : "A hand-picked shelf of agent-skills books, shared as a single link.";
+      ? `${rows.length} ${rows.length === 1 ? "repo" : "repos"} of agent skills, hand-picked and shared as a shelf.`
+      : "A hand-picked shelf of agent-skills repos, shared as a single link.";
 
   return {
     title,
@@ -57,7 +57,7 @@ export async function generateMetadata(props: {
                   .join(",")}`,
                 width: 1200,
                 height: 630,
-                alt: `A shelf of ${rows.length} agent-skills ${rows.length === 1 ? "book" : "books"}`,
+                alt: `A shelf of ${rows.length} agent-skills ${rows.length === 1 ? "repo" : "repos"}`,
               },
             ],
           }
@@ -111,7 +111,7 @@ async function SharedShelf({
       )}
       empty={
         <>
-          This link names no books — it may have been trimmed in transit. A
+          This link names no repos — it may have been trimmed in transit. A
           shared shelf looks like{" "}
           <code className="text-ink font-mono text-[0.85em]">
             /share?repos=anthropics/skills,vercel/ai

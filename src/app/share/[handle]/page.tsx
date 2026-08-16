@@ -13,6 +13,7 @@
  */
 
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { cache } from "react";
@@ -20,6 +21,7 @@ import { IssueAccentRules } from "@/components/home/issue-accent";
 import { Masthead } from "@/components/home/masthead";
 import { PaletteFallback, PaletteSlot } from "@/components/home/palette-slot";
 import { SiteFooter } from "@/components/home/site-footer";
+import { auth } from "@/lib/auth";
 import { getCollectionByHandle } from "@/lib/collections";
 import { parseShareRepos } from "@/lib/share";
 import { absoluteUrl, paths, SITE_NAME } from "@/lib/site";
@@ -40,8 +42,8 @@ export async function generateMetadata(props: {
   const count = shelf.items.length;
   const description =
     count > 0
-      ? `${count} ${count === 1 ? "book" : "books"} of agent skills, hand-picked and shared as a shelf.`
-      : "A hand-picked shelf of agent-skills books, shared as a single link.";
+      ? `${count} ${count === 1 ? "repo" : "repos"} of agent skills, hand-picked and shared as a shelf.`
+      : "A hand-picked shelf of agent-skills repos, shared as a single link.";
 
   return {
     title: shelf.name,
@@ -61,7 +63,7 @@ export async function generateMetadata(props: {
                 url: `/api/og/share?handle=${encodeURIComponent(shelf.slug)}`,
                 width: 1200,
                 height: 630,
-                alt: `A shelf of ${count} agent-skills ${count === 1 ? "book" : "books"}`,
+                alt: `A shelf of ${count} agent-skills ${count === 1 ? "repo" : "repos"}`,
               },
             ],
           }
@@ -102,6 +104,9 @@ async function SavedShelf({
   const shelf = await loadShelf(handle);
   if (!shelf) notFound();
 
+  const session = await auth.api.getSession({ headers: await headers() });
+  const canEdit = session?.user.id === shelf.userId;
+
   // Items are already validated on write; parsing again costs nothing and
   // keeps this page honest about what it will render.
   const rows = parseShareRepos(shelf.items.join(","));
@@ -112,7 +117,12 @@ async function SavedShelf({
       label="A saved shelf"
       title={shelf.name}
       shareUrl={absoluteUrl(paths.sharedShelf(shelf.slug))}
-      empty={<>This shelf is empty — its owner has not put any books on it yet.</>}
+      empty={<>This shelf is empty — its owner has not put any repos on it yet.</>}
+      edit={
+        canEdit
+          ? { id: shelf.id, name: shelf.name, slug: shelf.slug }
+          : undefined
+      }
     />
   );
 }

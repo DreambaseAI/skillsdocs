@@ -38,7 +38,7 @@ const MONO_LABEL =
   "font-mono text-[0.62rem] font-medium tracking-[0.18em] uppercase";
 
 const NOUNS: Record<CollectionKind, { one: string; many: string }> = {
-  shelf: { one: "book", many: "books" },
+  shelf: { one: "repo", many: "repos" },
   board: { one: "skill", many: "skills" },
 };
 

@@ -174,7 +174,7 @@ async function renderCard(request: Request) {
   }
 
   if (rows.length === 0) {
-    return new Response("No books on this shelf.", {
+    return new Response("No repos on this shelf.", {
       status: 404,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
@@ -242,7 +242,7 @@ async function renderCard(request: Request) {
               paddingBottom: 10,
             }}
           >
-            {rows.length} {rows.length === 1 ? "book" : "books"}
+            {rows.length} {rows.length === 1 ? "repo" : "repos"}
             {more > 0 ? `  ·  ${more} beyond the card` : ""}
             {"  ·  "}
             {SITE_NAME}
