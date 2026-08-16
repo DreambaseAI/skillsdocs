@@ -1,39 +1,54 @@
 "use client";
 
 /**
- * The library manager: two sections (shelves, boards), one card per saved
- * collection, and a create row that snapshots the device library.
+ * The library manager: two storage tabs under the page header.
  *
- * The server page hands over the initial list; from then on this component
- * owns it — every mutation calls its server action and then re-lists, so the
- * cards always show what the database holds, not what the click hoped.
+ * - **Browser Storage** — the device library, exactly one item per kind: the
+ *   localStorage shelf and board that every visitor has, account or not.
+ *   Signed in, each carries "Save to cloud storage", which snapshots it into
+ *   a named collection.
+ * - **Cloud Storage** — the saved collections, one card each with rename,
+ *   slug editing and delete. Signed out this tab is the pitch: empty states
+ *   that ask for an account, with the sign-in buttons right there.
  *
- * Slug editing is the one field with server-side failure as a normal outcome
- * ("taken"); the error renders under the field, not as a toast, because the
- * fix is another keystroke in the same input.
+ * The server page hands over the initial cloud list; from then on this
+ * component owns it — every mutation calls its server action and re-lists,
+ * so the cards always show what the database holds, not what the click
+ * hoped. Slug editing is the one field with server-side failure as a normal
+ * outcome ("taken"); the error renders under the field, not as a toast,
+ * because the fix is another keystroke in the same input.
  */
 
+import { Github01Icon, GoogleIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { announce } from "@/components/chrome/live-regions";
+import { SaveCollectionDialog } from "@/components/home/save-collection-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBookmarks, useFavorites } from "@/hooks/use-favorites";
+import { invalidateSavedCollections } from "@/hooks/use-saved-collection";
 import { capture } from "@/lib/analytics";
+import { signIn } from "@/lib/auth-client";
 import type { CollectionKind, CollectionSummary } from "@/lib/collections";
 import { absoluteUrl, paths } from "@/lib/site";
 import {
-  createCollectionAction,
   deleteCollectionAction,
   listCollectionsAction,
   renameCollectionAction,
-  replaceItemsAction,
   updateSlugAction,
 } from "./actions";
 
 const MONO_LABEL =
   "font-mono text-[0.62rem] font-medium tracking-[0.18em] uppercase";
+
+const UNITS: Record<CollectionKind, string> = {
+  shelf: "repos",
+  board: "skills",
+};
 
 function collectionPath(kind: CollectionKind, handle: string): string {
   return kind === "shelf"
@@ -41,72 +56,187 @@ function collectionPath(kind: CollectionKind, handle: string): string {
     : paths.sharedBoard(handle);
 }
 
-export function LibraryManager({ initial }: { initial: CollectionSummary[] }) {
+export function LibraryManager({
+  initial,
+  signedIn,
+}: {
+  initial: CollectionSummary[];
+  signedIn: boolean;
+}) {
   const [collections, setCollections] = useState(initial);
   const favorites = useFavorites();
   const bookmarks = useBookmarks();
 
   const refresh = useCallback(async () => {
+    invalidateSavedCollections();
     const result = await listCollectionsAction();
     if (result.ok) setCollections(result.collections);
   }, []);
 
-  const deviceKeys: Record<CollectionKind, readonly string[]> = {
-    shelf: favorites.keys,
-    board: bookmarks.keys,
-  };
-
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-8">
       <div>
         <p className={`${MONO_LABEL} text-issue-accent`}>Saved collections</p>
         <h1 className="font-display text-ink-strong mt-1 text-[clamp(2rem,6vw,3.2rem)] leading-none tracking-[-0.02em]">
           Your library
         </h1>
         <p className={`${MONO_LABEL} text-ink-muted mt-2.5`}>
-          Your saved shelves and boards
+          Shelves hold repos · boards hold skills · each lives at its own link
         </p>
       </div>
 
-      <Section
-        kind="shelf"
-        heading="Shelves"
-        unit="repos"
-        collections={collections.filter((c) => c.kind === "shelf")}
-        deviceKeys={deviceKeys.shelf}
-        deviceReady={favorites.ready}
-        refresh={refresh}
-      />
-      <Section
-        kind="board"
-        heading="Boards"
-        unit="skills"
-        collections={collections.filter((c) => c.kind === "board")}
-        deviceKeys={deviceKeys.board}
-        deviceReady={bookmarks.ready}
-        refresh={refresh}
-      />
+      <Tabs defaultValue={signedIn ? "cloud" : "browser"}>
+        <TabsList>
+          <TabsTrigger value="browser">Browser Storage</TabsTrigger>
+          <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="browser" className="mt-6 flex flex-col gap-10">
+          <BrowserSection
+            kind="shelf"
+            heading="Shelf"
+            keys={favorites.keys}
+            ready={favorites.ready}
+            signedIn={signedIn}
+            refresh={refresh}
+          />
+          <BrowserSection
+            kind="board"
+            heading="Board"
+            keys={bookmarks.keys}
+            ready={bookmarks.ready}
+            signedIn={signedIn}
+            refresh={refresh}
+          />
+        </TabsContent>
+
+        <TabsContent value="cloud" className="mt-6 flex flex-col gap-10">
+          {signedIn ? (
+            <>
+              <CloudSection
+                kind="shelf"
+                heading="Shelves"
+                collections={collections.filter((c) => c.kind === "shelf")}
+                refresh={refresh}
+              />
+              <CloudSection
+                kind="board"
+                heading="Boards"
+                collections={collections.filter((c) => c.kind === "board")}
+                refresh={refresh}
+              />
+            </>
+          ) : (
+            <>
+              <CloudCta
+                heading="Shelves"
+                pitch="Name a set of favorite repos and it gets an address of its own — a link that survives this browser and follows your account."
+              />
+              <CloudCta
+                heading="Boards"
+                pitch="Pin your bookmarked skills to a named board with a durable, shareable link — reorder it once, share it everywhere."
+              />
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-/* ---------------------------------------------------------------- section */
+/* -------------------------------------------------------- browser storage */
 
-function Section({
+function BrowserSection({
   kind,
   heading,
-  unit,
-  collections,
-  deviceKeys,
-  deviceReady,
+  keys,
+  ready,
+  signedIn,
   refresh,
 }: {
   kind: CollectionKind;
   heading: string;
-  unit: string;
+  keys: readonly string[];
+  ready: boolean;
+  signedIn: boolean;
+  refresh: () => Promise<void>;
+}) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const unit = UNITS[kind];
+  const empty = ready && keys.length === 0;
+  const viewHref =
+    kind === "shelf" ? paths.share([...keys]) : paths.board();
+
+  return (
+    <section aria-label={heading} className="flex flex-col gap-5">
+      <div className="border-rule/70 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b pb-3">
+        <h2 className="font-display text-ink-strong text-2xl tracking-[-0.01em]">
+          {heading}
+        </h2>
+        <p className={`${MONO_LABEL} text-ink-muted`}>Stored in this browser</p>
+      </div>
+
+      <div className="border-rule/70 flex flex-col gap-3.5 rounded-lg border p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <span className="text-ink-strong font-medium">
+            This browser’s {kind}
+          </span>
+          <span className={`${MONO_LABEL} text-ink-muted shrink-0`}>
+            {ready ? `${keys.length} ${unit}` : "…"}
+          </span>
+        </div>
+
+        {empty ? (
+          <p className="text-ink-muted text-sm">
+            {kind === "shelf"
+              ? "Nothing starred yet — tap ☆ on any repo and it lands here."
+              : "Nothing bookmarked yet — the ribbon beside a skill’s title pins it here."}
+          </p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link href={viewHref} />}
+            >
+              Open
+            </Button>
+            {signedIn && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDialogOpen(true)}
+              >
+                Save to cloud storage
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <SaveCollectionDialog
+        kind={kind}
+        keys={keys}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSaved={() => void refresh()}
+      />
+    </section>
+  );
+}
+
+/* ---------------------------------------------------------- cloud storage */
+
+function CloudSection({
+  kind,
+  heading,
+  collections,
+  refresh,
+}: {
+  kind: CollectionKind;
+  heading: string;
   collections: CollectionSummary[];
-  deviceKeys: readonly string[];
-  deviceReady: boolean;
   refresh: () => Promise<void>;
 }) {
   return (
@@ -120,19 +250,11 @@ function Section({
         </p>
       </div>
 
-      <CreateRow
-        kind={kind}
-        unit={unit}
-        deviceKeys={deviceKeys}
-        deviceReady={deviceReady}
-        refresh={refresh}
-      />
-
       {collections.length === 0 ? (
         <p className="text-ink-muted max-w-prose text-sm">
-          Nothing saved yet. Name your current{" "}
-          {kind === "shelf" ? "shelf" : "board"} above and it gets an address of
-          its own.
+          Nothing saved yet. Save this browser’s{" "}
+          {kind === "shelf" ? "shelf" : "board"} from the Browser Storage tab —
+          or from the share menu on the homepage.
         </p>
       ) : (
         <ul className="flex flex-col gap-4">
@@ -142,8 +264,6 @@ function Section({
               // its draft state starts from the fresh value.
               key={`${collection.id}:${collection.slug}`}
               collection={collection}
-              unit={unit}
-              deviceKeys={deviceKeys}
               refresh={refresh}
             />
           ))}
@@ -153,82 +273,44 @@ function Section({
   );
 }
 
-/* ------------------------------------------------------------- create row */
-
-function CreateRow({
-  kind,
-  unit,
-  deviceKeys,
-  deviceReady,
-  refresh,
-}: {
-  kind: CollectionKind;
-  unit: string;
-  deviceKeys: readonly string[];
-  deviceReady: boolean;
-  refresh: () => Promise<void>;
-}) {
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const empty = !deviceReady || deviceKeys.length === 0;
-
-  const create = useCallback(async () => {
-    const trimmed = name.trim();
-    if (!trimmed || busy || empty) return;
-    setBusy(true);
-    try {
-      const result = await createCollectionAction({
-        kind,
-        name: trimmed,
-        items: deviceKeys,
-      });
-      if (!result.ok) {
-        announce(result.error, "assertive");
-        toast.error(result.error);
-        return;
-      }
-      capture("collection_created", { kind });
-      setName("");
-      await refresh();
-      const url = absoluteUrl(collectionPath(kind, result.slug));
-      announce(`Saved as ${result.slug}`);
-      toast.success(`Saved — it lives at ${url}`);
-    } finally {
-      setBusy(false);
-    }
-  }, [name, busy, empty, kind, deviceKeys, refresh]);
+function CloudCta({ heading, pitch }: { heading: string; pitch: string }) {
+  const start = useCallback(async (provider: "github" | "google") => {
+    capture("sign_in_started", { provider });
+    await signIn.social({
+      provider,
+      callbackURL: window.location.pathname,
+    });
+  }, []);
 
   return (
-    <form
-      className="flex flex-wrap items-center gap-2.5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void create();
-      }}
-    >
-      <label className="sr-only" htmlFor={`create-${kind}`}>
-        Name for a new saved {kind}
-      </label>
-      <Input
-        id={`create-${kind}`}
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        placeholder={`Name this ${kind}…`}
-        maxLength={80}
-        className="max-w-72"
-      />
-      <Button type="submit" size="sm" disabled={busy || empty || !name.trim()}>
-        Save current {kind}
-        {deviceReady ? ` (${deviceKeys.length} ${unit})` : ""}
-      </Button>
-      {deviceReady && deviceKeys.length === 0 && (
-        <span className="text-ink-muted text-xs">
-          {kind === "shelf"
-            ? "Star some repos first — the shelf saves what you starred."
-            : "Bookmark some skills first — the board saves what you pinned."}
-        </span>
-      )}
-    </form>
+    <section aria-label={heading} className="flex flex-col gap-5">
+      <div className="border-rule/70 border-b pb-3">
+        <h2 className="font-display text-ink-strong text-2xl tracking-[-0.01em]">
+          {heading}
+        </h2>
+      </div>
+      <div className="border-rule/70 flex flex-col items-start gap-4 rounded-lg border border-dashed p-5 sm:p-6">
+        <p className="text-ink-muted max-w-prose text-sm">{pitch}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => void start("github")}>
+            <HugeiconsIcon
+              icon={Github01Icon}
+              data-icon="inline-start"
+              aria-hidden
+            />
+            Continue with GitHub
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void start("google")}>
+            <HugeiconsIcon
+              icon={GoogleIcon}
+              data-icon="inline-start"
+              aria-hidden
+            />
+            Continue with Google
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -236,16 +318,13 @@ function CreateRow({
 
 function CollectionCard({
   collection,
-  unit,
-  deviceKeys,
   refresh,
 }: {
   collection: CollectionSummary;
-  unit: string;
-  deviceKeys: readonly string[];
   refresh: () => Promise<void>;
 }) {
   const { id, kind } = collection;
+  const unit = UNITS[kind];
   const [name, setName] = useState(collection.name);
   const [slug, setSlug] = useState(collection.slug);
   const [slugError, setSlugError] = useState<string | null>(null);
@@ -285,19 +364,6 @@ function CollectionCard({
     }
   }, [slug, collection.slug, id, refresh]);
 
-  const sync = useCallback(async () => {
-    const result = await replaceItemsAction({ id, items: deviceKeys });
-    if (result.ok) {
-      capture("collection_updated", { kind });
-      announce("Updated from this device");
-      toast.success(`Updated — now ${deviceKeys.length} ${unit}`);
-      await refresh();
-    } else {
-      announce(result.error, "assertive");
-      toast.error(result.error);
-    }
-  }, [id, kind, deviceKeys, unit, refresh]);
-
   const remove = useCallback(async () => {
     if (!confirming) {
       setConfirming(true);
@@ -327,7 +393,7 @@ function CollectionCard({
     } catch {
       announce(
         "Could not copy automatically. The link is shown on screen.",
-        "assertive"
+        "assertive",
       );
       toast.error("Could not copy", { description: url, duration: 20_000 });
     }
@@ -397,9 +463,6 @@ function CollectionCard({
         </Button>
         <Button variant="outline" size="sm" onClick={() => void copy()}>
           Copy link
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => void sync()}>
-          Update from this device
         </Button>
         <Button
           variant="ghost"

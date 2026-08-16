@@ -27,14 +27,11 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { BoardStrip } from "@/components/home/board-strip";
-import { announce } from "@/components/chrome/live-regions";
 import { COVER_STAR_CLASS } from "@/components/home/cover-star";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { FavoritesShare } from "@/components/home/favorites-share";
 import { ownerAccentStyle } from "@/components/home/issue-accent";
-import { Button } from "@/components/ui/button";
 import { favoriteKey, useFavorites } from "@/hooks/use-favorites";
-import { capture } from "@/lib/analytics";
 import { external, paths } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -150,7 +147,7 @@ export interface SpineRailProps {
 const GHOST_COUNT = 8;
 
 export function SpineRail({ rows }: SpineRailProps) {
-  const { keys, clear, ready } = useFavorites();
+  const { keys, ready } = useFavorites();
 
   // The filled shelf holds the starred books and nothing else — the featured
   // rows exist only to be ghosts in the empty case. A starred book that is in
@@ -188,23 +185,7 @@ export function SpineRail({ rows }: SpineRailProps) {
       {ready && keys.length > 0 && (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <h3 className={`${MONO_LABEL} text-ink-muted`}>Favorite repos</h3>
-          <span className="flex items-center gap-3">
-            <FavoritesShare kind="shelf" keys={keys} />
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className="text-ink-muted hover:text-ink h-6 font-mono text-[0.62rem] tracking-[0.14em] uppercase"
-              onClick={() => {
-                const itemCount = keys.length;
-                clear();
-                capture("shelf_cleared", { item_count: itemCount });
-                announce("Shelf cleared");
-              }}
-            >
-              Clear
-            </Button>
-          </span>
+          <FavoritesShare kind="shelf" keys={keys} />
         </div>
       )}
 

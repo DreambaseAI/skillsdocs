@@ -57,24 +57,15 @@ export default function LibraryPage() {
 
 async function LibraryGate() {
   const session = await auth.api.getSession({ headers: await headers() });
-
-  if (!session) {
-    return (
-      <div className="flex flex-col items-start gap-5">
-        <h1 className="font-display text-ink-strong text-4xl tracking-[-0.02em]">
-          Your library
-        </h1>
-        <p className="text-ink-muted max-w-prose">
-          Saved shelves and boards belong to an account. Sign in with GitHub or
-          Google — the person icon in the header — and your device library can
-          be saved, named, and shared at its own address.
-        </p>
-      </div>
-    );
-  }
-
-  const collections = await listCollections(session.user.id);
-  return <LibraryManager initial={collections.map(summarize)} />;
+  // Signed out the page still stands: the Browser Storage tab is the
+  // visitor's own data, and the Cloud Storage tab makes the case to sign in.
+  const collections = session ? await listCollections(session.user.id) : [];
+  return (
+    <LibraryManager
+      initial={collections.map(summarize)}
+      signedIn={session !== null}
+    />
+  );
 }
 
 /** The library before the session resolves: headings, no cards yet. */
