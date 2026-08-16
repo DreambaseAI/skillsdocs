@@ -122,24 +122,32 @@ export const paths = {
   home: () => "/",
   search: (q?: string) => (q ? `/search?q=${enc(q)}` : "/search"),
   /**
-   * A shared shelf: one or more `owner/repo` keys, comma-joined. Slashes and
-   * commas are legal in a query value, so the URL stays human-readable —
-   * `/share?repos=anthropics/skills,vercel/ai`.
+   * A stateless shared shelf: one or more `owner/repo` keys, comma-joined.
+   * Slashes and commas are legal in a query value, so the URL stays
+   * human-readable — `/share/repos?repos=anthropics/skills,vercel/ai`.
    */
-  share: (keys: readonly string[]) => `/share?repos=${keys.join(",")}`,
+  share: (keys: readonly string[]) => `/share/repos?repos=${keys.join(",")}`,
   /**
    * The skill board: bookmarked skills as `owner/repo/slug` keys,
-   * comma-joined and ordered. Without keys it is the visitor's own board,
-   * read from their device.
+   * comma-joined and ordered. With keys it is the stateless shared form;
+   * without, the visitor's own device board.
    */
   board: (keys?: readonly string[]) =>
-    keys && keys.length > 0 ? `/bookmarks?skills=${keys.join(",")}` : "/bookmarks",
+    keys && keys.length > 0
+      ? `/share/skills?skills=${keys.join(",")}`
+      : "/bookmarks",
   /**
-   * A saved collection's page. The handle is its slug or its uuid — the slug
-   * is the pretty, editable form; the uuid survives any rename.
+   * A reader's pages. `/username` is the profile; `/username/repos/<x>` a
+   * shelf and `/username/skills/<x>` a board, where `<x>` is the editable
+   * slug or the row's rename-proof uuid.
    */
-  sharedShelf: (handle: string) => `/share/${enc(handle)}`,
-  sharedBoard: (handle: string) => `/bookmarks/${enc(handle)}`,
+  userProfile: (username: string) => `/${enc(username)}`,
+  userShelves: (username: string) => `/${enc(username)}/repos`,
+  userBoards: (username: string) => `/${enc(username)}/skills`,
+  userShelf: (username: string, handle: string) =>
+    `/${enc(username)}/repos/${enc(handle)}`,
+  userBoard: (username: string, handle: string) =>
+    `/${enc(username)}/skills/${enc(handle)}`,
   /** The signed-in reader's saved shelves and boards. */
   library: () => "/library",
   book: (owner: string, repo: string) => `/${enc(owner)}/${enc(repo)}`,

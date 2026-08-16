@@ -68,17 +68,23 @@ function SaveCollectionForm({
         return;
       }
       capture("collection_created", { kind });
-      const url = absoluteUrl(
-        kind === "shelf"
-          ? paths.sharedShelf(result.slug)
-          : paths.sharedBoard(result.slug)
-      );
+      const url = result.username
+        ? absoluteUrl(
+            kind === "shelf"
+              ? paths.userShelf(result.username, result.slug)
+              : paths.userBoard(result.username, result.slug),
+          )
+        : null;
       onClose();
       setName("");
       announce(`Saved as ${result.slug}`);
-      toast.success("Saved to your library", { description: url });
+      toast.success("Saved to your library", {
+        description:
+          url ?? "Choose a username in your library to give it a link.",
+      });
       onSaved?.({
         id: result.id,
+        username: result.username,
         kind,
         name: trimmed,
         slug: result.slug,

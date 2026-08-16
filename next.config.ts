@@ -33,6 +33,9 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 2_592_000,
     remotePatterns: [
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
+    // Profile avatars arrive from whichever OAuth provider signed the
+    // reader in.
+    { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "github.com" },
       { protocol: "https", hostname: "raw.githubusercontent.com" },
       { protocol: "https", hostname: "user-images.githubusercontent.com" },

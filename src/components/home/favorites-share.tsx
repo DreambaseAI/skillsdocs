@@ -53,10 +53,12 @@ export function FavoritesShare({ kind, keys }: FavoritesShareProps) {
   const { saved, setSaved } = useSavedCollection(kind);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const savedPath = saved
+  // A saved collection without a username has no address yet — share the
+  // stateless form until its owner picks one in the library.
+  const savedPath = saved?.username
     ? kind === "shelf"
-      ? paths.sharedShelf(saved.slug)
-      : paths.sharedBoard(saved.slug)
+      ? paths.userShelf(saved.username, saved.slug)
+      : paths.userBoard(saved.username, saved.slug)
     : null;
 
   // The working copy: the stateless share page for repos, the device board

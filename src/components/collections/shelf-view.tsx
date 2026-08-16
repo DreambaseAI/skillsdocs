@@ -37,7 +37,7 @@ export interface ShelfViewProps {
   empty: ReactNode;
   /** Present only for the signed-in owner of a saved shelf: the edit popover
    * (rename, re-slug, delete). */
-  edit?: { id: string; name: string; slug: string };
+  edit?: { id: string; name: string; slug: string; username: string };
 }
 
 export async function ShelfView({
@@ -128,6 +128,7 @@ export async function ShelfView({
               id={edit.id}
               name={edit.name}
               slug={edit.slug}
+              username={edit.username}
               className="border-rule text-ink hover:text-issue-accent rounded-full border"
             />
           )}

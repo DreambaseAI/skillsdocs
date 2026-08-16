@@ -22,6 +22,9 @@ export type CollectionKind = "shelf" | "board";
 export interface Collection {
   id: string;
   userId: string;
+  /** The owner's username, or null while they have not chosen one — a
+   * collection with no username has no address yet. */
+  username: string | null;
   kind: CollectionKind;
   name: string;
   slug: string;
@@ -34,6 +37,7 @@ export interface Collection {
  * flattened to ISO strings so it serialises across the RSC boundary. */
 export interface CollectionSummary {
   id: string;
+  username: string | null;
   kind: CollectionKind;
   name: string;
   slug: string;
@@ -44,6 +48,7 @@ export interface CollectionSummary {
 export function summarize(collection: Collection): CollectionSummary {
   return {
     id: collection.id,
+    username: collection.username,
     kind: collection.kind,
     name: collection.name,
     slug: collection.slug,
@@ -145,6 +150,7 @@ export function cleanItems(
 interface CollectionRow {
   id: string;
   user_id: string;
+  username: string | null;
   kind: CollectionKind;
   name: string;
   slug: string;
@@ -160,6 +166,7 @@ function rowToCollection(row: CollectionRow): Collection {
   return {
     id: row.id,
     userId: row.user_id,
+    username: row.username,
     kind: row.kind,
     name: row.name,
     slug: row.slug,
@@ -169,15 +176,20 @@ function rowToCollection(row: CollectionRow): Collection {
   };
 }
 
-const COLS = "id, user_id, kind, name, slug, items, created_at, updated_at";
+/** Every read joins the owner's username — a collection's address needs it. */
+const COLS = `c.id, c.user_id, u."username" AS username, c.kind, c.name,
+              c.slug, c.items, c.created_at, c.updated_at`;
+const FROM = `FROM collection c JOIN "user" u ON u.id = c.user_id`;
 
 /**
- * Resolve a URL handle. Uuid-shaped (after lowercasing — pasted uppercase
- * uuids are still that row) looks up by id; anything else by slug. The uuid
- * shape is validated in JS first: `= $1::uuid` on arbitrary text would throw,
- * not miss.
+ * A user's collection at `/username/<kindSegment>/<handle>`. The handle is
+ * the slug or the row's uuid (uuid-shape validated in JS first — `::uuid` on
+ * arbitrary text would throw, not miss); either way the row must belong to
+ * that username, so a uuid pasted under someone else's name is a 404, not a
+ * leak.
  */
-export async function getCollectionByHandle(
+export async function getUserCollection(
+  username: string,
   kind: CollectionKind,
   handle: string,
 ): Promise<Collection | null> {
@@ -186,17 +198,32 @@ export async function getCollectionByHandle(
   if (!byId && !SLUG_RE.test(lower)) return null;
   const { rows } = await db.query<CollectionRow>(
     byId
-      ? `SELECT ${COLS} FROM collection WHERE kind = $1 AND id = $2::uuid`
-      : `SELECT ${COLS} FROM collection WHERE kind = $1 AND slug = $2`,
-    [kind, lower],
+      ? `SELECT ${COLS} ${FROM}
+         WHERE u."username" = $1 AND c.kind = $2 AND c.id = $3::uuid`
+      : `SELECT ${COLS} ${FROM}
+         WHERE u."username" = $1 AND c.kind = $2 AND c.slug = $3`,
+    [username.toLowerCase(), kind, lower],
+  );
+  return rows[0] ? rowToCollection(rows[0]) : null;
+}
+
+/** Direct id lookup — the OG image routes' path. */
+export async function getCollectionById(
+  kind: CollectionKind,
+  id: string,
+): Promise<Collection | null> {
+  if (!UUID_RE.test(id.toLowerCase())) return null;
+  const { rows } = await db.query<CollectionRow>(
+    `SELECT ${COLS} ${FROM} WHERE c.kind = $1 AND c.id = $2::uuid`,
+    [kind, id.toLowerCase()],
   );
   return rows[0] ? rowToCollection(rows[0]) : null;
 }
 
 export async function listCollections(userId: string): Promise<Collection[]> {
   const { rows } = await db.query<CollectionRow>(
-    `SELECT ${COLS} FROM collection WHERE user_id = $1
-     ORDER BY kind, updated_at DESC`,
+    `SELECT ${COLS} ${FROM} WHERE c.user_id = $1
+     ORDER BY c.kind, c.updated_at DESC`,
     [userId],
   );
   return rows.map(rowToCollection);
@@ -226,14 +253,19 @@ export async function createCollection(options: {
   );
 
   for (const slug of candidates) {
-    const { rows } = await db.query<CollectionRow>(
+    // RETURNING can't join, so the insert returns the id and a second read
+    // brings the username along.
+    const { rows } = await db.query<{ id: string }>(
       `INSERT INTO collection (user_id, kind, name, slug, items)
        VALUES ($1, $2, $3, $4, $5::jsonb)
-       ON CONFLICT (kind, slug) DO NOTHING
-       RETURNING ${COLS}`,
+       ON CONFLICT (user_id, kind, slug) DO NOTHING
+       RETURNING id`,
       [userId, kind, name, slug, JSON.stringify(items)],
     );
-    if (rows[0]) return rowToCollection(rows[0]);
+    if (rows[0]) {
+      const created = await getCollectionById(kind, rows[0].id);
+      if (created) return created;
+    }
   }
   throw new Error("could not find a free slug");
 }

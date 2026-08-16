@@ -40,6 +40,7 @@ import {
   listCollectionsAction,
   renameCollectionAction,
   updateSlugAction,
+  updateUsernameAction,
 } from "./actions";
 
 const MONO_LABEL =
@@ -50,20 +51,27 @@ const UNITS: Record<CollectionKind, string> = {
   board: "skills",
 };
 
-function collectionPath(kind: CollectionKind, handle: string): string {
+function collectionPath(
+  username: string,
+  kind: CollectionKind,
+  handle: string,
+): string {
   return kind === "shelf"
-    ? paths.sharedShelf(handle)
-    : paths.sharedBoard(handle);
+    ? paths.userShelf(username, handle)
+    : paths.userBoard(username, handle);
 }
 
 export function LibraryManager({
   initial,
   signedIn,
+  username: initialUsername,
 }: {
   initial: CollectionSummary[];
   signedIn: boolean;
+  username: string | null;
 }) {
   const [collections, setCollections] = useState(initial);
+  const [username, setUsername] = useState(initialUsername);
   const favorites = useFavorites();
   const bookmarks = useBookmarks();
 
@@ -84,6 +92,16 @@ export function LibraryManager({
           Shelves hold repos · boards hold skills · each lives at its own link
         </p>
       </div>
+
+      {signedIn && (
+        <UsernameSection
+          username={username}
+          onChanged={(next) => {
+            setUsername(next);
+            void refresh();
+          }}
+        />
+      )}
 
       <Tabs defaultValue={signedIn ? "cloud" : "browser"}>
         <TabsList>
@@ -141,6 +159,103 @@ export function LibraryManager({
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------- username */
+
+function UsernameSection({
+  username,
+  onChanged,
+}: {
+  username: string | null;
+  onChanged: (username: string) => void;
+}) {
+  const [draft, setDraft] = useState(username ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const save = useCallback(async () => {
+    const next = draft.trim().toLowerCase();
+    if (!next || next === username || busy) return;
+    setBusy(true);
+    try {
+      const result = await updateUsernameAction({ username: next });
+      if (result.ok) {
+        setError(null);
+        capture("username_set");
+        announce(`Username set to ${result.username}`);
+        toast.success(`Your pages live at /${result.username}`);
+        onChanged(result.username);
+      } else {
+        setError(result.error);
+        announce(result.error, "assertive");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [draft, username, busy, onChanged]);
+
+  return (
+    <section
+      aria-label="Username"
+      className={`border-rule/70 flex flex-col gap-2 rounded-lg border p-4 sm:p-5 ${username ? "" : "border-dashed"}`}
+    >
+      {!username && (
+        <p className="text-ink-muted max-w-prose text-sm">
+          Choose a username to give your saved shelves and boards their
+          addresses — <span className="font-mono text-xs">/username/repos/…</span>
+        </p>
+      )}
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+      >
+        <label className="flex items-center gap-1.5">
+          <span className="text-ink-muted font-mono text-sm">/</span>
+          <span className="sr-only">Username</span>
+          <Input
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setError(null);
+            }}
+            placeholder="username"
+            maxLength={30}
+            className="max-w-56 font-mono text-sm"
+          />
+        </label>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={busy || !draft.trim() || draft.trim().toLowerCase() === username}
+        >
+          {username ? "Change username" : "Claim username"}
+        </Button>
+        {username && (
+          <Link
+            href={paths.userProfile(username)}
+            className={`${MONO_LABEL} text-issue-accent no-underline hover:underline`}
+          >
+            View your page <span aria-hidden>→</span>
+          </Link>
+        )}
+      </form>
+      {error && (
+        <p className="text-destructive text-xs" role="alert">
+          {error}
+        </p>
+      )}
+      {username && (
+        <p className="text-ink-muted text-xs">
+          Changing it breaks previously shared links — the uuid form keeps
+          working.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -329,8 +444,11 @@ function CollectionCard({
   const [slug, setSlug] = useState(collection.slug);
   const [slugError, setSlugError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const href = collectionPath(kind, collection.slug);
-  const url = absoluteUrl(href);
+  // No username yet → no address yet; the card's link actions wait.
+  const href = collection.username
+    ? collectionPath(collection.username, kind, collection.slug)
+    : null;
+  const url = href ? absoluteUrl(href) : null;
 
   const rename = useCallback(async () => {
     const trimmed = name.trim();
@@ -385,6 +503,7 @@ function CollectionCard({
   }, [confirming, id, kind, collection.name, refresh]);
 
   const copy = useCallback(async () => {
+    if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
       capture("link_copied");
@@ -427,7 +546,8 @@ function CollectionCard({
       <div className="flex flex-col gap-1">
         <label className="flex flex-wrap items-center gap-2">
           <span className="text-ink-muted font-mono text-xs">
-            {kind === "shelf" ? "/share/" : "/bookmarks/"}
+            /{collection.username ?? "username"}/
+            {kind === "shelf" ? "repos" : "skills"}/
           </span>
           <Input
             value={slug}
@@ -453,17 +573,25 @@ function CollectionCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          nativeButton={false}
-          render={<Link href={href} />}
-        >
-          Open
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => void copy()}>
-          Copy link
-        </Button>
+        {href ? (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link href={href} />}
+            >
+              Open
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void copy()}>
+              Copy link
+            </Button>
+          </>
+        ) : (
+          <span className="text-ink-muted text-xs">
+            Claim a username above to give this a link.
+          </span>
+        )}
         <Button
           variant="ghost"
           size="sm"

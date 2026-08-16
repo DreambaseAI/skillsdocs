@@ -30,6 +30,11 @@ import {
   summarize,
   updateSlug,
 } from "@/lib/collections";
+import {
+  canClaimUsername,
+  normalizeUsername,
+  setUsername,
+} from "@/lib/users";
 
 export type ActionResult<T = Record<never, never>> =
   | ({ ok: true } & T)
@@ -46,7 +51,9 @@ export async function createCollectionAction(input: {
   kind: CollectionKind;
   name: string;
   items: readonly string[];
-}): Promise<ActionResult<{ id: string; slug: string }>> {
+}): Promise<
+  ActionResult<{ id: string; slug: string; username: string | null }>
+> {
   const userId = await sessionUserId();
   if (!userId) return { ok: false, error: SIGN_IN };
   if (input.kind !== "shelf" && input.kind !== "board") {
@@ -64,7 +71,43 @@ export async function createCollectionAction(input: {
     name: input.name,
     items: input.items,
   });
-  return { ok: true, id: collection.id, slug: collection.slug };
+  return {
+    ok: true,
+    id: collection.id,
+    slug: collection.slug,
+    username: collection.username,
+  };
+}
+
+export async function updateUsernameAction(input: {
+  username: string;
+}): Promise<ActionResult<{ username: string }>> {
+  const userId = await sessionUserId();
+  if (!userId) return { ok: false, error: SIGN_IN };
+  const username = normalizeUsername(input.username);
+  const claim = await canClaimUsername(userId, username);
+  if (claim === "invalid") {
+    return {
+      ok: false,
+      error:
+        "Usernames are 3–30 characters: lowercase letters, digits and hyphens.",
+    };
+  }
+  if (claim === "taken") {
+    return { ok: false, error: "That username is taken." };
+  }
+  try {
+    const updated = await setUsername(userId, username, username);
+    return updated
+      ? { ok: true, username }
+      : { ok: false, error: "Not found." };
+  } catch (error) {
+    // The unique index is the final referee under concurrency.
+    if ((error as { code?: string })?.code === "23505") {
+      return { ok: false, error: "That username is taken." };
+    }
+    throw error;
+  }
 }
 
 export async function listCollectionsAction(): Promise<
